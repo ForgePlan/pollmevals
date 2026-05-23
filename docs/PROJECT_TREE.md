@@ -1,0 +1,29 @@
+# Project tree
+
+```text
+pollmevals-project-starter/
+  README.md
+  .env.example
+  Makefile
+  docs/
+  methodology/
+  adrs/
+  apps/
+    api/
+    site/
+    eval-core-py/
+  packages/
+    contracts/
+    db/
+  evals/
+    tasks/
+    rubrics/
+    calibration/
+  stacks/
+  infra/
+    litellm/
+    sandbox/
+  scripts/
+  data/
+  source-archive/
+```

@@ -1,0 +1,48 @@
+schema_version: pollmevals.task.v1
+id: be_01
+slug: jwt-auth-middleware-with-refresh
+version: "1.0"
+category: backend
+difficulty: medium
+language: typescript
+description: |
+  Write a JWT authentication middleware for Express.js in TypeScript. It must validate access tokens from the Authorization header, support refresh token rotation, set secure HTTP-only cookies, add CSRF protection for state-changing operations, return correct HTTP status codes and log failed auth attempts without leaking secrets.
+prompt_template: |
+  Implement the middleware in a single TypeScript file. Use jsonwebtoken, express and cookie-parser. Output only the code.
+success_criteria:
+  - All tests pass.
+  - Cyclomatic complexity is at or below the task threshold.
+  - TypeScript strict mode passes.
+  - No high or critical Semgrep findings.
+  - Pattern compliance median judge score is at least 7/10.
+evaluator_commands:
+  - npm test --silent
+  - eslint --max-warnings=0 workspace/solution.ts
+  - tsc --noEmit --strict workspace/solution.ts
+expected_tokens_in: 900
+expected_tokens_out: 1400
+expected_wall_clock_seconds: 30-90
+weight_components:
+  correctness: 0.40
+  test_coverage: 0.15
+  complexity: 0.10
+  linter: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15
+calibration_set:
+  perfect_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/perfect.ts
+    expected_score: 9.5
+  good_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/good.ts
+    expected_score: 7.5
+  mediocre_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/mediocre.ts
+    expected_score: 5.0
+  poor_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/poor.ts
+    expected_score: 2.5
+  broken_example:
+    code_uri: ./gold/be_01/v1.0/calibration/broken.ts
+    expected_score: 0.5
+license: CC-BY-SA-4.0

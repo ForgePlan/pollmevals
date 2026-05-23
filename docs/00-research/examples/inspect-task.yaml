@@ -1,0 +1,129 @@
+# Пример полной спеки задачи для POLLMEVALS
+# Задача be_01: JWT auth middleware
+
+id: be_01
+slug: jwt-auth-middleware-with-refresh
+version: "1.0"
+category: backend
+difficulty: medium
+language: typescript
+
+description: |
+  Write a JWT authentication middleware for Express.js (TypeScript) that:
+  
+  1. Validates JWT access tokens from the Authorization header (Bearer scheme)
+  2. Implements refresh token rotation (when access token expires, exchange refresh for new pair)
+  3. Sets secure HTTP-only cookies for refresh tokens
+  4. Includes CSRF protection for state-changing operations
+  5. Returns 401 for invalid/missing tokens, 403 for expired refresh tokens
+  6. Logs security events (failed auth attempts) without leaking sensitive data
+  
+  The middleware should be a single function exported as default that takes
+  Express app and applies the necessary middleware. It should be testable
+  in isolation.
+
+prompt_template: |
+  {description}
+  
+  Implement the middleware in a single TypeScript file. Use these dependencies
+  (already installed):
+  - jsonwebtoken (^9.0)
+  - express (^4.18)
+  - cookie-parser (^1.4)
+  
+  Constants you can use:
+  - JWT_SECRET (from process.env)
+  - JWT_REFRESH_SECRET (from process.env)
+  - ACCESS_TOKEN_TTL = '15m'
+  - REFRESH_TOKEN_TTL = '7d'
+  
+  Output the complete implementation. Do not include explanatory prose,
+  do not introduce yourself, do not greet — output only the code.
+
+gold_solution_uri: ./gold/be_01/v1.0/solution.ts
+test_path_uri: ./gold/be_01/v1.0/tests.spec.ts
+evaluator_uri: ./gold/be_01/v1.0/evaluator.sh
+
+success_criteria:
+  - All tests in tests.spec.ts pass (binary check)
+  - Cyclomatic complexity ≤ 8 per function (radon equivalent for TS)
+  - Type-safe under tsc --strict (no errors)
+  - No high/critical findings from semgrep --config=p/typescript
+  - Pattern compliance via judge (≥ 7/10)
+
+evaluator_commands:
+  - cd workspace && npm test --silent
+  - eslint --rule 'complexity: [error, 8]' workspace/solution.ts
+  - tsc --noEmit --strict workspace/solution.ts
+  - semgrep --config=p/typescript --error-on-findings workspace/solution.ts
+
+expected_tokens_in: ~900
+expected_tokens_out: ~1400
+expected_wall_clock_seconds: 30-90
+
+weight_components:
+  correctness: 0.40        # binary — pass/fail tests
+  test_coverage: 0.15      # % of branches covered (need separate test)
+  complexity: 0.10         # CC ratio vs gold (lower = better)
+  linter: 0.10             # 1 - (errors+warnings/3)/max_acceptable
+  type_safety: 0.10        # tsc errors per LOC
+  pattern_match: 0.15      # judge score from panel
+
+scoring_formula: |
+  Normalize each metric to 0-1, then weighted sum:
+  
+  final_score_01 = 
+    0.40 * correctness +     # 1 if all tests pass else 0
+    0.15 * test_coverage +   # branches_hit / total_branches
+    0.10 * (1 - abs(cc_solution - cc_gold) / cc_gold) +
+    0.10 * max(0, 1 - (lint_errors + lint_warnings/3) / 10) +
+    0.10 * max(0, 1 - tsc_errors_per_loc * 10) +
+    0.15 * judge_panel_median / 10
+  
+  final_score_10 = final_score_01 * 10
+
+calibration_set:
+  perfect_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/perfect.ts
+    expected_score: 9.5
+  good_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/good.ts
+    expected_score: 7.5
+  mediocre_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/mediocre.ts
+    expected_score: 5.0
+  poor_score_example:
+    code_uri: ./gold/be_01/v1.0/calibration/poor.ts
+    expected_score: 2.5
+  broken_example:
+    code_uri: ./gold/be_01/v1.0/calibration/broken.ts
+    expected_score: 0.5
+
+real_world_source: |
+  Inspired by common production patterns in Node.js services. 
+  No proprietary code used. Original gold solution written for POLLMEVALS.
+
+added_at: 2026-05-21
+added_by: pollmevals-maintainers
+license: CC-BY-SA-4.0
+
+# Inspect AI task definition (auto-generated from this YAML)
+inspect_ai_task: |
+  from inspect_ai import Task, task
+  from inspect_ai.dataset import Sample
+  from inspect_ai.scorer import scorer, Score
+  from inspect_ai.solver import generate
+  
+  @task
+  def be_01_jwt_auth_middleware():
+      return Task(
+          dataset=[Sample(input=PROMPT_FROM_TEMPLATE)],
+          solver=generate(),
+          scorer=composite_scorer([
+              correctness_scorer(),
+              complexity_scorer(),
+              linter_scorer(),
+              type_safety_scorer(),
+              judge_panel_scorer(),
+          ]),
+      )

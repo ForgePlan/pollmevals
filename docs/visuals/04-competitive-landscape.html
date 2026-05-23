@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POLLMEVALS — Competitive Landscape</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #fafafa; margin: 0; padding: 40px 20px; }
+  .wrap { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .legend-box { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: #444; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  canvas { max-height: 500px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1a1a; color: #eee; }
+    .wrap { background: #252525; }
+    h1 { color: #fff; }
+    .sub, .legend-box { color: #999; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Competitive landscape — где пустая ниша</h1>
+  <p class="sub">X axis: что меряется (модели → стеки). Y axis: как агрегируется (single → panel).</p>
+  <canvas id="quad"></canvas>
+  <div class="legend-box">
+    <div class="legend-item"><span class="legend-dot" style="background:#6B7280"></span> Single-judge / single-source</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#7F77DD"></span> Multi-source / human preference</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#10B981"></span> POLLMEVALS (пустая ниша)</div>
+  </div>
+</div>
+<script>
+const ctx = document.getElementById('quad').getContext('2d');
+new Chart(ctx, {
+  type: 'scatter',
+  data: {
+    datasets: [
+      { label: 'Single-judge', backgroundColor: '#6B7280',
+        data: [
+          { x: 1, y: 1, label: 'HF Open LLM Leaderboard' },
+          { x: 1.5, y: 1.5, label: 'LiveBench' },
+          { x: 2, y: 1.5, label: 'SWE-bench' },
+          { x: 2, y: 2, label: 'BigCodeBench' },
+          { x: 1.5, y: 2.5, label: 'Aider Polyglot' },
+          { x: 3, y: 2, label: 'TokenMix' },
+        ], pointRadius: 12, pointHoverRadius: 14 },
+      { label: 'Multi-source', backgroundColor: '#7F77DD',
+        data: [
+          { x: 1.8, y: 8, label: 'LMSYS Arena' },
+          { x: 2.5, y: 7.5, label: 'Artificial Analysis' },
+          { x: 3, y: 7, label: 'BenchLM' },
+          { x: 3.5, y: 7.5, label: 'SEAL (Scale AI)' },
+          { x: 2, y: 6.5, label: 'Onyx' },
+        ], pointRadius: 12, pointHoverRadius: 14 },
+      { label: 'POLLMEVALS', backgroundColor: '#10B981',
+        data: [{ x: 7.5, y: 8.5, label: 'POLLMEVALS' }],
+        pointRadius: 18, pointHoverRadius: 20 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: {
+        min: 0, max: 10,
+        title: { display: true, text: '→ scaffolding evaluation (что меряется)' },
+        ticks: { callback: v => v < 4 ? (v === 2 ? 'модели' : '') : (v > 6 ? (v === 8 ? 'стеки' : '') : '') },
+        grid: { color: '#eee' }
+      },
+      y: {
+        min: 0, max: 10,
+        title: { display: true, text: '↑ multi-source / panel scoring' },
+        ticks: { callback: v => v < 4 ? (v === 2 ? 'single judge' : '') : (v > 6 ? (v === 8 ? 'panel' : '') : '') },
+        grid: { color: '#eee' }
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: { label: ctx => ctx.raw.label }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

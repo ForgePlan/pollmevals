@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pollmevals.local/schemas/task.schema.json",
+  "title": "POLLMEVALS Task",
+  "type": "object",
+  "required": ["schema_version", "id", "slug", "version", "category", "difficulty", "language", "description", "prompt_template", "success_criteria", "weight_components"],
+  "properties": {
+    "schema_version": { "const": "pollmevals.task.v1" },
+    "id": { "type": "string" },
+    "slug": { "type": "string" },
+    "version": { "type": "string" },
+    "category": { "type": "string" },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "language": { "type": "string" },
+    "description": { "type": "string" },
+    "prompt_template": { "type": "string" },
+    "success_criteria": { "type": "array", "items": { "type": "string" } },
+    "evaluator_commands": { "type": "array", "items": { "type": "string" } },
+    "weight_components": { "type": "object" },
+    "calibration_set": { "type": "object" }
+  }
+}

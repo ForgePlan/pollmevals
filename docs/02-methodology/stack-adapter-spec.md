@@ -1,0 +1,56 @@
+# Stack adapter spec v0.1.0
+
+A stack adapter defines how a model plus scaffolding executes a task.
+
+## YAML shape
+
+```yaml
+schema_version: pollmevals.stack.v1
+slug: claude-code-basic
+name: Claude Code Basic
+base_model_slug: claude-sonnet
+agent_cli: claude-code
+agent_cli_version: pinned
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: true
+  L2_tools: true
+  L3_skills: false
+  L4_file_memory: false
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: false
+  L8_framework: null
+execution:
+  mode: repository_patch
+  command: claude
+  args:
+    - --print
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+limits:
+  max_wall_clock_seconds: 600
+  max_tool_calls: 50
+  max_input_tokens: 50000
+  max_output_tokens: 10000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace
+```
+
+## Fairness policy
+
+- All stacks must receive the same task prompt and repository snapshot.
+- Tool access must be declared.
+- Network access is disabled unless the task explicitly requires it.
+- Retries and validator loops count toward cost and latency.
+- File mutations must be captured in trace.

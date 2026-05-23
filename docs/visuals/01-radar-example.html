@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POLLMEVALS — Model Radar Example</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #fafafa; margin: 0; padding: 40px 20px; }
+  .wrap { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .note { color: #888; font-size: 12px; margin-top: 24px; font-style: italic; }
+  canvas { max-height: 600px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1a1a; color: #eee; }
+    .wrap { background: #252525; }
+    h1 { color: #fff; }
+    .sub, .note { color: #999; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Model radar — 12 axes evaluation (example)</h1>
+  <p class="sub">Иллюстративные данные на 5 моделях. В production версии: real data из weekly run + bootstrap CI shaded zones.</p>
+  <canvas id="radar"></canvas>
+  <p class="note">Source: POLLMEVALS Phase 1 (mock). Methodology: panel of 5 judges, median scoring, 5 seeds.</p>
+</div>
+<script>
+const ctx = document.getElementById('radar').getContext('2d');
+new Chart(ctx, {
+  type: 'radar',
+  data: {
+    labels: ['Backend API', 'Frontend UI', 'Fullstack', 'Database', 'DevOps', 'Tests', 'Docs', 'Review', 'Refactor', 'Reasoning', 'Long-context', 'Tool use'],
+    datasets: [
+      { label: 'Claude Opus 4.7', data: [9.2, 8.6, 9.0, 8.4, 8.0, 9.1, 9.4, 9.0, 8.8, 9.3, 9.2, 8.9],
+        borderColor: '#7F77DD', backgroundColor: 'rgba(127,119,221,0.15)', borderWidth: 2, pointRadius: 3 },
+      { label: 'GPT-5', data: [9.0, 8.4, 8.7, 8.6, 8.4, 8.8, 8.5, 8.7, 8.5, 9.0, 8.6, 9.1],
+        borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 2, pointRadius: 3 },
+      { label: 'Gemini 2.5 Pro', data: [8.5, 8.8, 8.4, 8.0, 7.8, 8.4, 8.6, 8.2, 8.0, 8.7, 9.0, 8.4],
+        borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 2, pointRadius: 3 },
+      { label: 'Llama 3.3 70B', data: [7.8, 7.4, 7.5, 7.6, 7.2, 7.8, 7.5, 7.4, 7.3, 7.8, 7.0, 7.6],
+        borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 2, pointRadius: 3 },
+      { label: 'Qwen 2.5 14B (local)', data: [6.5, 6.0, 6.2, 6.4, 5.8, 6.6, 6.5, 6.0, 5.9, 6.4, 5.8, 6.2],
+        borderColor: '#6B7280', backgroundColor: 'rgba(107,114,128,0.15)', borderWidth: 2, pointRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: { r: { beginAtZero: true, max: 10, ticks: { stepSize: 2, color: '#999' }, grid: { color: '#ddd' }, angleLines: { color: '#ddd' } } },
+    plugins: { legend: { position: 'bottom', labels: { padding: 16 } } }
+  }
+});
+</script>
+</body>
+</html>

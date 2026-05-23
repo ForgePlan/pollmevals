@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "jwt-auth-middleware-with-refresh",
+    "version": "1.0",
+    "category": "backend",
+    "difficulty": "medium",
+    "language": "typescript"
+  },
+  {
+    "slug": "accessible-multistep-form-persisted-draft",
+    "version": "1.0",
+    "category": "frontend",
+    "difficulty": "medium",
+    "language": "typescript-react"
+  },
+  {
+    "slug": "readme-for-open-source-cli",
+    "version": "1.0",
+    "category": "docs",
+    "difficulty": "easy",
+    "language": "markdown"
+  }
+]

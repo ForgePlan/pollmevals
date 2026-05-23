@@ -1,0 +1,24 @@
+schema_version: pollmevals.stack.v1
+slug: raw-llm
+name: Raw LLM
+base_model_slug: configurable
+agent_cli: null
+layers:
+  L0_bare_llm: true
+  L1_system_prompt: false
+  L2_tools: false
+  L3_skills: false
+  L4_file_memory: false
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: false
+  L8_framework: null
+execution:
+  mode: direct_completion
+  command: litellm
+  args: []
+limits:
+  max_wall_clock_seconds: 300
+  max_tool_calls: 0
+  max_input_tokens: 50000
+  max_output_tokens: 10000

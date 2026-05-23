@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pollmevals.local/schemas/run-manifest.schema.json",
+  "title": "POLLMEVALS Run Manifest",
+  "type": "object",
+  "required": ["schema_version", "run_hash", "run_type", "created_at", "methodology_version", "models", "tasks", "stacks", "evals"],
+  "properties": {
+    "schema_version": { "const": "pollmevals.run_manifest.v1" },
+    "run_hash": { "type": "string", "minLength": 12 },
+    "run_type": { "enum": ["smoke", "weekly", "flagship_triggered", "calibration", "ablation"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "methodology_version": { "type": "string" },
+    "models": { "type": "array", "items": { "type": "object" } },
+    "tasks": { "type": "array", "items": { "type": "object" } },
+    "stacks": { "type": "array", "items": { "type": "object" } },
+    "evals": { "type": "array", "items": { "type": "object" } },
+    "artifacts": { "type": "array", "items": { "type": "object" } }
+  }
+}

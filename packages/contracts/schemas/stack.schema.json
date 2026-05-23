@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pollmevals.local/schemas/stack.schema.json",
+  "title": "POLLMEVALS Stack Adapter",
+  "type": "object",
+  "required": ["schema_version", "slug", "name", "base_model_slug", "layers", "execution", "limits"],
+  "properties": {
+    "schema_version": { "const": "pollmevals.stack.v1" },
+    "slug": { "type": "string" },
+    "name": { "type": "string" },
+    "base_model_slug": { "type": "string" },
+    "agent_cli": { "type": ["string", "null"] },
+    "layers": { "type": "object" },
+    "execution": { "type": "object" },
+    "limits": { "type": "object" }
+  }
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "slug": "raw-llm",
+    "name": "Raw LLM",
+    "layers": {
+      "L0_bare_llm": true
+    }
+  },
+  {
+    "slug": "claude-code-basic",
+    "name": "Claude Code Basic",
+    "layers": {
+      "L1_system_prompt": true,
+      "L2_tools": true
+    }
+  },
+  {
+    "slug": "forgeplan-framework",
+    "name": "ForgePlan Framework",
+    "layers": {
+      "L3_skills": true,
+      "L4_file_memory": true,
+      "L6_subagents": true,
+      "L7_validator": true,
+      "L8_framework": "forgeplan"
+    }
+  }
+]

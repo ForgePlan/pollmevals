@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" width="720" height="600">
+  <defs>
+    <style>
+      .h-top { fill: #7F77DD; }
+      .h-section { fill: #5EEAD4; }
+      .h-page { fill: #E5E7EB; }
+      .h-infra { fill: #FCA5A5; }
+      .t-title { font: bold 16px -apple-system, system-ui, sans-serif; fill: #1F2937; }
+      .t-section { font: bold 14px -apple-system, system-ui, sans-serif; fill: #1F2937; }
+      .t-page { font: 12px -apple-system, system-ui, sans-serif; fill: #4B5563; }
+      .t-sub { font: 11px -apple-system, system-ui, sans-serif; fill: #fff; }
+      .t-infra-h { font: bold 13px -apple-system, system-ui, sans-serif; fill: #7F1D1D; }
+      .t-infra { font: 11px -apple-system, system-ui, sans-serif; fill: #991B1B; }
+    </style>
+  </defs>
+
+  <!-- Top -->
+  <rect x="270" y="20" width="180" height="48" rx="8" class="h-top"/>
+  <text x="360" y="42" text-anchor="middle" font-weight="bold" fill="#fff" font-size="16">POLLMEVALS</text>
+  <text x="360" y="60" text-anchor="middle" class="t-sub">pollmevals.com</text>
+
+  <!-- Section: Data -->
+  <rect x="20" y="100" width="160" height="40" rx="8" class="h-section"/>
+  <text x="100" y="124" text-anchor="middle" class="t-section">Data</text>
+
+  <rect x="20" y="148" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="168" text-anchor="middle" class="t-page">/leaderboards</text>
+  <rect x="20" y="184" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="204" text-anchor="middle" class="t-page">/models/[slug]</text>
+  <rect x="20" y="220" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="240" text-anchor="middle" class="t-page">/stacks/[slug]</text>
+  <rect x="20" y="256" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="276" text-anchor="middle" class="t-page">/tasks/[slug]</text>
+  <rect x="20" y="292" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="312" text-anchor="middle" class="t-page">/compare</text>
+  <rect x="20" y="328" width="160" height="32" rx="6" class="h-page"/>
+  <text x="100" y="348" text-anchor="middle" class="t-page">/runs/[hash]</text>
+
+  <!-- Section: Methodology -->
+  <rect x="200" y="100" width="160" height="40" rx="8" class="h-section"/>
+  <text x="280" y="124" text-anchor="middle" class="t-section">Methodology</text>
+
+  <rect x="200" y="148" width="160" height="32" rx="6" class="h-page"/>
+  <text x="280" y="168" text-anchor="middle" class="t-page">/methodology</text>
+  <rect x="200" y="184" width="160" height="32" rx="6" class="h-page"/>
+  <text x="280" y="204" text-anchor="middle" class="t-page">/judges</text>
+  <rect x="200" y="220" width="160" height="32" rx="6" class="h-page"/>
+  <text x="280" y="240" text-anchor="middle" class="t-page">/calibration</text>
+  <rect x="200" y="256" width="160" height="32" rx="6" class="h-page"/>
+  <text x="280" y="276" text-anchor="middle" class="t-page">/scoring</text>
+  <rect x="200" y="292" width="160" height="32" rx="6" class="h-page"/>
+  <text x="280" y="312" text-anchor="middle" class="t-page">/blog</text>
+
+  <!-- Section: Community -->
+  <rect x="380" y="100" width="160" height="40" rx="8" class="h-section"/>
+  <text x="460" y="124" text-anchor="middle" class="t-section">Community</text>
+
+  <rect x="380" y="148" width="160" height="32" rx="6" class="h-page"/>
+  <text x="460" y="168" text-anchor="middle" class="t-page">/vote</text>
+  <rect x="380" y="184" width="160" height="32" rx="6" class="h-page"/>
+  <text x="460" y="204" text-anchor="middle" class="t-page">/propose-model</text>
+  <rect x="380" y="220" width="160" height="32" rx="6" class="h-page"/>
+  <text x="460" y="240" text-anchor="middle" class="t-page">/propose-task</text>
+  <rect x="380" y="256" width="160" height="32" rx="6" class="h-page"/>
+  <text x="460" y="276" text-anchor="middle" class="t-page">/propose-stack</text>
+  <rect x="380" y="292" width="160" height="32" rx="6" class="h-page"/>
+  <text x="460" y="312" text-anchor="middle" class="t-page">/discuss</text>
+
+  <!-- Section: Pro / API -->
+  <rect x="560" y="100" width="140" height="40" rx="8" class="h-section"/>
+  <text x="630" y="124" text-anchor="middle" class="t-section">Pro / API</text>
+
+  <rect x="560" y="148" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="168" text-anchor="middle" class="t-page">/api</text>
+  <rect x="560" y="184" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="204" text-anchor="middle" class="t-page">/datasets</text>
+  <rect x="560" y="220" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="240" text-anchor="middle" class="t-page">/status</text>
+  <rect x="560" y="256" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="276" text-anchor="middle" class="t-page">/pricing</text>
+  <rect x="560" y="292" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="312" text-anchor="middle" class="t-page">/changelog</text>
+  <rect x="560" y="328" width="140" height="32" rx="6" class="h-page"/>
+  <text x="630" y="348" text-anchor="middle" class="t-page">/disclosures</text>
+
+  <!-- Lines from top to sections -->
+  <line x1="360" y1="68" x2="100" y2="100" stroke="#7F77DD" stroke-width="1.5" opacity="0.4"/>
+  <line x1="360" y1="68" x2="280" y2="100" stroke="#7F77DD" stroke-width="1.5" opacity="0.4"/>
+  <line x1="360" y1="68" x2="460" y2="100" stroke="#7F77DD" stroke-width="1.5" opacity="0.4"/>
+  <line x1="360" y1="68" x2="630" y2="100" stroke="#7F77DD" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Infra block -->
+  <rect x="40" y="430" width="640" height="140" rx="12" class="h-infra" opacity="0.25"/>
+  <rect x="40" y="430" width="640" height="32" rx="12" class="h-infra"/>
+  <text x="360" y="450" text-anchor="middle" class="t-infra-h">Бэкенд платформы (не публичный)</text>
+
+  <text x="60" y="486" class="t-infra"><tspan font-weight="bold">Eval orchestrator:</tspan> Inspect AI + кастомный Python сервис</text>
+  <text x="60" y="506" class="t-infra"><tspan font-weight="bold">Inference gateway:</tspan> LiteLLM proxy с cost tracking → Postgres</text>
+  <text x="60" y="526" class="t-infra"><tspan font-weight="bold">Inference backends:</tspan> Runpod (vLLM) · Cerebras · OpenRouter · own EU/US/APAC workers</text>
+  <text x="60" y="546" class="t-infra"><tspan font-weight="bold">Storage:</tspan> Postgres (results) · Cloudflare R2 (raw outputs) · Upstash Redis (cache, queue)</text>
+  <text x="60" y="566" class="t-infra"><tspan font-weight="bold">Frontend:</tspan> Next.js 15 + Tailwind + shadcn/ui · Vercel hosting</text>
+</svg>

@@ -1,0 +1,29 @@
+[
+  {
+    "slug": "qwen-2.5-14b-local",
+    "name": "Qwen 2.5 14B Local",
+    "vendor": "ollama",
+    "versionTag": "qwen2.5:14b",
+    "isOpenWeight": true,
+    "contextWindow": 32768,
+    "maxOutputTokens": 4096
+  },
+  {
+    "slug": "claude-sonnet",
+    "name": "Claude Sonnet",
+    "vendor": "anthropic",
+    "versionTag": "pinned-by-provider-snapshot",
+    "isOpenWeight": false,
+    "contextWindow": 200000,
+    "maxOutputTokens": 8192
+  },
+  {
+    "slug": "gpt-5",
+    "name": "GPT-5",
+    "vendor": "openai",
+    "versionTag": "pinned-by-provider-snapshot",
+    "isOpenWeight": false,
+    "contextWindow": 200000,
+    "maxOutputTokens": 8192
+  }
+]

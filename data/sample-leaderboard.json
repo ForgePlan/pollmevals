@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-05-23T00:00:00Z",
+  "methodology_version": "v0.1.0",
+  "models": [
+    {
+      "model_slug": "claude-sonnet",
+      "mean_score": 8.2,
+      "cost_per_correct": 0.044,
+      "n_evals": 9
+    },
+    {
+      "model_slug": "gpt-5",
+      "mean_score": 8.0,
+      "cost_per_correct": 0.052,
+      "n_evals": 9
+    },
+    {
+      "model_slug": "qwen-2.5-14b-local",
+      "mean_score": 7.1,
+      "cost_per_correct": 0.0,
+      "n_evals": 9
+    }
+  ]
+}

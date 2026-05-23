@@ -1,0 +1,42 @@
+schema_version: pollmevals.task.v1
+id: fe_01
+slug: accessible-multistep-form-persisted-draft
+version: "1.0"
+category: frontend
+difficulty: medium
+language: typescript-react
+description: |
+  Build a React multi-step form with validation, persisted draft state, accessible keyboard navigation and clear loading/error/empty states.
+prompt_template: |
+  Implement the component and tests. Use React, TypeScript and Testing Library. Output only the code files separated by filename comments.
+success_criteria:
+  - Component tests pass.
+  - Keyboard navigation works.
+  - Draft state persists.
+  - axe-core accessibility check has no serious violations.
+  - No race conditions in async validation.
+evaluator_commands:
+  - npm test --silent
+  - npm run test:a11y
+  - tsc --noEmit --strict
+expected_tokens_in: 1000
+expected_tokens_out: 2200
+expected_wall_clock_seconds: 60-180
+weight_components:
+  correctness: 0.35
+  accessibility: 0.20
+  test_coverage: 0.15
+  type_safety: 0.10
+  ux_states: 0.10
+  pattern_match: 0.10
+calibration_set:
+  perfect_score_example:
+    code_uri: ./gold/fe_01/v1.0/calibration/perfect.tsx
+    expected_score: 9.5
+  mediocre_score_example:
+    code_uri: ./gold/fe_01/v1.0/calibration/mediocre.tsx
+    expected_score: 5.0
+  broken_example:
+    code_uri: ./gold/fe_01/v1.0/calibration/broken.tsx
+    expected_score: 0.5
+license: CC-BY-SA-4.0

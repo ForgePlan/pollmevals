@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POLLMEVALS — Scaffolding Ablation</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #fafafa; margin: 0; padding: 40px 20px; }
+  .wrap { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .insight { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 4px; margin-top: 24px; font-size: 14px; }
+  .note { color: #888; font-size: 12px; margin-top: 16px; font-style: italic; }
+  canvas { max-height: 500px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1a1a; color: #eee; }
+    .wrap { background: #252525; }
+    h1 { color: #fff; }
+    .sub, .note { color: #999; }
+    .insight { background: #3F2E0F; color: #FBBF24; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Лесенка обвязки L0 → L6 — что даёт каждый слой</h1>
+  <p class="sub">Финальный балл на одной фиксированной refactor-задаче. Иллюстративные данные.</p>
+  <canvas id="ablation"></canvas>
+  <div class="insight">
+    <strong>Key insight:</strong> Qwen 2.5 14B локально + skills + memory + validator (L0-L7) даёт качество близкое к Claude Opus без обвязки на 1/20 стоимости.
+  </div>
+  <p class="note">Source: POLLMEVALS Phase 2 (mock). Stack ablation на refactor-задаче на 500-line module.</p>
+</div>
+<script>
+const ctx = document.getElementById('ablation').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['L0: bare LLM', 'L1: +system prompt', 'L2: +tools', 'L3: +skills', 'L4: +file memory', 'L5: +vector memory', 'L6: +validator'],
+    datasets: [
+      { label: 'Claude Sonnet 4.6', data: [5.2, 5.8, 6.4, 7.2, 7.8, 8.2, 8.7],
+        backgroundColor: '#7F77DD', borderRadius: 4 },
+      { label: 'Qwen 2.5 14B (local)', data: [3.4, 4.1, 4.8, 6.2, 6.8, 7.3, 8.0],
+        backgroundColor: '#10B981', borderRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true,
+    indexAxis: 'y',
+    scales: {
+      x: { beginAtZero: true, max: 10, title: { display: true, text: 'Final score (0-10)' }, grid: { color: '#eee' } },
+      y: { grid: { display: false } }
+    },
+    plugins: { legend: { position: 'bottom', labels: { padding: 16 } } }
+  }
+});
+</script>
+</body>
+</html>

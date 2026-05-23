@@ -1,0 +1,45 @@
+# === forgeplan workspace runtime state (managed by `forgeplan init`) ===
+.forgeplan/lance/
+.forgeplan/.fastembed_cache/
+.forgeplan/session.yaml
+.forgeplan/state/
+.forgeplan/trash/
+.forgeplan/logs/
+.forgeplan/locks/
+.forgeplan/secrets.env
+.forgeplan/secrets.env.bak-*
+.forgeplan/.secrets.env.tmp-*
+.forgeplan/anomalies-journal.jsonl
+.forgeplan/.anomalies-journal.jsonl.tmp
+# === end forgeplan section ===
+
+# === macOS ===
+.DS_Store
+
+# === Migration leftovers (delete after verification) ===
+_draft/
+
+# === Build outputs ===
+node_modules/
+.venv/
+dist/
+build/
+.next/
+out/
+target/
+.moon/cache/
+artifacts/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# === Secrets ===
+.env
+.env.local
+.env.*.local

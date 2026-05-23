@@ -1,0 +1,38 @@
+schema_version: pollmevals.task.v1
+id: doc_01
+slug: readme-for-open-source-cli
+version: "1.0"
+category: docs
+difficulty: easy
+language: markdown
+description: |
+  Write a README for an open-source CLI tool. The README must explain what the CLI does, installation, quick start, configuration, commands, examples, troubleshooting and contribution rules.
+prompt_template: |
+  Write a complete README.md for the described CLI. Use concise technical writing. Output only Markdown.
+success_criteria:
+  - Required sections are present.
+  - Instructions are actionable.
+  - No contradictions.
+  - Commands and examples are clear.
+  - Judge panel median score is at least 7/10.
+evaluator_commands: []
+expected_tokens_in: 800
+expected_tokens_out: 1800
+expected_wall_clock_seconds: 30-120
+weight_components:
+  structural_completeness: 0.20
+  factual_accuracy: 0.20
+  clarity: 0.20
+  actionability: 0.20
+  consistency: 0.20
+calibration_set:
+  perfect_score_example:
+    doc_uri: ./gold/doc_01/v1.0/calibration/perfect.md
+    expected_score: 9.5
+  mediocre_score_example:
+    doc_uri: ./gold/doc_01/v1.0/calibration/mediocre.md
+    expected_score: 5.0
+  broken_example:
+    doc_uri: ./gold/doc_01/v1.0/calibration/broken.md
+    expected_score: 1.0
+license: CC-BY-SA-4.0
