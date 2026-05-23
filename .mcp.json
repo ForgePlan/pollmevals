@@ -2,9 +2,17 @@
   "mcpServers": {
     "forgeplan": {
       "command": "forgeplan",
+      "args": ["serve"],
+      "transport": "stdio"
+    },
+    "hindsight": {
+      "command": "node",
       "args": [
-        "serve"
+        "/Users/explosovebit/.claude/plugins/cache/ForgePlan-marketplace/fpl-hsmem/2.1.0/dist/index.mjs"
       ],
+      "env": {
+        "HINDSIGHT_BANK_ID": "pollmevals"
+      },
       "transport": "stdio"
     }
   }
