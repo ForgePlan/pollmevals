@@ -6,6 +6,7 @@
 .forgeplan/trash/
 .forgeplan/logs/
 .forgeplan/locks/
+.forgeplan/.lock
 .forgeplan/secrets.env
 .forgeplan/secrets.env.bak-*
 .forgeplan/.secrets.env.tmp-*

@@ -18,6 +18,7 @@
     "ci": "moon ci"
   },
   "devDependencies": {
+    "lefthook": "^1.7.0",
     "typescript": "^5.7.2"
   }
 }

@@ -10,6 +10,39 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/explosovebit/.claude/plugins/cache/ForgePlan-marketplace/fpl-hsmem/2.1.0/dist/hooks/recall.mjs",
+            "timeout": 12
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/explosovebit/.claude/plugins/cache/ForgePlan-marketplace/fpl-hsmem/2.1.0/dist/hooks/retain.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/explosovebit/.claude/plugins/cache/ForgePlan-marketplace/fpl-hsmem/2.1.0/dist/hooks/session-end.mjs",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

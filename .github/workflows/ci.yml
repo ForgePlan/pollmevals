@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  moon-ci:
+    name: moon ci (affected projects)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: pnpm
+
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: 0.10.2
+          enable-cache: true
+
+      - name: Setup Python (via uv)
+        run: uv python install 3.12.0
+
+      - name: Install Python deps
+        if: ${{ hashFiles('uv.lock') != '' }}
+        run: uv sync --frozen
+
+      # moon ci auto-detects affected projects from git history.
+      # On pull_request it diffs against the base ref; on push to main it runs all.
+      - name: Run moon ci
+        run: pnpm exec moon ci --color

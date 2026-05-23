@@ -1,0 +1,80 @@
+# Lefthook — fast local git hooks (Go binary, no Node runtime in hot path).
+# https://lefthook.dev/configuration/
+#
+# Install once after `pnpm install`:
+#   pnpm exec lefthook install
+#
+# Skip in emergencies (NOT recommended; CLAUDE.md red-line — fix root cause):
+#   LEFTHOOK=0 git commit ...
+
+pre-commit:
+  parallel: true
+  commands:
+
+    # 1. Format + lint staged TypeScript/JavaScript (auto-fix in place).
+    format-ts:
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs}"
+      run: pnpm exec prettier --write {staged_files} && pnpm exec eslint --fix --no-warn-ignored {staged_files}
+      stage_fixed: true
+      fail_text: "TS/JS format or lint failed — review changes above and re-commit."
+
+    # 2. Format + lint staged Python (auto-fix in place).
+    format-py:
+      glob: "*.py"
+      run: uv run ruff format {staged_files} && uv run ruff check --fix {staged_files}
+      stage_fixed: true
+      fail_text: "Python format or lint failed — review changes above and re-commit."
+
+    # 3. Block literal API keys and obvious secrets in staged files.
+    #    Red-line per CLAUDE.md: never commit literal sk-/AIza/ant- prefixed keys,
+    #    and config.yaml must use api_key_env (env var NAME), not api_key (literal).
+    secret-scan:
+      glob: "*"
+      exclude:
+        - "pnpm-lock.yaml"
+        - "uv.lock"
+        - "package-lock.json"
+        - ".github/workflows/*"  # legitimate `${{ secrets.X }}` refs
+      run: |
+        bad=0
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          if grep -nE '(sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,}|ant-[A-Za-z0-9_-]{20,}|xoxb-[0-9]+-[0-9]+-[A-Za-z0-9]+)' "$f" 2>/dev/null; then
+            echo "  ↑ literal-looking API key in $f"
+            bad=1
+          fi
+        done
+        # Forgeplan config specifically — must use api_key_env, not api_key:
+        if echo "{staged_files}" | tr ' ' '\n' | grep -q '^\.forgeplan/config\.yaml$'; then
+          if grep -nE '^[[:space:]]*api_key:[[:space:]]*["'\'']?(sk-|AIza|ant-)' .forgeplan/config.yaml 2>/dev/null; then
+            echo "  ↑ literal api_key in .forgeplan/config.yaml — use api_key_env instead"
+            bad=1
+          fi
+        fi
+        if [ "$bad" -ne 0 ]; then
+          echo ""
+          echo "Secret-scan blocked the commit. If this is a false positive, narrow the regex above."
+          echo "If a key has already been committed in a previous commit: REVOKE the key, then rewrite history."
+          exit 1
+        fi
+      fail_text: "Possible secret leak — see lines above."
+
+    # 4. Validate staged forgeplan artifacts against schema.
+    forgeplan-validate:
+      glob: ".forgeplan/{prds,rfcs,adrs,specs,evidence,epics,problems,solutions,refresh,notes}/*.md"
+      run: |
+        for f in {staged_files}; do
+          # Extract artifact ID from filename: .forgeplan/prds/PRD-001-foo.md → PRD-001
+          id=$(basename "$f" .md | grep -oE '^[A-Z]+-[0-9]+' || true)
+          [ -n "$id" ] || continue
+          forgeplan validate "$id" || exit 1
+        done
+      fail_text: "Forgeplan validate failed — fix MUST errors before commit."
+
+    # 5. Full TypeScript typecheck (no auto-fix, just gate).
+    #    NOTE: slower than the rest (~10-30s on a populated monorepo).
+    #    Move to pre-push if it starts blocking flow.
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec moon run :typecheck
+      fail_text: "TypeScript typecheck failed — see errors above."
