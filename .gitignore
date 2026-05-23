@@ -43,3 +43,7 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+
+# Claude Code per-host settings (may contain API keys, host-personal hooks)
+.claude/settings.local.json
+.claude/settings.*.local.json
