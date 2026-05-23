@@ -1,0 +1,13 @@
+# Workspace configuration for moon.
+# https://moonrepo.dev/docs/config/workspace
+#
+# Projects discovered from glob patterns. apps/* are runnable services;
+# packages/* are shared libraries.
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+projects:
+  - 'apps/*'
+  - 'packages/*'
+
+vcs:
+  defaultBranch: 'main'

@@ -1,0 +1,56 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+# Python eval orchestrator — Inspect AI-compatible task model, LiteLLM
+# wrapper, evaluator sandbox, run manifest generator. Skeleton only;
+# package code lives in `src/pollmevals_eval_core/`.
+layer: 'application'
+language: 'python'
+
+project:
+  name: 'eval-core-py'
+  description: 'Python eval orchestrator (skeleton).'
+
+tasks:
+  install:
+    command: 'uv sync --package pollmevals-eval-core'
+    inputs:
+      - 'pyproject.toml'
+      - '/pyproject.toml'
+
+  test:
+    command: 'uv run pytest tests/'
+    inputs:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+      - 'pyproject.toml'
+    deps:
+      - '~:install'
+
+  lint:
+    command: 'uv run ruff check src/ tests/'
+    inputs:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+      - '/pyproject.toml'
+    deps:
+      - '~:install'
+
+  format:
+    command: 'uv run ruff format src/ tests/'
+    inputs:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+
+  typecheck:
+    command: 'uv run mypy src/'
+    inputs:
+      - 'src/**/*.py'
+      - 'pyproject.toml'
+      - '/pyproject.toml'
+    deps:
+      - '~:install'
+
+  demo-run:
+    command: 'uv run python -m pollmevals_eval_core.demo_run --tasks /evals/tasks --output /artifacts'
+    deps:
+      - '~:install'

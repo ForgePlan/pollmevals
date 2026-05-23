@@ -1,0 +1,47 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+# Next.js 15 public site — leaderboards, methodology blog, run pages,
+# /compare. App Router. Skeleton; source lives in `src/app/`.
+layer: 'application'
+language: 'typescript'
+
+project:
+  name: 'site'
+  description: 'Next.js 15 public site (skeleton).'
+
+dependsOn:
+  - 'contracts'
+
+tasks:
+  dev:
+    command: 'pnpm dev'
+    preset: 'server'
+
+  build:
+    command: 'pnpm build'
+    inputs:
+      - 'src/**/*'
+      - 'public/**/*'
+      - 'package.json'
+      - 'next.config.*'
+      - 'tsconfig.json'
+    outputs:
+      - '.next'
+      - 'out'
+
+  test:
+    command: 'pnpm test'
+    inputs:
+      - 'src/**/*'
+      - 'tests/**/*'
+
+  lint:
+    command: 'pnpm lint'
+    inputs:
+      - 'src/**/*'
+
+  typecheck:
+    command: 'pnpm typecheck'
+    inputs:
+      - 'src/**/*'
+      - 'tsconfig.json'

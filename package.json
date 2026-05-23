@@ -1,0 +1,23 @@
+{
+  "name": "pollmevals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Open evaluation platform for full LLM stacks (model + agent CLI + skills + memory + validator).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "moon run :build",
+    "test": "moon run :test",
+    "lint": "moon run :lint",
+    "format": "moon run :format",
+    "typecheck": "moon run :typecheck",
+    "ci": "moon ci"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

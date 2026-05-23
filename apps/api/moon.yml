@@ -1,0 +1,45 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+# Hono TypeScript API — read endpoints for leaderboards, runs, models,
+# stacks. Reads from Postgres via Drizzle. Auth + rate limiting later.
+# Skeleton; source lives in `src/`.
+layer: 'application'
+language: 'typescript'
+
+project:
+  name: 'api'
+  description: 'Hono TypeScript API (skeleton).'
+
+dependsOn:
+  - 'contracts'
+
+tasks:
+  dev:
+    command: 'pnpm dev'
+    preset: 'server'
+
+  build:
+    command: 'pnpm build'
+    inputs:
+      - 'src/**/*'
+      - 'package.json'
+      - 'tsconfig.json'
+    outputs:
+      - 'dist'
+
+  test:
+    command: 'pnpm test'
+    inputs:
+      - 'src/**/*'
+      - 'tests/**/*'
+
+  lint:
+    command: 'pnpm lint'
+    inputs:
+      - 'src/**/*'
+
+  typecheck:
+    command: 'pnpm typecheck'
+    inputs:
+      - 'src/**/*'
+      - 'tsconfig.json'

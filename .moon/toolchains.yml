@@ -1,0 +1,33 @@
+# Toolchain configuration for moon (v2.x — note: plural "toolchains.yml").
+# https://moonrepo.dev/docs/config/toolchain
+#
+# JavaScript + Node + pnpm for the product plane (apps/api, apps/site,
+# packages/contracts). unstable_python + unstable_uv for the eval plane
+# (apps/eval-core-py). Python is still flagged unstable in moon 2.x — required
+# prefix per migration docs.
+$schema: 'https://moonrepo.dev/schemas/toolchains.json'
+
+# === JavaScript / TypeScript ===
+
+javascript:
+  packageManager: 'pnpm'
+  # Don't auto-convert package.json scripts to moon tasks — we declare tasks
+  # explicitly in moon.yml. Set true if you prefer scripts-as-tasks migration.
+  inferTasksFromScripts: false
+
+node:
+  version: '22.18.0'
+
+pnpm:
+  version: '9.15.0'
+
+typescript: {}
+
+# === Python (still unstable in moon 2.x) ===
+
+unstable_python:
+  version: '3.12.0'
+  packageManager: 'uv'
+
+unstable_uv:
+  version: '0.10.2'

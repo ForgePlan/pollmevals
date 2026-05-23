@@ -1,0 +1,16 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+# SQL migrations. Applied via Drizzle Kit from apps/api once it lands.
+# Not a Node package itself — just hosts the .sql files.
+layer: 'library'
+
+project:
+  name: 'db'
+  description: 'SQL migrations (8 tables: models, model_providers, stacks, tasks, runs, evals, judgments, calibration_runs).'
+
+tasks:
+  validate:
+    command: 'noop'  # validated by Drizzle Kit once apps/api lands
+
+  lint:
+    command: 'noop'

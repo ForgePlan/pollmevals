@@ -1,0 +1,35 @@
+# Global tasks inherited by every project (overridable in moon.yml).
+# https://moonrepo.dev/docs/config/tasks
+#
+# These declare task NAMES — concrete commands are defined in each project's
+# moon.yml. The :build, :test, :lint, :format, :typecheck task names give
+# us workspace-wide aggregations: `moon run :test` runs every project's test.
+$schema: 'https://moonrepo.dev/schemas/tasks.json'
+
+# Implicit deps so :test waits for :build of upstream projects.
+implicitDeps:
+  - '^:build'
+
+# Implicit inputs picked up by every task (changes invalidate cache).
+implicitInputs:
+  - 'package.json'
+  - '/.moon/*.yml'
+
+# Task placeholders. Projects override with concrete commands.
+tasks:
+  build:
+    command: 'noop'
+    options:
+      runDepsInParallel: true
+
+  test:
+    command: 'noop'
+
+  lint:
+    command: 'noop'
+
+  format:
+    command: 'noop'
+
+  typecheck:
+    command: 'noop'

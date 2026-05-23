@@ -1,0 +1,46 @@
+[project]
+name = "pollmevals-workspace"
+version = "0.0.0"
+description = "POLLMEVALS workspace root — uv workspace anchor for Python apps."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+# This is the workspace root — does not contain code itself.
+# Members are declared below.
+
+[tool.uv.workspace]
+members = [
+    "apps/eval-core-py",
+]
+
+[tool.uv]
+# Pin Python version range; uv will fail fast if a member tries a different one.
+required-version = ">=0.5.0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps/eval-core-py/src"]
+
+[tool.ruff.lint]
+# Enable a sensible default set: pycodestyle, pyflakes, isort, bugbear, comprehensions.
+select = ["E", "F", "I", "B", "C4", "UP", "SIM", "PL"]
+ignore = [
+    "PLR0913",  # too-many-arguments — fine for eval orchestrator entry points
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+exclude = [
+    "build/",
+    "dist/",
+    ".venv/",
+]

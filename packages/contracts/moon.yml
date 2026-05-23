@@ -1,0 +1,36 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+# JSON Schemas (task, stack, run-manifest) + TypeScript types.
+# Consumed by apps/api, apps/site, and Python eval-core (via codegen).
+layer: 'library'
+language: 'typescript'
+
+project:
+  name: 'contracts'
+  description: 'JSON Schemas + TypeScript types — pollmevals.{task,stack,run_manifest}.v1.'
+
+tasks:
+  build:
+    command: 'pnpm exec tsc --build'
+    inputs:
+      - 'src/**/*.ts'
+      - 'tsconfig.json'
+    outputs:
+      - 'dist'
+
+  test:
+    command: 'noop'  # JSON schemas validated by check task
+
+  check:
+    script: 'pnpm exec ajv validate -s schemas/task.schema.json -d "/evals/tasks/**/task.yaml" || true'
+    inputs:
+      - 'schemas/*.json'
+
+  lint:
+    command: 'noop'
+
+  typecheck:
+    command: 'pnpm exec tsc --noEmit'
+    inputs:
+      - 'src/**/*.ts'
+      - 'tsconfig.json'
