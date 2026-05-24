@@ -65,6 +65,13 @@ from src.contracts import (  # noqa: E402
     StackPin,
     TaskPin,
 )
+from src.evaluators import (  # noqa: E402
+    ComplexityEvaluator,
+    Evaluator,
+    LintEvaluator,
+    SecretScanEvaluator,
+)
+from src.evaluators.protocol import EvaluatorResult  # noqa: E402
 from src.orchestrator.cost import BudgetGate  # noqa: E402
 from src.orchestrator.eval_caller import (  # noqa: E402
     FakeEvalCaller,
@@ -463,6 +470,70 @@ def run_evaluators(
             }
         }
     return out
+
+
+# ---------------------------------------------------------------------------
+# Step 8: Phase 2D real evaluator dispatch
+# ---------------------------------------------------------------------------
+
+_EVALUATORS: list[Evaluator] = [
+    LintEvaluator(),
+    ComplexityEvaluator(),
+    SecretScanEvaluator(),
+]
+
+
+def _resolve_artifact_path(uri: str) -> str:
+    """Resolve a file:// artifact URI to an absolute local path.
+
+    URIs are of the form ``file://artifacts/runs/<hash>/evals/<id>/...``
+    The repo-relative portion is resolved against _REPO_ROOT so both
+    dry-run (tmp) and real-run (artifacts/) paths work.
+
+    Non-file:// URIs (e.g. r2://) are returned unchanged -- callers must
+    handle the path-not-exists case gracefully.
+    """
+    if uri.startswith("file://"):
+        rel = uri[len("file://") :]
+        return str(_REPO_ROOT / rel)
+    return uri
+
+
+async def _dispatch_evaluators(grid_result: GridRunResult) -> None:
+    """Run all EVALUATORS on each succeeded eval's raw_output artifact.
+
+    Results are attached in-place to each EvalRow's automatic_metrics dict
+    using model_copy(update=...) because EvalRow is frozen.
+
+    Evaluator errors are caught and stored as {"error": str, "skipped": True}
+    to preserve FR-009 invariant (no eval is silently dropped).
+    """
+    for eval_result in grid_result.succeeded():
+        row = eval_result.eval_row
+        if row is None:
+            continue
+
+        raw_output_path = _resolve_artifact_path(row.artifact_refs.raw_output.uri)
+        eval_metrics: dict[str, object] = dict(row.automatic_metrics or {})
+
+        for evaluator in _EVALUATORS:
+            try:
+                result: EvaluatorResult = await evaluator.evaluate(raw_output_path, row.task_id)
+                eval_metrics[evaluator.name] = result.model_dump(mode="json")
+            except Exception as exc:
+                logger.warning(
+                    "Evaluator %r failed for eval_id=%s: %s",
+                    evaluator.name,
+                    row.eval_id,
+                    exc,
+                )
+                eval_metrics[evaluator.name] = {"error": str(exc), "skipped": True}
+
+        # EvalRow is frozen -- use model_copy to produce updated instance.
+        updated_row = row.model_copy(update={"automatic_metrics": eval_metrics})
+        # Patch the eval_result in-place (EvalResult is a frozen dataclass --
+        # we reassign the attribute on the mutable list element).
+        object.__setattr__(eval_result, "eval_row", updated_row)
 
 
 def build_aggregates(grid_result: GridRunResult) -> RunAggregates:
@@ -939,8 +1010,9 @@ async def async_main(args: argparse.Namespace) -> int:
         grid_result.total_cost_usd,
     )
 
-    # Steps 8-9: evaluators (Phase 2B stubs)
-    logger.info("Step 8: Running evaluators (Phase 2B stubs)...")
+    # Steps 8-9: evaluators (Phase 2D real dispatch)
+    logger.info("Step 8: Running evaluators (Phase 2D — ruff/lizard/gitleaks)...")
+    await _dispatch_evaluators(grid_result)
 
     # Steps 10-11: aggregate + write manifest (write-once, 0o444)
     logger.info("Step 10-11: Aggregating scores + writing manifest...")

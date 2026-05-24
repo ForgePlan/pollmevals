@@ -24,6 +24,10 @@ dependencies = [
     # Used via `litellm.cost_per_token()` in scripts/smoke_run.py — auto-updates
     # with model price changes from LiteLLM's maintained model_cost map.
     "litellm>=1.50,<2",
+    # Multi-language cyclomatic complexity — Phase 2D Slice 1 ComplexityEvaluator.
+    # Library-first per CLAUDE.md 2026-05-25; Context7 /terryyin/lizard confirmed API.
+    # gitleaks is a system binary (NOT a Python dep) — detect via shutil.which().
+    "lizard>=1.17,<2",
 ]
 
 [project.optional-dependencies]
