@@ -336,6 +336,51 @@ make validate-tasks              # YAML task spec validation
 
 ---
 
+## Library-first (mandatory rule, user 2026-05-25)
+
+> 🔴 **Не писать своё с нуля если есть готовое.** Перед тем как реализовывать любой компонент — evaluator, metric, linter, scanner, parser, formatter, retry logic, queue, cache, validator, и т.п. — обязательно **искать готовое решение**.
+
+**Pipeline для каждого "хочу написать X":**
+
+1. **Context7 lookup ОБЯЗАТЕЛЕН первым шагом.** Любой раз когда задача = "реализовать X" (особенно если X пересекается с известной библиотечной задачей — cyclomatic, coverage, lint, type check, security scan, profiling, docstring coverage, dep audit, retry, rate limit, cache, validation, parsing, formatting, async pool):
+   - `mcp__context7__resolve-library-id` с keywords задачи → найти подходящую библиотеку
+   - `mcp__context7__query-docs` с конкретным вопросом → понять API + supported version
+   - **Только если Context7 не находит подходящего** — двигаемся к ручному коду
+2. **WebSearch для prior art** — если Context7 не нашёл: search `"<task> python library"` / `"<task> typescript npm"`. Look at GitHub stars, last commit, license, install count.
+3. **Pin version + cite source.** Любая dependency должна быть pinned (e.g. `radon>=6,<7` not `radon`) и упомянута в commit message (`feat: cyclomatic eval via radon>=6.0`).
+4. **Wrap, don't replace.** Если library API не подходит идеально — оборачиваем тонким adapter'ом под наш Protocol seam (e.g. `EvalCaller`-style). Не переписываем функциональность.
+5. **Custom code только когда:**
+   - Existing libraries не покрывают core domain logic (например POLLMEVALS-specific Krippendorff α на ordinal data — но и тут используем `krippendorff` PyPI package, не пишем сами)
+   - License incompatible (e.g. GPL в commercial context — нам не релевантно, all permissive OK)
+   - Library abandoned (last commit > 2 years AND no fork) AND нужен fix
+   - Library trivially wrappable в <20 строк и dep weight не оправдан (rare)
+
+**Канонические готовые решения для POLLMEVALS metrics** (NOTE-004 Section 5):
+
+| Метрика | Готовая library |
+|---|---|
+| cyclomatic complexity | `radon` (Python), `lizard` (multi-lang), `eslint --max-complexity` (TS) |
+| test coverage | `coverage` (Python), `c8` (Node), `vitest --coverage` |
+| linting | `ruff` (Python), `eslint` (TS), `clippy` (Rust) |
+| type safety | `mypy --strict` (Python), `tsc --strict` (TS) |
+| security scan | `bandit` (Python), `semgrep` (multi), `trivy` (containers), `pip-audit` (Python deps), `npm audit` (Node deps), `gitleaks` (secrets) |
+| docstring coverage | `interrogate` (Python), `documentation` / `jsdoc-coverage` (TS) |
+| profiling | `cProfile` + `pyinstrument` (Python), `clinic.js` (Node) |
+| dep selection quality | `pip-licenses` + `pypistats` (Python), `bundle-phobia` API (Node) — LLM judge для "did they pick well-maintained?" |
+| inter-judge agreement (α) | `krippendorff` (PyPI) |
+| async retry / backoff | `tenacity` (Python), `p-retry` (Node) — НЕ catch+sleep loop вручную |
+| HTTP client | `httpx` (Python — уже в use), `axios`/`undici` (Node) |
+| validation | `pydantic` v2 (Python — уже), `zod` (TS) |
+| LLM eval orchestration | Inspect AI (Python — уже в use per EVID-004); LM-Harness как backup |
+
+**Anti-patterns to refuse:**
+- "Я напишу свой cyclomatic counter — это всего 50 строк" → **NO**, use radon/lizard.
+- "Свой retry decorator с exponential backoff" → **NO**, use tenacity.
+- "Кастомный YAML parser" → **NO**, use ruamel.yaml or PyYAML.
+- "Своя impl Krippendorff α" → **NO**, use `krippendorff` package.
+
+**Exception**: domain-specific orchestration (GridRunner, JudgePanel, JournalWriter manifest immutability) — это **наша** uniqueness. Сюда custom код оправдан. Но даже там — внутри используем готовые primitives (httpx, asyncio, pydantic).
+
 ## AI-agent rules
 
 > Rules for AI agents working on this codebase non-interactively (`/autorun`, hooks).
@@ -345,6 +390,7 @@ make validate-tasks              # YAML task spec validation
 - When `forgeplan health` reports stubs/orphans/duplicates — note them, don't auto-fix unless that's the explicit task.
 - Match scope to request: a bug fix doesn't need surrounding cleanup; one-shot operations don't need helpers.
 - Don't write feature flags, backwards-compat shims, or "for future use" abstractions unless asked.
+- **Library-first**: see § Library-first section above — Context7 lookup ОБЯЗАТЕЛЕН перед любым "I'll implement X" если X пересекается с known library territory. Wrap, don't replace. Cite library + version in commit.
 - **Terminology precision**: don't sprinkle specialised terms ("hexagonal", "monadic", "idempotent", "bounded context") unless you can map the technical meaning to the current context. Buzzword-matching sounds smart but misleads. Name the pattern in plain words first; cross-reference the official term only if you're sure.
 - **Forgeplan non-interactive hygiene**: always invoke `forgeplan init -y` (no interactive prompt). After every spawned `Agent({…})`, the orchestrator owns the writeback to `forgeplan` (claim/release, evidence linking) — sub-agents should not call `forgeplan activate` directly unless the orchestrator explicitly delegated it.
 - **Auto-loaded files**: `MEMORY.md` is loaded every turn — don't waste tokens on `memory_recall` for facts already in the index. The auto-loaded `@docs/agents/*.md` imports below mean those files are also already in scope.
