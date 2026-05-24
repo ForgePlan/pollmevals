@@ -15,6 +15,8 @@ links:
   relation: informs
 - target: ADR-001
   relation: informs
+- target: PRD-002
+  relation: informs
 status: active
 title: 'prior art: Inspect AI (UK AISI) — Task/Solver/Scorer + EvalLog gaps'
 ---
@@ -119,4 +121,5 @@ EvalLog: `.eval` binary (1/8 size of JSON, default v0.3.46+). Post-eval edits la
 - EVID-014 (Wave 4 — cost attribution gap closed)
 - EVID-015 (Wave 4 — EvalCaller seam wraps Inspect AI)
 - NOTE-002 (Evidence Quality Standard — retrofit)
+
 
