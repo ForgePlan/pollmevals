@@ -79,6 +79,15 @@ litellm-down:
 	bash infra/scripts/litellm-proxy-down.sh
 
 # ---------------------------------------------------------------------------
+# OpenRouter smoke test — pre-flight for `make smoke-run` (Phase 2B).
+# Tests ADR-003 5-model lineup with minimal chat completion (~$0.0003 total).
+# Exit 0 if ≥3 models OK (PRD-001 degraded threshold).
+# ---------------------------------------------------------------------------
+
+openrouter-smoke:
+	uv run --project apps/eval-core-py python infra/scripts/smoke-openrouter.py
+
+# ---------------------------------------------------------------------------
 # Env diagnostics (no secrets in output — only key names + set/missing)
 # ---------------------------------------------------------------------------
 
