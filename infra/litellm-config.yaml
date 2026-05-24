@@ -60,6 +60,22 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
+  # ── Judge routes (RFC-002 Phase 3 W1 H1 spike + future JudgePanel) ──────────
+  # Separate routes billed to OPENROUTER_API_KEY_JUDGE for billing isolation
+  # per RFC-002 NFR-005. Naming convention: <base-model>-judge.
+  # Added 2026-05-24 for Phase 3 W1 H1 spike.
+  - model_name: claude-sonnet-4-6-judge
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4.6
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: gpt-5-mini-judge
+    litellm_params:
+      model: openrouter/openai/gpt-5-mini
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+      api_base: https://openrouter.ai/api/v1
+
 # General proxy settings
 litellm_settings:
   # Prometheus metrics at GET /metrics — DB available so this works.
