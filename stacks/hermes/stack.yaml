@@ -1,0 +1,39 @@
+schema_version: pollmevals.stack.v1
+slug: hermes
+name: Hermes Agent (Nous Research)
+base_model_slug: configurable
+agent_cli: hermes
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: true
+  L2_tools: true
+  L3_skills: true
+  L4_file_memory: true
+  L5_vector_memory: true
+  L6_subagents: true
+  L7_validator: true
+  L8_framework: null
+execution:
+  mode: repository_patch_with_validator
+  command: hermes
+  args: []
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+    - validator_report
+limits:
+  max_wall_clock_seconds: 900
+  max_tool_calls: 120
+  max_input_tokens: 100000
+  max_output_tokens: 20000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace
