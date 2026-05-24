@@ -14,9 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
+
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 from src.contracts import EvalStatus
 from src.orchestrator.cost import BudgetGate, PricingTuple, compute_cost
@@ -29,6 +33,8 @@ from src.orchestrator.eval_caller import (
 from src.orchestrator.journal import JournalWriter
 
 logger = logging.getLogger(__name__)
+
+tracer = trace.get_tracer(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants (per ADR-001 and AC-3)
@@ -239,38 +245,67 @@ class GridRunner:
                 )
                 return None
 
-            result = await self._caller.call(request)
+            span_attrs: dict[str, str | int] = {
+                "pollmevals.eval_id": request.eval_id,
+                "pollmevals.task_id": request.task_id,
+                "pollmevals.model_id": request.model_id,
+                "pollmevals.stack_id": request.stack_id,
+                "pollmevals.seed": request.seed,
+            }
 
-            # Journal + cost attribution for any eval that produced an EvalRow
-            # (both scored and gracefully-failed rows are journaled — FR-009).
-            if result.eval_row is not None:
-                # Update running cost total from the EvalRow's recorded cost_usd.
-                # The FakeEvalCaller already populates stats.cost_usd with
-                # _DEFAULT_COST_USD; for the real caller (Phase 2B), InspectEvalCaller
-                # fills this from the token counts x pricing snapshot.
-                # We also compute the cost independently via compute_cost() for
-                # cross-verification when pricing_snapshot covers this model.
-                row_cost = result.eval_row.stats.cost_usd
-                if request.model_id in self._pricing_snapshot:
-                    expected = compute_cost(
-                        result.eval_row.stats,
-                        self._pricing_snapshot[request.model_id],
-                    )
-                    if expected != row_cost:
-                        logger.debug(
-                            "Cost delta for eval_id=%s: row_cost=%s compute_cost=%s "
-                            "(using row_cost as authoritative)",
-                            result.eval_row.eval_id,
-                            row_cost,
-                            expected,
+            with tracer.start_as_current_span("eval.run_single", attributes=span_attrs) as span:
+                start_ns = time.monotonic_ns()
+                try:
+                    result = await self._caller.call(request)
+                except Exception as exc:
+                    span.record_exception(exc)
+                    span.set_status(StatusCode.ERROR, str(exc))
+                    raise
+
+                duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+
+                # Journal + cost attribution for any eval that produced an EvalRow
+                # (both scored and gracefully-failed rows are journaled — FR-009).
+                if result.eval_row is not None:
+                    # Update running cost total from the EvalRow's recorded cost_usd.
+                    # The FakeEvalCaller already populates stats.cost_usd with
+                    # _DEFAULT_COST_USD; for the real caller (Phase 2B), InspectEvalCaller
+                    # fills this from the token counts x pricing snapshot.
+                    # We also compute the cost independently via compute_cost() for
+                    # cross-verification when pricing_snapshot covers this model.
+                    row_cost = result.eval_row.stats.cost_usd
+                    if request.model_id in self._pricing_snapshot:
+                        expected = compute_cost(
+                            result.eval_row.stats,
+                            self._pricing_snapshot[request.model_id],
                         )
+                        if expected != row_cost:
+                            logger.debug(
+                                "Cost delta for eval_id=%s: row_cost=%s compute_cost=%s "
+                                "(using row_cost as authoritative)",
+                                result.eval_row.eval_id,
+                                row_cost,
+                                expected,
+                            )
 
-                self._running_total += row_cost
+                    self._running_total += row_cost
 
-                # Persist the row to the append-only journal (NOTE-001).
-                self._journal_writer.append(result.eval_row.model_dump(mode="json"))
+                    # Record outcome attrs on the span.
+                    span.set_attribute(
+                        "pollmevals.final_score",
+                        float(result.eval_row.final_score)
+                        if result.eval_row.final_score is not None
+                        else -1.0,
+                    )
+                    span.set_attribute("pollmevals.duration_ms", duration_ms)
+                    span.set_attribute("pollmevals.cost_usd", float(result.eval_row.stats.cost_usd))
 
-            return result
+                    # Persist the row to the append-only journal (NOTE-001).
+                    self._journal_writer.append(result.eval_row.model_dump(mode="json"))
+                else:
+                    span.set_attribute("pollmevals.duration_ms", duration_ms)
+
+                return result
 
     async def run(self, spec: GridSpec) -> GridRunResult:
         """Execute the full evaluation grid defined by *spec*.

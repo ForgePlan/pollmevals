@@ -3,7 +3,12 @@
 Covers:
  - Protocol structural conformance (runtime_checkable)
  - compute_eval_id determinism and output format
- - InspectEvalCaller stub behaviour (raises NotImplementedError, Phase 2B documented)
+ - InspectEvalCaller Phase 2C real implementation:
+     * happy-path mocked HTTP 200
+     * 429 retry (max 3, exponential backoff)
+     * 500 -> SANDBOX_FAILURE (no raise)
+     * httpx network error -> NETWORK failure (no raise)
+     * backward-compat attributes (_openrouter_base_url, _litellm_base_url)
  - FakeEvalCaller success path (default + deterministic overrides)
  - FakeEvalCaller failure simulation path
 """
@@ -13,7 +18,10 @@ from __future__ import annotations
 import pathlib
 import re
 from datetime import UTC
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from src.contracts import ErrorClass, EvalStatus
@@ -50,6 +58,27 @@ def _make_request(
         task_id=task_id,
         seed=seed,
     )
+
+
+def _mock_openai_response(
+    *,
+    content: str = "hello",
+    prompt_tokens: int = 10,
+    completion_tokens: int = 5,
+    status_code: int = 200,
+) -> MagicMock:
+    """Return a mock httpx.Response with an OpenAI-compatible body."""
+    resp = MagicMock(spec=httpx.Response)
+    resp.status_code = status_code
+    resp.json.return_value = {
+        "choices": [{"message": {"content": content, "role": "assistant"}}],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+    }
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -116,28 +145,12 @@ class TestComputeEvalId:
 
 
 # ---------------------------------------------------------------------------
-# 3. InspectEvalCaller stub
+# 3. InspectEvalCaller Phase 2C -- constructor attributes
 # ---------------------------------------------------------------------------
 
 
-class TestInspectEvalCallerStub:
-    @pytest.mark.asyncio
-    async def test_raises_not_implemented(self, tmp_path: pathlib.Path) -> None:
-        caller = InspectEvalCaller(log_dir=tmp_path)
-        req = _make_request()
-        with pytest.raises(NotImplementedError) as exc_info:
-            await caller.call(req)
-        msg = str(exc_info.value)
-        assert "Phase 2B" in msg
-        assert "OPENROUTER_API_KEY" in msg
-
-    @pytest.mark.asyncio
-    async def test_stub_message_mentions_fake_caller(self, tmp_path: pathlib.Path) -> None:
-        caller = InspectEvalCaller(log_dir=tmp_path)
-        req = _make_request()
-        with pytest.raises(NotImplementedError) as exc_info:
-            await caller.call(req)
-        assert "FakeEvalCaller" in str(exc_info.value)
+class TestInspectEvalCallerAttributes:
+    """Verify backward-compat attributes and constructor defaults."""
 
     def test_default_openrouter_base_url(self, tmp_path: pathlib.Path) -> None:
         caller = InspectEvalCaller(log_dir=tmp_path)
@@ -150,9 +163,270 @@ class TestInspectEvalCallerStub:
         )
         assert caller._openrouter_base_url == "http://localhost:4000/v1"
 
+    def test_default_litellm_base_url(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        assert caller._litellm_base_url == "http://localhost:4000"
+
+    def test_custom_litellm_base_url(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path, litellm_base_url="http://myproxy:9000")
+        assert caller._litellm_base_url == "http://myproxy:9000"
+
+    def test_trailing_slash_stripped_from_litellm_url(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path, litellm_base_url="http://localhost:4000/")
+        assert caller._litellm_base_url == "http://localhost:4000"
+
 
 # ---------------------------------------------------------------------------
-# 4. FakeEvalCaller -- success path
+# 4. InspectEvalCaller Phase 2C -- HTTP call behaviour (mocked)
+# ---------------------------------------------------------------------------
+
+
+class TestInspectEvalCallerHTTP:
+    """Mock the httpx.AsyncClient.post to test HTTP call behaviour."""
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_scored_status(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = _mock_openai_response(content="Hello from mock")
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert isinstance(result, EvalResult)
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.SCORED
+        assert result.exception is None
+
+    @pytest.mark.asyncio
+    async def test_happy_path_token_counts_extracted(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = _mock_openai_response(prompt_tokens=42, completion_tokens=17)
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.stats.input_tokens == 42
+        assert result.eval_row.stats.output_tokens == 17
+
+    @pytest.mark.asyncio
+    async def test_happy_path_request_shape(self, tmp_path: pathlib.Path) -> None:
+        """Verify POST is made to the correct URL with JSON body."""
+        caller = InspectEvalCaller(log_dir=tmp_path, litellm_base_url="http://localhost:4000")
+        req = _make_request(model_id="openrouter/my/model", seed=7)
+
+        mock_resp = _mock_openai_response()
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            await caller.call(req)
+
+        mock_post.assert_called_once()
+        call_args = mock_post.call_args
+        assert call_args.args[0] == "http://localhost:4000/chat/completions"
+        sent_json = call_args.kwargs["json"]
+        assert sent_json["model"] == "openrouter/my/model"
+        assert sent_json["seed"] == 7
+
+    @pytest.mark.asyncio
+    async def test_api_key_sent_as_bearer_header(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path, api_key="sk-test-123")
+        req = _make_request()
+
+        mock_resp = _mock_openai_response()
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            await caller.call(req)
+
+        headers_sent = mock_post.call_args.kwargs["headers"]
+        assert headers_sent.get("Authorization") == "Bearer sk-test-123"
+
+    @pytest.mark.asyncio
+    async def test_500_returns_sandbox_failure(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.SANDBOX_FAILURE
+
+    @pytest.mark.asyncio
+    async def test_400_returns_sandbox_failure(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 400
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.SANDBOX_FAILURE
+
+    @pytest.mark.asyncio
+    async def test_network_error_returns_network_failure(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            new_callable=AsyncMock,
+            side_effect=httpx.ConnectError("connection refused"),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.NETWORK
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_timeout_failure(self, tmp_path: pathlib.Path) -> None:
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            new_callable=AsyncMock,
+            side_effect=TimeoutError(),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.TIMEOUT
+
+
+# ---------------------------------------------------------------------------
+# 5. InspectEvalCaller -- 429 retry behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestInspectEvalCallerRetry:
+    """Verify retry-on-429 logic: max 3 retries, exponential backoff, no crash."""
+
+    @pytest.mark.asyncio
+    async def test_429_followed_by_200_succeeds(self, tmp_path: pathlib.Path) -> None:
+        """One 429 then a 200 should succeed without error."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        responses = [
+            MagicMock(spec=httpx.Response, status_code=429),
+            _mock_openai_response(content="ok after retry"),
+        ]
+        call_count = 0
+
+        async def _post(*args: object, **kwargs: object) -> MagicMock:
+            nonlocal call_count
+            r = responses[call_count]
+            call_count += 1
+            return r
+
+        with (
+            patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, side_effect=_post),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.SCORED
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_429_exhausted_returns_rate_limit_failure(self, tmp_path: pathlib.Path) -> None:
+        """Four consecutive 429s (initial + 3 retries) must produce RATE_LIMIT failure."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        call_count = 0
+
+        async def _always_429(*args: object, **kwargs: object) -> MagicMock:
+            nonlocal call_count
+            call_count += 1
+            return MagicMock(spec=httpx.Response, status_code=429)
+
+        with (
+            patch.object(
+                httpx.AsyncClient, "post", new_callable=AsyncMock, side_effect=_always_429
+            ),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.RATE_LIMIT
+        # Should have attempted initial + _RETRY_MAX retries = 4 calls total
+        assert call_count == 4
+
+    @pytest.mark.asyncio
+    async def test_429_retry_uses_exponential_backoff(self, tmp_path: pathlib.Path) -> None:
+        """asyncio.sleep delays must grow exponentially (1s, 2s, 4s)."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        sleep_delays: list[float] = []
+
+        async def _capture_sleep(delay: float) -> None:
+            sleep_delays.append(delay)
+
+        async def _always_429(*args: object, **kwargs: object) -> MagicMock:
+            return MagicMock(spec=httpx.Response, status_code=429)
+
+        with (
+            patch.object(
+                httpx.AsyncClient, "post", new_callable=AsyncMock, side_effect=_always_429
+            ),
+            patch("asyncio.sleep", side_effect=_capture_sleep),
+        ):
+            await caller.call(req)
+
+        # 3 retries -> 3 sleep calls: 1.0, 2.0, 4.0
+        assert len(sleep_delays) == 3
+        assert sleep_delays[0] == pytest.approx(1.0)
+        assert sleep_delays[1] == pytest.approx(2.0)
+        assert sleep_delays[2] == pytest.approx(4.0)
+
+    @pytest.mark.asyncio
+    async def test_result_is_fr009_compliant_on_429_exhaustion(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """RATE_LIMIT result must carry a valid EvalRow (FR-009 -- never drops)."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        with (
+            patch.object(
+                httpx.AsyncClient,
+                "post",
+                new_callable=AsyncMock,
+                return_value=MagicMock(spec=httpx.Response, status_code=429),
+            ),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.artifact_refs is not None
+        assert result.eval_row.stats is not None
+        assert result.exception is None  # graceful degradation, not exception
+
+
+# ---------------------------------------------------------------------------
+# 6. FakeEvalCaller -- success path
 # ---------------------------------------------------------------------------
 
 
@@ -193,8 +467,6 @@ class TestFakeEvalCallerSuccess:
 
     @pytest.mark.asyncio
     async def test_stats_populated_with_defaults(self) -> None:
-        from decimal import Decimal
-
         caller = FakeEvalCaller()
         req = _make_request()
         result = await caller.call(req)
@@ -232,7 +504,7 @@ class TestFakeEvalCallerSuccess:
 
 
 # ---------------------------------------------------------------------------
-# 5. FakeEvalCaller -- failure simulation
+# 7. FakeEvalCaller -- failure simulation
 # ---------------------------------------------------------------------------
 
 
@@ -287,7 +559,7 @@ class TestFakeEvalCallerFailures:
 
 
 # ---------------------------------------------------------------------------
-# 6. FakeEvalCaller -- deterministic outputs
+# 8. FakeEvalCaller -- deterministic outputs
 # ---------------------------------------------------------------------------
 
 

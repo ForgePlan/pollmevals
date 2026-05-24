@@ -22,7 +22,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
 
+from opentelemetry import trace
+
 logger = logging.getLogger(__name__)
+
+tracer = trace.get_tracer(__name__)
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -150,17 +154,27 @@ class JournalWriter:
         if self._closed:
             raise RuntimeError("JournalWriter is closed")
 
-        try:
-            line = json.dumps(row, default=str) + "\n"
-        except (TypeError, ValueError) as exc:
-            raise JournalCorruptionError(f"Failed to serialize row to JSON: {exc}") from exc
+        entry_id = str(row.get("eval_id", ""))
+        entry_type = str(row.get("status", "unknown"))
+        span_attrs: dict[str, str | int] = {
+            "pollmevals.journal.entry_type": entry_type,
+            "pollmevals.journal.entry_id": entry_id,
+        }
 
-        try:
-            self._fh.write(line.encode())
-            self._fh.flush()
-            os.fsync(self._fh.fileno())
-        except OSError as exc:
-            raise JournalCorruptionError(f"Failed to write/fsync journal entry: {exc}") from exc
+        with tracer.start_as_current_span("journal.append", attributes=span_attrs) as span:
+            try:
+                line = json.dumps(row, default=str) + "\n"
+            except (TypeError, ValueError) as exc:
+                raise JournalCorruptionError(f"Failed to serialize row to JSON: {exc}") from exc
+
+            span.set_attribute("pollmevals.journal.size_bytes", len(line.encode()))
+
+            try:
+                self._fh.write(line.encode())
+                self._fh.flush()
+                os.fsync(self._fh.fileno())
+            except OSError as exc:
+                raise JournalCorruptionError(f"Failed to write/fsync journal entry: {exc}") from exc
 
     def append_many(self, rows: Iterable[dict[str, object]]) -> None:
         """Append multiple rows, each with its own fsync.
