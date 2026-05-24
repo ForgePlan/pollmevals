@@ -290,21 +290,51 @@ def make_run_hash(
 # Aliases (LiteLLM proxy route names) -> canonical OpenRouter paths that
 # LiteLLM SDK recognises for cost lookup.
 _PROXY_ALIAS_TO_LITELLM_MODEL: dict[str, str] = {
+    # ADR-003 smoke baseline (5 models)
     "claude-sonnet-4-6": "openrouter/anthropic/claude-sonnet-4.6",
     "gpt-5-mini": "openrouter/openai/gpt-5-mini",
     "gemini-3-flash": "openrouter/google/gemini-3-flash-preview",
     "qwen-3-14b": "openrouter/qwen/qwen3-14b",
     "llama-3-3-70b": "openrouter/meta-llama/llama-3.3-70b-instruct",
+    # ADR-006 Phase 1 additions — OpenRouter closed APIs
+    "claude-opus-4-7": "openrouter/anthropic/claude-opus-4.7",
+    "gpt-5": "openrouter/openai/gpt-5",
+    "gemini-2-5-pro": "openrouter/google/gemini-2.5-pro",
+    "grok-4": "openrouter/x-ai/grok-4",
+    "deepseek-v3-5": "openrouter/deepseek/deepseek-v3.5",
+    # ADR-006 Phase 1 additions — Cerebras direct
+    "llama-3-3-70b-cerebras": "cerebras/llama3.3-70b",
+    "qwen-3-32b": "cerebras/qwen-3-32b",
+    "glm-4-7": "cerebras/glm-4.7",
+    "gpt-oss-120b": "cerebras/gpt-oss-120b",
+    # ADR-006 Phase 1 additions — Runpod vLLM
+    "qwen-2-5-72b": "hosted_vllm/Qwen/Qwen2.5-72B-Instruct",
 }
 
 # Fallback when litellm.cost_per_token() is unknown for the alias. Per-Mtoken USD.
 # Refresh when LiteLLM lookup misses for an alias we still want priced.
+# Primary path: litellm.cost_per_token() — auto-updated (commit 5d4b432).
+# Fallback numbers: OpenRouter/Cerebras published prices as of 2026-05-25 (ADR-006).
 _FALLBACK_PRICING_PER_MTOKEN: dict[str, tuple[Decimal, Decimal]] = {
+    # ADR-003 smoke baseline (5 models)
     "claude-sonnet-4-6": (Decimal("3.00"), Decimal("15.00")),
     "gpt-5-mini": (Decimal("0.25"), Decimal("2.00")),
     "gemini-3-flash": (Decimal("0.075"), Decimal("0.30")),
     "qwen-3-14b": (Decimal("0.06"), Decimal("0.12")),
     "llama-3-3-70b": (Decimal("0.60"), Decimal("0.60")),
+    # ADR-006 Phase 1 additions — OpenRouter closed APIs
+    "claude-opus-4-7": (Decimal("15.00"), Decimal("75.00")),
+    "gpt-5": (Decimal("5.00"), Decimal("15.00")),
+    "gemini-2-5-pro": (Decimal("2.50"), Decimal("10.00")),
+    "grok-4": (Decimal("5.00"), Decimal("15.00")),
+    "deepseek-v3-5": (Decimal("0.27"), Decimal("1.10")),
+    # ADR-006 Phase 1 additions — Cerebras direct
+    "llama-3-3-70b-cerebras": (Decimal("0.85"), Decimal("1.20")),
+    "qwen-3-32b": (Decimal("0.18"), Decimal("0.36")),
+    "glm-4-7": (Decimal("0.18"), Decimal("0.36")),
+    "gpt-oss-120b": (Decimal("0.10"), Decimal("0.20")),
+    # ADR-006 Phase 1 additions — Runpod vLLM
+    "qwen-2-5-72b": (Decimal("0.90"), Decimal("0.90")),
 }
 
 

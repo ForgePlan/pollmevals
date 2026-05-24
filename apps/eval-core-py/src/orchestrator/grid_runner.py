@@ -374,6 +374,32 @@ SMOKE_MODELS: list[str] = [
     "openrouter/qwen/qwen-2-5-14b",
     "openrouter/meta-llama/llama-4-70b",
 ]
+
+# ADR-006 Phase 1 weekly grid — 14 models across 3 providers.
+# Uses LiteLLM proxy aliases (infra/litellm-config.yaml model_name entries).
+# Grid: 14 models x 20 tasks x 5 seeds = 1400 evals per PRD-003.
+# SMOKE_MODELS above is unchanged (ADR-006 invariant: smoke contract preserved).
+WEEKLY_MODELS: list[str] = [
+    # OpenRouter — closed APIs
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "gpt-5",
+    "gpt-5-mini",
+    "gemini-2-5-pro",
+    "gemini-3-flash",
+    "grok-4",
+    "deepseek-v3-5",
+    # Cerebras — fast open-weight (primary; llama-3-3-70b is OpenRouter fallback)
+    "llama-3-3-70b-cerebras",
+    "qwen-3-32b",
+    "glm-4-7",
+    "gpt-oss-120b",
+    # Runpod vLLM — self-hosted large model
+    "qwen-2-5-72b",
+    # OpenRouter HF router — cheap open-weight (smoke-gated)
+    "qwen-3-14b",
+]
+
 SMOKE_TASKS: list[str] = [
     "be_01_jwt_auth",
     "fe_01_multistep_form",
