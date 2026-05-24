@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import IO
 
 from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,8 @@ class JournalWriter:
             try:
                 line = json.dumps(row, default=str) + "\n"
             except (TypeError, ValueError) as exc:
+                span.record_exception(exc)
+                span.set_status(StatusCode.ERROR, str(exc))
                 raise JournalCorruptionError(f"Failed to serialize row to JSON: {exc}") from exc
 
             span.set_attribute("pollmevals.journal.size_bytes", len(line.encode()))
@@ -174,6 +177,8 @@ class JournalWriter:
                 self._fh.flush()
                 os.fsync(self._fh.fileno())
             except OSError as exc:
+                span.record_exception(exc)
+                span.set_status(StatusCode.ERROR, str(exc))
                 raise JournalCorruptionError(f"Failed to write/fsync journal entry: {exc}") from exc
 
     def append_many(self, rows: Iterable[dict[str, object]]) -> None:

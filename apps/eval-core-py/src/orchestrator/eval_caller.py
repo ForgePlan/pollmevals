@@ -153,7 +153,7 @@ class InspectEvalCaller:
     with exponential back-off (1 s -> 2 s -> 4 s).  All other 4xx / 5xx errors
     produce a graceful EvalRow(status=FAILED) rather than raising.
 
-    TODO(Phase 2D): replace direct HTTP with ``inspect_ai.eval()`` wiring once
+    TODO(Phase 2D, PRD-001 FR-003): replace direct HTTP with ``inspect_ai.eval()`` wiring once
     task scaffolding (task.yaml + solver pipeline) is ready.  The EvalRow
     mapping table from SPEC-001 applies unchanged; only the invocation layer
     changes.
@@ -271,7 +271,7 @@ class InspectEvalCaller:
                     data = resp.json()
                     return self._make_success_result(request, started_at, row_id, data, wall_ms)
 
-                except TimeoutError as exc:
+                except (TimeoutError, httpx.TimeoutException) as exc:
                     last_exc = exc
                     return self._make_failed_result(
                         request,
@@ -351,9 +351,16 @@ class InspectEvalCaller:
         completed_at = datetime.now(UTC)
 
         # Extract token usage from OpenAI-compatible response.
-        usage = data.get("usage") or {}
-        input_tokens = int(usage.get("prompt_tokens") or 0)  # type: ignore[arg-type]
-        output_tokens = int(usage.get("completion_tokens") or 0)  # type: ignore[arg-type]
+        # isinstance() narrowing is required for mypy --strict: data.get("usage") returns
+        # object, and object has no .get(). The isinstance check gives us dict[str, object].
+        usage: dict[str, object] = {}
+        _u = data.get("usage")
+        if isinstance(_u, dict):
+            usage = _u
+        _pt = usage.get("prompt_tokens")
+        input_tokens = int(_pt) if isinstance(_pt, (int, float)) else 0
+        _ct = usage.get("completion_tokens")
+        output_tokens = int(_ct) if isinstance(_ct, (int, float)) else 0
 
         # Extract raw output text.
         raw_output = ""

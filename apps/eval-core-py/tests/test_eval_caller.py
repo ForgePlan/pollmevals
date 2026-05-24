@@ -308,6 +308,57 @@ class TestInspectEvalCallerHTTP:
         assert result.eval_row.status == EvalStatus.FAILED
         assert result.eval_row.error_class == ErrorClass.TIMEOUT
 
+    @pytest.mark.asyncio
+    async def test_httpx_read_timeout_classified_as_timeout(self, tmp_path: pathlib.Path) -> None:
+        """httpx.ReadTimeout must be classified as TIMEOUT not NETWORK.
+
+        Regression test for EVID-021 Finding #1: httpx.TimeoutException subclasses
+        do NOT inherit from built-in TimeoutError; without the explicit
+        ``except (TimeoutError, httpx.TimeoutException)`` they fall through to
+        ``except httpx.HTTPError`` and get classified as NETWORK.
+        """
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            new_callable=AsyncMock,
+            side_effect=httpx.ReadTimeout("read timed out"),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.TIMEOUT, (
+            "httpx.ReadTimeout must map to TIMEOUT, not NETWORK (EVID-021 #1)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_httpx_connect_timeout_classified_as_timeout(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """httpx.ConnectTimeout must be classified as TIMEOUT not NETWORK.
+
+        Regression test for EVID-021 Finding #1 — same root cause as ReadTimeout.
+        """
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            new_callable=AsyncMock,
+            side_effect=httpx.ConnectTimeout("connect timed out"),
+        ):
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status == EvalStatus.FAILED
+        assert result.eval_row.error_class == ErrorClass.TIMEOUT, (
+            "httpx.ConnectTimeout must map to TIMEOUT, not NETWORK (EVID-021 #1)"
+        )
+
 
 # ---------------------------------------------------------------------------
 # 5. InspectEvalCaller -- 429 retry behaviour
