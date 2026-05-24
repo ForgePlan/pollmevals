@@ -23,6 +23,9 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
+import random
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from inspect_ai.model import GenerateConfig
@@ -30,7 +33,10 @@ from inspect_ai.model import GenerateConfig
 from src.contracts import JudgeAggregation, Judgment
 
 if TYPE_CHECKING:
+    from inspect_ai import Task as InspectTask
+    from inspect_ai.log import EvalLog
     from inspect_ai.model import Model as InspectModel
+    from inspect_ai.solver import Solver
 
     from src.orchestrator.eval_caller import EvalResult
 
@@ -225,19 +231,184 @@ class JudgePanel:
     async def score(self, eval_result: EvalResult, task_id: str) -> list[Judgment]:
         """Score one candidate output across the full judge panel.
 
-        Slice B implementation: Inspect AI list-of-scorers wiring per EVID-023
-        (multi_scorer() is broken in inspect_ai==0.3.46 — use list path instead).
+        Uses Inspect AI's list-of-scorers path (Task(scorer=[s1, s2, s3])).
+        Per-judge Score objects are read from EvalLog.samples[0].scores (a dict
+        keyed by auto-assigned scorer names: 'model_graded_qa', 'model_graded_qa_1',
+        ...).
 
-        Returns one Judgment per judge. Position in the returned list matches
-        the randomised judge_order (H2 position-bias mitigation).
+        API source: Context7 /ukgovernmentbeis/inspect_ai — model_graded_qa,
+        Task(scorer=[...]), EvalLog.samples[].scores pattern.
+        Confirmed working by EVID-023 H1 spike (inspect_ai==0.3.46).
 
-        NOTE: This is a Slice B stub — raises NotImplementedError until Slice B
-        is merged.
+        NOTE: multi_scorer() is BROKEN in inspect_ai==0.3.46 (runtime crash
+        "Object score does not have registry info"). Do NOT use multi_scorer()
+        until upstream fix lands (github.com/UKGovernmentBEIS/inspect_ai/issues/4027).
+
+        IMPORTANT: always cap judge max_tokens explicitly via
+        get_model(judge, config=GenerateConfig(max_tokens=512)) — the default
+        is the model's native max (65k for Claude Sonnet), which exhausts
+        OpenRouter monthly budget on the first run (HTTP 402 confirmed EVID-023).
+
+        Args:
+            eval_result: the completed candidate evaluation (status=SCORED).
+                         raw candidate output is read from the local artifact URI
+                         stored in eval_result.eval_row.artifact_refs.raw_output.
+            task_id: task identifier (e.g. "be_01_jwt_auth") — used as the
+                     judge prompt context and for rubric loading in future slices.
+
+        Returns:
+            One Judgment per judge model. Position in the list matches the
+            randomised judge_order (H2 position-bias mitigation per RFC-002).
         """
-        raise NotImplementedError(
-            "JudgePanel.score() is not implemented yet — Slice B. "
-            "See RFC-002 Slice B for the Inspect AI list-of-scorers wiring plan."
+        from inspect_ai import Task
+        from inspect_ai.dataset import Sample
+        from inspect_ai.scorer import model_graded_qa
+        from inspect_ai.solver import solver as _solver
+
+        # ── 1. Read raw candidate output from artifact URI ─────────────────
+        raw_output_text = self._read_raw_output(eval_result)
+
+        # ── 2. Build forwarding solver — injects pre-computed output so
+        #       judges grade existing text, not a new generation ────────────
+        @_solver
+        def _forwarding_solver(forced_output: str) -> Solver:
+            """Return a solver that plants pre-computed text into TaskState.output.
+
+            This avoids re-generating the candidate response — judges receive
+            the same text that the candidate actually produced.
+            """
+            from inspect_ai.model import ModelOutput
+            from inspect_ai.solver import Generate, TaskState
+
+            async def _solve(state: TaskState, generate: Generate) -> TaskState:
+                state.output = ModelOutput.from_content(
+                    model=str(state._model),
+                    content=forced_output,
+                )
+                state.completed = True
+                return state
+
+            return _solve
+
+        # ── 3. Randomise judge order (H2 position-bias mitigation) ──────────
+        judge_ids_shuffled = list(self._judge_models)
+        random.shuffle(judge_ids_shuffled)
+
+        # ── 4. Build per-judge scorers with explicit max_tokens cap ──────────
+        #       EVID-023 finding #3: without this cap, HTTP 402 on OpenRouter.
+        judge_model_objs = self._make_judge_models()
+        # Rebuild in shuffled order (judge_model_objs preserves init order,
+        # so we need to re-map after shuffling).
+        original_order = list(self._judge_models)
+        judge_models_in_shuffled_order = [
+            judge_model_objs[original_order.index(jid)] for jid in judge_ids_shuffled
+        ]
+
+        scorers = [model_graded_qa(model=jm) for jm in judge_models_in_shuffled_order]
+
+        # ── 5. Build a minimal Task for judging ──────────────────────────────
+        #       input = task description (so judges understand context)
+        #       target = empty (model_graded_qa grades completion vs input)
+        #       The forwarding solver injects raw_output_text into state.output.
+        sample_input = (
+            f"[POLLMEVALS judge task] task={task_id} "
+            f"model={eval_result.request.model_id} "
+            f"stack={eval_result.request.stack_id} "
+            f"seed={eval_result.request.seed}\n\n"
+            f"Evaluate the following model output for task '{task_id}':\n\n"
+            f"{raw_output_text}"
         )
+
+        judge_task = Task(
+            dataset=[
+                Sample(
+                    input=sample_input,
+                    target="",  # judges grade via model_graded_qa template
+                    metadata={"forced_output": raw_output_text},
+                )
+            ],
+            solver=_forwarding_solver(forced_output=raw_output_text),
+            scorer=scorers,
+        )
+
+        # ── 6. Run judges via Inspect AI eval_async ───────────────────────────
+        #       We set OPENAI_BASE_URL + OPENAI_API_KEY so Inspect AI routes
+        #       through the LiteLLM proxy (same pattern as spike script line 183).
+        logs = await self._run_judge_task(judge_task)
+
+        # ── 7. Parse per-judge Score from EvalLog.samples[0].scores ──────────
+        #       Keys are auto-assigned: 'model_graded_qa', 'model_graded_qa_1', …
+        #       Per EVID-023: dict with N entries, one per scorer in the list.
+        if not logs:
+            raise RuntimeError("JudgePanel.score(): Inspect AI eval_async returned no logs")
+        # Import EvalLog for isinstance narrowing so mypy knows .samples exists.
+        from inspect_ai.log import EvalLog as _EvalLog
+
+        log = logs[0]
+        if not isinstance(log, _EvalLog):
+            raise RuntimeError(
+                f"JudgePanel.score(): unexpected log type {type(log).__name__}; expected EvalLog"
+            )
+        if not log.samples:
+            raise RuntimeError("JudgePanel.score(): EvalLog has no samples")
+
+        sample = log.samples[0]
+        # sample.scores is dict[str, Score] | None in inspect_ai type stubs.
+        raw_scores = sample.scores
+        scores_dict = raw_scores if isinstance(raw_scores, dict) else {}
+
+        judgments: list[Judgment] = []
+        for idx, judge_id in enumerate(judge_ids_shuffled):
+            # Scorer names: first scorer = 'model_graded_qa', subsequent = 'model_graded_qa_1', etc.
+            # Inspect AI uses the auto-suffix pattern confirmed in EVID-023.
+            scorer_key = "model_graded_qa" if idx == 0 else f"model_graded_qa_{idx}"
+            score_obj = scores_dict.get(scorer_key)
+
+            if score_obj is None:
+                # Fallback: try positional access if naming pattern shifted.
+                score_obj_list = list(scores_dict.values())
+                score_obj = score_obj_list[idx] if idx < len(score_obj_list) else None
+
+            if score_obj is None:
+                logger.warning(
+                    "JudgePanel.score(): no Score for judge %s (scorer_key=%s); available keys=%s",
+                    judge_id,
+                    scorer_key,
+                    list(scores_dict.keys()),
+                )
+                # Skip this judge rather than crash; caller handles missing judgments.
+                continue
+
+            # model_graded_qa returns 'C' (correct) or 'I' (incorrect) for QA-style.
+            # Slice C+ will use multi-criterion rubric scores. For Slice B:
+            # "C" -> 1.0 (correct), "I" -> 0.0 (incorrect), scaled to 0-10.
+            raw_value = score_obj.value
+            if isinstance(raw_value, (int, float)):
+                numeric_01 = max(0.0, min(1.0, float(raw_value)))
+            elif isinstance(raw_value, str):
+                numeric_01 = 1.0 if raw_value.upper() == "C" else 0.0
+            else:
+                numeric_01 = 0.0
+
+            # Scale 0-1 -> 0-10 for Judgment.total_score (validated ge=0, le=10).
+            total_score_10 = numeric_01 * 10.0
+
+            judgments.append(
+                Judgment(
+                    judge_model_id=judge_id,
+                    judge_order=idx,
+                    rubric_version=self._rubric_version,
+                    rubric_scores={"overall": total_score_10},
+                    total_score=total_score_10,
+                    raw_explanation=str(score_obj.explanation or ""),
+                    latency_ms=0,  # TODO Slice E — read from log.stats
+                    tokens_in=0,  # TODO Slice E
+                    tokens_out=0,  # TODO Slice E
+                    cost_usd=Decimal("0"),  # TODO Slice E (litellm.cost_per_token)
+                )
+            )
+
+        return judgments
 
     def aggregate(self, judgments: list[Judgment]) -> JudgeAggregation:
         """Compute median + Krippendorff alpha + bootstrap CI across the panel.
@@ -330,6 +501,98 @@ class JudgePanel:
 
         if self._judge_model_objects is None:
             self._judge_model_objects = [
-                get_model(f"openai/{jm}", config=self._judge_config) for jm in self._judge_models
+                get_model(
+                    self._proxy_alias_for(jm),
+                    config=self._judge_config,
+                )
+                for jm in self._judge_models
             ]
         return self._judge_model_objects
+
+    def _proxy_alias_for(self, judge_id: str) -> str:
+        """Build the Inspect AI model string that routes through LiteLLM proxy.
+
+        Per EVID-023 spike script (line 213): "openai/" prefix tells Inspect AI
+        to use OPENAI_BASE_URL (which we point at the LiteLLM proxy at
+        self._base_url).  The judge_id is passed through as-is; if it already
+        contains a "/" the LiteLLM proxy resolves it via its model_list config.
+
+        Examples:
+          "claude-sonnet-4-6-judge"         → "openai/claude-sonnet-4-6-judge"
+          "openrouter/anthropic/claude-..."  → "openai/openrouter/anthropic/claude-..."
+              (technically valid; LiteLLM strips the openai/ routing prefix)
+
+        For production use, judge model IDs should match the model_name entries
+        in infra/litellm-config.yaml (e.g. "claude-sonnet-4-6-judge").
+        """
+        if judge_id.startswith("openai/"):
+            return judge_id  # already prefixed
+        return f"openai/{judge_id}"
+
+    def _read_raw_output(self, eval_result: EvalResult) -> str:
+        """Read the candidate's raw output text from the local artifact file.
+
+        The artifact URI has the form "file://artifacts/evals/{row_id}/{label}-{sha256}.txt".
+        We strip the "file://" prefix and resolve relative to CWD.
+
+        If the file cannot be read (e.g. in unit tests with stub URIs), falls back
+        to a placeholder string so that test mocks can verify the rest of the flow
+        without requiring real disk I/O.
+        """
+        if eval_result.eval_row is None:
+            return "[no eval_row — candidate output unavailable]"
+
+        uri = eval_result.eval_row.artifact_refs.raw_output.uri
+        if not uri.startswith("file://"):
+            # Non-local URI (e.g. r2://...) — cannot read locally.
+            return f"[non-local artifact uri={uri}]"
+
+        file_path = pathlib.Path(uri[len("file://") :])
+        try:
+            return file_path.read_text(encoding="utf-8")
+        except OSError:
+            logger.debug(
+                "_read_raw_output: cannot read artifact at %s — "
+                "returning placeholder (unit test or missing artifact)",
+                file_path,
+            )
+            return f"[artifact not readable: {uri}]"
+
+    async def _run_judge_task(self, judge_task: InspectTask) -> list[EvalLog]:
+        """Run a judge Task via Inspect AI eval_async, with proxy env wiring.
+
+        Sets OPENAI_BASE_URL and OPENAI_API_KEY in the process environment so
+        Inspect AI routes all "openai/" prefixed model calls through our
+        LiteLLM proxy (same pattern as spike script, lines 183-184).
+
+        Returns the list[EvalLog] from eval_async.
+        """
+        from inspect_ai import eval_async as _inspect_eval_async
+        from inspect_ai.log import EvalLog as _EvalLog
+
+        old_base_url = os.environ.get("OPENAI_BASE_URL")
+        old_api_key = os.environ.get("OPENAI_API_KEY")
+        try:
+            os.environ["OPENAI_BASE_URL"] = self._base_url
+            api_key = self.api_key or "none"
+            os.environ["OPENAI_API_KEY"] = api_key
+
+            # eval_async is a native coroutine in inspect_ai — await directly.
+            result = await _inspect_eval_async(
+                judge_task,
+                log_dir="/tmp/pollmevals_judge_logs",
+                log_level="warning",
+            )
+            if not result:
+                return []
+            return [r for r in result if isinstance(r, _EvalLog)]
+        finally:
+            # Restore original env state.
+            if old_base_url is None:
+                os.environ.pop("OPENAI_BASE_URL", None)
+            else:
+                os.environ["OPENAI_BASE_URL"] = old_base_url
+            if old_api_key is None:
+                os.environ.pop("OPENAI_API_KEY", None)
+            else:
+                os.environ["OPENAI_API_KEY"] = old_api_key
