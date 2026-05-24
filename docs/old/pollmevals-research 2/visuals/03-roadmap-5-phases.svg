@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 580" width="720" height="580">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L0,10 L10,5 z" fill="#999"/>
+    </marker>
+    <style>
+      .title { font: bold 22px -apple-system, system-ui, sans-serif; fill: #222; }
+      .phase-num { font: bold 14px -apple-system, system-ui, sans-serif; fill: #fff; }
+      .phase-title { font: bold 16px -apple-system, system-ui, sans-serif; fill: #fff; }
+      .phase-sub { font: 13px -apple-system, system-ui, sans-serif; fill: rgba(255,255,255,0.85); }
+      .phase-count { font: 12px -apple-system, system-ui, sans-serif; fill: rgba(255,255,255,0.7); }
+      .ax-label { font: 11px -apple-system, system-ui, sans-serif; fill: #666; }
+    </style>
+  </defs>
+
+  <text x="360" y="35" text-anchor="middle" class="title">POLLMEVALS — 5-phase research series</text>
+
+  <!-- Phase 1 -->
+  <g>
+    <rect x="60" y="70" width="600" height="80" rx="12" fill="#6B7280"/>
+    <text x="80" y="100" class="phase-num">PHASE 1</text>
+    <text x="80" y="120" class="phase-title">Baseline моделей на голых задачах</text>
+    <text x="80" y="140" class="phase-sub">Радар: 14 моделей × 20 задач × 5 seeds</text>
+    <text x="620" y="120" text-anchor="end" class="phase-count">~260 runs · 1 неделя</text>
+    <text x="620" y="140" text-anchor="end" class="phase-sub">artifact: radar chart</text>
+  </g>
+  <line x1="360" y1="150" x2="360" y2="170" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 2 -->
+  <g>
+    <rect x="60" y="170" width="600" height="80" rx="12" fill="#7F77DD"/>
+    <text x="80" y="200" class="phase-num">PHASE 2</text>
+    <text x="80" y="220" class="phase-title">Лестница обвязки L0 → L6 ablation</text>
+    <text x="80" y="240" class="phase-sub">Что даёт каждый слой: tools, skills, память, validator</text>
+    <text x="620" y="220" text-anchor="end" class="phase-count">~50 runs · 1-2 недели</text>
+    <text x="620" y="240" text-anchor="end" class="phase-sub">artifact: ablation bars</text>
+  </g>
+  <line x1="360" y1="250" x2="360" y2="270" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 3 -->
+  <g>
+    <rect x="60" y="270" width="600" height="80" rx="12" fill="#7F77DD"/>
+    <text x="80" y="300" class="phase-num">PHASE 3</text>
+    <text x="80" y="320" class="phase-title">Память: file vs vector сравнение</text>
+    <text x="80" y="340" class="phase-sub">mem0, hindsight, file-based, vs raw context</text>
+    <text x="620" y="320" text-anchor="end" class="phase-count">~40 runs · 1 неделя</text>
+    <text x="620" y="340" text-anchor="end" class="phase-sub">artifact: comparison chart</text>
+  </g>
+  <line x1="360" y1="350" x2="360" y2="370" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 4 -->
+  <g>
+    <rect x="60" y="370" width="600" height="80" rx="12" fill="#7F77DD"/>
+    <text x="80" y="400" class="phase-num">PHASE 4</text>
+    <text x="80" y="420" class="phase-title">CLI agents: Claude Code vs Codex vs Gemini vs Hermes</text>
+    <text x="80" y="440" class="phase-sub">Сравнение agentic CLI на одном best стеке</text>
+    <text x="620" y="420" text-anchor="end" class="phase-count">~40 runs · 1 неделя</text>
+    <text x="620" y="440" text-anchor="end" class="phase-sub">artifact: bar comparison</text>
+  </g>
+  <line x1="360" y1="450" x2="360" y2="470" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 5 -->
+  <g>
+    <rect x="60" y="470" width="600" height="80" rx="12" fill="#10B981"/>
+    <text x="80" y="500" class="phase-num">PHASE 5</text>
+    <text x="80" y="520" class="phase-title">Финальный Pareto cost vs quality</text>
+    <text x="80" y="540" class="phase-sub">6-8 лучших стеков × 8 типов задач</text>
+    <text x="620" y="520" text-anchor="end" class="phase-count">~80 runs · 2 недели</text>
+    <text x="620" y="540" text-anchor="end" class="phase-sub">artifact: Pareto scatter</text>
+  </g>
+
+  <text x="360" y="572" text-anchor="middle" class="ax-label">Total: ~470 runs (вместо 51 480 при full grid) · ~6-8 недель работы</text>
+</svg>

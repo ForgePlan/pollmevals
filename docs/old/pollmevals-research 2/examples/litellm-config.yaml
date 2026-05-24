@@ -1,0 +1,179 @@
+# LiteLLM конфиг для POLLMEVALS
+# Сохрани как litellm_config.yaml
+# Запуск: litellm --config litellm_config.yaml --port 4000
+
+model_list:
+  # ===== CLOUD CLOSED MODELS (через OpenRouter) =====
+  
+  - model_name: claude-opus-4.7
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4.7
+      api_key: os.environ/OPENROUTER_API_KEY
+      
+  - model_name: claude-sonnet-4.6
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4.6
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  - model_name: gpt-5
+    litellm_params:
+      model: openrouter/openai/gpt-5
+      api_key: os.environ/OPENROUTER_API_KEY
+      
+  - model_name: gpt-5-mini
+    litellm_params:
+      model: openrouter/openai/gpt-5-mini
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: openrouter/google/gemini-2.5-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  - model_name: grok-4
+    litellm_params:
+      model: openrouter/xai/grok-4
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  - model_name: deepseek-v3.5
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v3.5
+      api_key: os.environ/OPENROUTER_API_KEY
+  
+  # ===== OPEN MODELS — FAST (через Cerebras) =====
+  
+  - model_name: llama-3.3-70b
+    litellm_params:
+      model: cerebras/llama3.3-70b
+      api_key: os.environ/CEREBRAS_API_KEY
+      # Custom price (если хочешь считать GPU-hour cost)
+      input_cost_per_token: 0.0000006   # $0.60/MTok
+      output_cost_per_token: 0.0000012  # $1.20/MTok
+  
+  - model_name: qwen3-32b
+    litellm_params:
+      model: cerebras/qwen-3-32b
+      api_key: os.environ/CEREBRAS_API_KEY
+  
+  - model_name: glm-4.7
+    litellm_params:
+      model: cerebras/glm-4.7
+      api_key: os.environ/CEREBRAS_API_KEY
+  
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: cerebras/gpt-oss-120b
+      api_key: os.environ/CEREBRAS_API_KEY
+  
+  # ===== OPEN MODELS — SELF-HOSTED (через Runpod vLLM) =====
+  
+  - model_name: qwen-2.5-72b
+    litellm_params:
+      model: hosted_vllm/Qwen/Qwen2.5-72B-Instruct
+      api_base: http://runpod-vllm.your-domain.com:8000/v1
+      api_key: os.environ/RUNPOD_VLLM_KEY  # любой fake key
+      # Custom price для GPU-hour
+      input_cost_per_token: 0.0000005
+      output_cost_per_token: 0.0000005
+  
+  # ===== LOCAL SMOKE TEST (через Ollama на Mac) =====
+  
+  - model_name: qwen-2.5-14b-local
+    litellm_params:
+      model: ollama/qwen2.5:14b
+      api_base: http://localhost:11434
+      # Local = $0 cost
+      input_cost_per_token: 0
+      output_cost_per_token: 0
+  
+  # ===== JUDGES (отдельные ключи для tracking) =====
+  
+  - model_name: judge-opus
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4.7
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+  
+  - model_name: judge-gpt5
+    litellm_params:
+      model: openrouter/openai/gpt-5
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+  
+  - model_name: judge-gemini
+    litellm_params:
+      model: openrouter/google/gemini-2.5-pro
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+
+
+# ===== ROUTER SETTINGS =====
+router_settings:
+  routing_strategy: latency-based-routing  # для load balancing
+  num_retries: 2
+  timeout: 600  # 10 min per request
+  
+  # Fallback chains
+  fallbacks:
+    - claude-opus-4.7:
+        - claude-sonnet-4.6  # fallback на Sonnet если Opus упал
+    - gpt-5:
+        - gpt-5-mini
+    - llama-3.3-70b:
+        - qwen-2.5-72b      # fallback на Runpod если Cerebras упал
+
+
+# ===== LITELLM SETTINGS =====
+litellm_settings:
+  drop_params: true                # не падать на unknown params
+  success_callback: ["langfuse"]   # опционально, для observability
+  failure_callback: ["langfuse"]
+  
+  # Cache (опционально, не для evals — мы хотим fresh каждый run)
+  # cache: false
+
+
+# ===== GENERAL SETTINGS =====
+general_settings:
+  master_key: "sk-pollmevals-master-key"  # CHANGE THIS
+  database_url: "postgresql://litellm:password@postgres:5432/litellm"
+  
+  # Rate limits per virtual key
+  alerting:
+    - slack
+  
+  # Per-run virtual key creation API
+  allow_user_auth: true
+  
+
+# ===== HOW TO USE =====
+#
+# Setup:
+#   pip install 'litellm[proxy]'
+#   docker run -d --name pg \
+#     -e POSTGRES_USER=litellm \
+#     -e POSTGRES_PASSWORD=password \
+#     -p 5432:5432 \
+#     postgres:16
+#
+# Run:
+#   litellm --config litellm_config.yaml --port 4000
+#
+# Test:
+#   curl http://localhost:4000/v1/chat/completions \
+#     -H "Authorization: Bearer sk-pollmevals-master-key" \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "model": "claude-opus-4.7",
+#       "messages": [{"role": "user", "content": "Hello"}]
+#     }'
+#
+# Use in Inspect AI:
+#   export OPENAI_BASE_URL=http://localhost:4000/v1
+#   export OPENAI_API_KEY=sk-pollmevals-master-key
+#   inspect eval ./tasks/be_01.yaml --model openai/claude-opus-4.7
+#
+# Get spend data:
+#   psql -d litellm -c 'SELECT model, SUM(spend) FROM "LiteLLM_SpendLogs" GROUP BY model;'

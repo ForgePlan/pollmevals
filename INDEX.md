@@ -1,14 +1,29 @@
 # POLLMEVALS — File Index
 
-105 файлов. Сгенерировано 2026-05-23.
+Последнее обновление: 2026-05-24 (Phase 2C complete + Slice A skeleton + NOTE-004 expanded vision).
+
+**Where to start (quick navigation)**:
+- Что есть в проекте → этот файл (root INDEX.md)
+- Что есть в docs/ → `docs/INDEX.md` (focused docs map)
+- Что есть в forgeplan/ → `forgeplan list` или `mcp__forgeplan__forgeplan_list`
+- Правила работы AI-агента → `CLAUDE.md`
+- Domain glossary → `CONTEXT.md`
+- Expanded vision catalog (stacks, memory, tools, metrics) → **`.forgeplan/notes/NOTE-004-*.md`** (canonical) или `forgeplan get NOTE-004`
 
 ## Корень
 
 - `README.md` — навигация и быстрый старт
-- `MASTER.md` — линейный свод всей документации (4000 строк)
-- `INDEX.md` — этот файл
-- `Makefile` — `demo-run`, `docker-up`, `api-dev`, `site-dev`, `validate-tasks`, `reproduce`
+- `MASTER.md` — линейный свод всей документации (151 KB)
+- `INDEX.md` — этот файл (file index + migration map)
+- `CLAUDE.md` — правила для AI-агента в этом проекте (auto-loaded)
+- `CONTEXT.md` — ubiquitous language / domain glossary (auto-loaded via @import)
+- `Makefile` — `stack-up/down`, `obs-up/down`, `smoke-dry`, `smoke-run`, `litellm-smoke`, `openrouter-smoke`, `validate-tasks`
 - `.env.example` — шаблон секретов
+- `.env` — `gitignored`, реальные секреты (OPENROUTER_API_KEY, OPENROUTER_API_KEY_JUDGE, LITELLM_MASTER_KEY, NATS_URL, GEMINI_API_KEY, HF_TOKEN)
+- `pyproject.toml` — Python project root (uv workspace)
+- `package.json` — Node.js root + lefthook devDep
+- `lefthook.yml` — pre-commit hooks (secret-scan, forgeplan-validate, format-py, format-ts, typecheck)
+- `.mcp.json` — MCP server config (forgeplan, hindsight, context7 в зависимости от настройки)
 
 ## docs/
 
@@ -92,6 +107,44 @@
 
 ### docs/PROJECT_TREE.md
 
+### docs/INDEX.md ⚡ NEW — focused docs map (added 2026-05-24)
+
+## .forgeplan/ — управляемые артефакты (через CLI/MCP only — red line: no direct edits)
+
+Полный список через `forgeplan list` или `mcp__forgeplan__forgeplan_list`. Краткий снапшот (на 2026-05-24, всего 40+ artifacts):
+
+- `epics/EPIC-001` — v0.1 launch
+- `prds/PRD-001` (active, deep) — v0.1 smoke evaluation run
+- `prds/PRD-002` (active, body=deep) — judge panel layer methodology
+- `prds/PRD-003..005` (draft stubs) — weekly cadence, leaderboard, release pipeline
+- `specs/SPEC-001` — run manifest contracts
+- `rfcs/RFC-001` (active) — overall implementation plan
+- `rfcs/RFC-002` (draft) — judge panel layer implementation (5 slices A-E)
+- `adrs/ADR-001..003` (active, done) — concurrency, reproduce semantics, 5-model lineup
+- `adrs/ADR-004` (active) — MoleculerPy adoption for PRD-003 distributed orchestrator
+- `adrs/ADR-005` (draft) — median reducer + bootstrap CI lower-bound rationale
+- `notes/NOTE-001` — crash recovery
+- `notes/NOTE-002` — **mandatory evidence quality contract** (ADI + Trust Calculus per EVID)
+- `notes/NOTE-003` — observability stack research seed (LGTM)
+- `notes/NOTE-004` — **expanded vision catalog** (agent CLIs, memory variants, context tools, indexing tools, extended metrics) ← canonical reference for full vision
+- `evidence/EVID-001..018` — Phase 1 prior art + reviews + audits
+- `evidence/EVID-019` — OpenRouter direct smoke test
+- `evidence/EVID-020` — Phase 2B stack bootstrap capture
+- `evidence/EVID-021` (superseded by 022) — Phase 2C OTel code review CONCERNS
+- `evidence/EVID-022` — Phase 2C fix re-review PASS
+- `evidence/EVID-023` — Phase 3 W1 H1 spike — Inspect AI per-judge access SUPPORTED
+
+Gitignored под `.forgeplan/`: `lance/`, `.fastembed_cache/`, `logs/`, `.lock`, `session.yaml`, `trash/`, `discovery/`, `claims/`.
+
+## artifacts/ — runtime smoke run outputs (gitignored)
+
+Каждый run = `artifacts/runs/sha256:<hash>/`:
+- `manifest.json` (file mode `0o444` per ADR-002 immutability)
+- `POSTMORTEM.md` (template from playbook)
+- `manifest.journal.ndjson` (append-only journal of grid execution)
+- `determinism-check.journal.ndjson` (re-run verification log)
+- `evals/<eval_id>/` (raw_output, normalized_output, evaluator_json — content-addressed)
+
 ## packages/
 
 ### packages/contracts/
@@ -107,11 +160,26 @@
 
 - `0001_initial.sql` — 8 таблиц: `models`, `model_providers`, `stacks`, `tasks`, `runs`, `evals`, `judgments`, `calibration_runs`
 
-## apps/ (skeletons, .gitkeep)
+## apps/
 
-- `eval-core-py/` — Python eval orchestrator
-- `api/` — Hono TypeScript API
-- `site/` — Next.js 15 публичный сайт
+### apps/eval-core-py/ — Python orchestrator (Phase 2A/B/C complete)
+
+- `pyproject.toml` + `uv.lock` — Python deps (pydantic v2, httpx, inspect-ai, opentelemetry-{api,sdk,exporter-otlp-proto-http}, ruff, mypy)
+- `src/orchestrator/grid_runner.py` — GridRunner (asyncio + Semaphore(3) + budget gate); has `SMOKE_MODELS` constant per ADR-003
+- `src/orchestrator/eval_caller.py` — `EvalCaller` Protocol + `FakeEvalCaller` + **`InspectEvalCaller` real impl** (HTTP to LiteLLM proxy + 429 retry + httpx.TimeoutException handling)
+- `src/orchestrator/journal.py` — `JournalWriter` (NDJSON append + fsync + OTel span error recording)
+- `src/orchestrator/manifest_writer.py` — `ManifestWriter` (state machine + `chmod 0o444` write-once)
+- `src/orchestrator/cost.py` — `BudgetGate` (Decimal precision + 80% abort threshold) + `CostReconciler` (with OTel spans)
+- `src/orchestrator/judge_panel.py` ⚡ NEW — RFC-002 Slice A skeleton: `JudgePanel` + `SelfJudgingError` + `_normalise_model_family` (cross-route family detection)
+- `src/orchestrator/telemetry.py` — OTel bootstrap (`init_tracing()`, OTLP HTTP exporter to localhost:4318)
+- `src/contracts/` — Pydantic v2 models (EvalRow, ManifestPin, GridSpec, ArtifactRef, Judgment, JudgeAggregation, ...)
+- `src/contracts/judge.py` ⚡ NEW — `Judgment` + `JudgeAggregation` Pydantic models (Slice A)
+- `src/evaluators/__init__.py` — STUB (Phase 2D scope: real cyclomatic/coverage/lint/type-safety evaluators)
+- `scripts/smoke_run.py` ⚡ NEW — Phase 2B coda entrypoint (playbook steps 1-14, dry-run / --confirm-spend gates)
+- `tests/` — 425 tests pass (test_grid_runner, test_journal, test_manifest_writer, test_cost, test_eval_caller, test_telemetry, test_judge_panel, test_smoke_runner, test_integration, test_contracts)
+
+### apps/api/ — Hono TypeScript API (Phase 4+)
+### apps/site/ — Next.js 15 публичный сайт (Phase 4+)
 
 ## evals/
 
@@ -149,10 +217,32 @@
 - `sample-leaderboard.json` — пример агрегации
 - `sample-run-manifest.json` — skeleton manifest
 
-## infra/scripts/
+## infra/ (Phase 2B + 2C additions)
 
-- `validate-task-specs.py` — проверка YAML спек
-- `reproduce-local-run.sh` — повторный запуск из manifest
+### infra/docker-compose.*.yml
+
+- `docker-compose.litellm.yml` — Postgres + NATS + LiteLLM proxy (data plane)
+- `docker-compose.observability.yml` — Grafana + Loki + Tempo + Prometheus + OTel Collector (LGTM stack)
+
+### infra/litellm-config.yaml
+
+5 candidate model routes (per ADR-003: claude-sonnet-4-6, gpt-5-mini, gemini-3-flash, qwen-3-14b, llama-3-3-70b) + 2 judge routes (claude-sonnet-4-6-judge, gpt-5-mini-judge) с `OPENROUTER_API_KEY_JUDGE` billing isolation per RFC-002 NFR-005.
+
+### infra/observability/
+
+- `otel-collector-config.yaml` — OTLP receivers (gRPC + HTTP) + Tempo/Loki/Prometheus exporters
+- `prometheus.yml` — scrapes LiteLLM `/metrics` with Bearer auth
+- `tempo-config.yaml`, `loki-config.yaml`, `grafana-datasources.yaml` — auto-provisioned
+
+### infra/scripts/
+
+- `validate-task-specs.py` — JSON Schema validation на `evals/task-packs/*/task.yaml`
+- `validate-stack-specs.py` — JSON Schema validation на `stacks/*/stack.yaml`
+- `smoke-openrouter.py` — direct OpenRouter pre-flight (ADR-003 model availability check)
+- `smoke-litellm.py` — через LiteLLM proxy pre-flight (proxy routing + master key validation)
+- `inspect_ai_h1_spike.py` ⚡ NEW — Phase 3 W1 H1 spike (verifies Inspect AI per-judge access — EVID-023)
+- `litellm-proxy-up.sh`, `litellm-proxy-down.sh` — legacy helpers (use `make stack-up` instead)
+- `reproduce-local-run.sh` — evaluator-only reproduce из manifest (per ADR-002 immutability)
 
 ## Migration Map (от старого `_draft/` к новому)
 

@@ -156,17 +156,29 @@ def validate_stack_specs(stack_ids: list[str]) -> PreflightResult:
 
 
 async def check_litellm_proxy(base_url: str = _LITELLM_BASE_URL) -> PreflightResult:
-    """Step 3 -- Ping LiteLLM proxy GET /health."""
+    """Step 3 -- Ping LiteLLM proxy GET /health/liveliness.
+
+    LiteLLM's `/health` endpoint requires the master key in newer versions;
+    `/health/liveliness` is the standard k8s-style unauthenticated readiness
+    probe that still works for connectivity check. If the proxy is up but the
+    key is wrong, the actual chat completions call surfaces the auth error.
+    """
+    import os
+
     import httpx
+
+    master_key = os.environ.get("LITELLM_MASTER_KEY", "")
+    headers = {"Authorization": f"Bearer {master_key}"} if master_key else {}
+    url = f"{base_url.rstrip('/')}/health/liveliness"
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-            resp = await client.get(f"{base_url.rstrip('/')}/health")
+            resp = await client.get(url, headers=headers)
             if resp.status_code == 200:
                 return PreflightResult(ok=True, issues=[])
             return PreflightResult(
                 ok=False,
-                issues=[f"LiteLLM proxy unhealthy: HTTP {resp.status_code} from {base_url}/health"],
+                issues=[f"LiteLLM proxy unhealthy: HTTP {resp.status_code} from {url}"],
             )
     except Exception as exc:
         return PreflightResult(

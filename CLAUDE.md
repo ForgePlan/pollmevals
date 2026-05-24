@@ -523,6 +523,25 @@ forgeplan health                     # verify clean state
 
 ---
 
+## File RAG — где что лежит (read these first when in doubt)
+
+| Вопрос | Файл |
+|---|---|
+| Что есть в проекте целиком? | `INDEX.md` (root) |
+| Что есть в docs/? | `docs/INDEX.md` |
+| Полный каталог stacks/memory/tools/metrics dimensions | `forgeplan get NOTE-004` (canonical reference for expanded vision) |
+| Что в forgeplan сейчас? | `forgeplan list` / `forgeplan health` |
+| Glossary | `CONTEXT.md` |
+| Long-term memory | Hindsight MCP bank `pollmevals` |
+
+## Expanded vision (NOTE-004 canonical)
+
+POLLMEVALS evaluates **whole scaffolding stacks**, not isolated models. The full catalog of agent CLIs (Claude Code, Codex, Aider, Gemini CLI, Cursor, Cline, **Pi (pi.dev)**, **Hermes (Nous Research)**, OpenHands, Plandex, Goose, forgeplan-framework), memory variants (file CLAUDE.md/AGENTS.md, mem0, Letta, Zep, Hindsight, GraphRAG, RAFLOW), context tools (Context7 axis: yes/no), codebase indexing (Serena, Aider repo-map, Sourcegraph, Cody), and extended metrics dimensions (existing 6 — correctness/coverage/complexity/lint/type-safety/judge_pattern — **plus 4 new** — docstring_coverage, profile_score, dep_selection_quality, vulnerability_scan_score) is captured in `NOTE-004`.
+
+**Cite NOTE-004 не повторяй каталог в новых артефактах.** Don't re-derive — `forgeplan get NOTE-004` is the source of truth. Promote to PRD-006 when 5+ stacks implemented + extended metrics design proven viable.
+
+**Phase numbering disambiguation** (NOTE-004 Section 6): codebase uses "Phase 0-5" (infra phases — what to build), research uses "Фаза 1-5" (experiment phases — what to measure). They are **different axes**. Be explicit which one you mean.
+
 ## References
 
 - `forgeplan` CLI — installed at `/opt/homebrew/bin/forgeplan` (v0.32.1). `brew install ForgePlan/tap/forgeplan` or `cargo install --git https://github.com/ForgePlan/forgeplan forgeplan-cli`.
