@@ -10,7 +10,7 @@ endif
 
 .PHONY: demo-run docker-up docker-down api-dev site-dev format-tree \
         validate-tasks validate-stacks reproduce \
-        smoke-run resume postmortem \
+        smoke-run smoke-dry resume postmortem \
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
         openrouter-smoke env-check
 
@@ -33,13 +33,18 @@ format-tree:
 	find . -maxdepth 3 -type f | sort
 
 # ---------------------------------------------------------------------------
-# Smoke-run targets (Phase 2B/2C — stubs; real implementation lands in later waves)
+# Smoke-run targets (Phase 2B coda — entrypoint implemented)
 # ---------------------------------------------------------------------------
 
+smoke-dry:
+	uv run --project apps/eval-core-py python apps/eval-core-py/scripts/smoke_run.py --dry-run
+
 smoke-run:
-	@echo "TODO: smoke-run not yet implemented (Phase 2B)."
-	@echo "See docs/04-runbook/12-first-smoke-run-playbook.md for the planned entrypoint."
-	@exit 0
+	@echo "Smoke run will spend \$$5-15 in real OpenRouter inference."
+	@echo "Use 'make smoke-dry' first to verify all pre-flight checks pass."
+	@echo "To execute: uv run --project apps/eval-core-py python apps/eval-core-py/scripts/smoke_run.py --confirm-spend"
+	@echo ""
+	@echo "(make smoke-run is intentionally NOT one command — explicit --confirm-spend prevents accidental spend)"
 
 resume:
 	@echo "TODO: resume not yet implemented (Phase 2A wave 5)."
