@@ -8,6 +8,7 @@ Public API — import from here, not from sub-modules:
 from .aggregates import CountsByStatus, RunAggregates
 from .artifact_ref import ArtifactRef
 from .eval_row import ErrorClass, EvalArtifactRefs, EvalRow, EvalStats, EvalStatus
+from .judge import JudgeAggregation, Judgment
 from .manifest import (
     METHODOLOGY_VERSION_V0_1_0,
     SCHEMA_VERSION_V1_0_0,
@@ -28,6 +29,8 @@ __all__ = [
     "EvalRow",
     "EvalStats",
     "EvalStatus",
+    "JudgeAggregation",
+    "Judgment",
     "Manifest",
     "ModelPin",
     "PricingSnapshot",
