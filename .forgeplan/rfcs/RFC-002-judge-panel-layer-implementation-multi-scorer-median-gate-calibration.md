@@ -2,7 +2,7 @@
 depth: standard
 id: RFC-002
 kind: rfc
-last_modified_at: 2026-05-24T19:09:50.884374+00:00
+last_modified_at: 2026-05-24T21:46:48.274965+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: PRD-002
@@ -246,21 +246,31 @@ class JudgePanel:
 
 ### Slice B — Inspect AI multi_scorer wiring + Phase 3 Week 1 spike (FR-001, H1 verification)
 
-**Spike first** (one-day): see § Phase 3 Week 1 spike below — write a 30-LOC verification script. If H1 holds (per-judge `Score` objects individually accessible), proceed with Slice B implementation. If H1 refuted, **file ADR-006** (reserved) and revise Slice B to use custom `@scorer` per judge plus manual aggregation.
+> **STATUS UPDATE (2026-05-24, post-EVID-023 spike)**: H1 SUPPORTED via fallback path (list-of-scorers). `multi_scorer()` BROKEN in `inspect_ai==0.3.46` — runtime crash `Object score does not have registry info`. Tracked upstream at github.com/UKGovernmentBEIS/inspect_ai/issues/4027. ADR-006 NOT needed; this RFC's Slice B "fallback" promoted to primary.
 
-**Implementation (assuming H1 holds)**:
+**Spike first** (one-day): see § Phase 3 Week 1 spike below — COMPLETED 2026-05-24, results in EVID-023. Proceed with Slice B implementation using list-of-scorers as primary path.
+
+**Implementation (H1 confirmed via list-of-scorers path)**:
 
 ```python
 async def score(self, eval_result: EvalResult, task_id: str) -> list[Judgment]:
     """Score one candidate output across the panel.
 
-    Wraps Inspect AI's:
-        multi_scorer(model_graded_qa(model=[j1, j2, j3]), reducer=mean_score())
+    Uses Inspect AI's list-of-scorers path (Task(scorer=[s1, s2, s3])).
 
-    NOTE: Inspect AI's default reducer is `mean_score`; we override to NOT
-    reduce here — we want per-judge Score objects (one per judge) and we
-    compute median ourselves in aggregate() per docs/02-methodology/scoring.md
+    NOTE: multi_scorer() is BROKEN in inspect_ai==0.3.46 (runtime crash
+    "Object score does not have registry info"). Do NOT use multi_scorer()
+    until upstream fix lands. Use the list-of-scorers path below.
+
+    Per-judge Score objects are accessible via sample.scores (dict keyed by
+    scorer name: 'model_graded_qa', 'model_graded_qa1', ...).
+    We compute median ourselves in aggregate() per docs/02-methodology/scoring.md
     (and EVID-001: HELM uses mean, POLLMEVALS uses median).
+
+    IMPORTANT: always cap judge max_tokens explicitly via
+    get_model(judge, config=GenerateConfig(max_tokens=512)) — the default
+    is the model's native max (65k for Claude Sonnet), which will exhaust
+    OpenRouter monthly budget on the first run (HTTP 402 confirmed in EVID-023).
 
     Returns one Judgment per judge model. Position in the returned list
     matches the randomised judge_order (H2 mitigation of position bias).
@@ -268,23 +278,29 @@ async def score(self, eval_result: EvalResult, task_id: str) -> list[Judgment]:
     # 1. Load rubric for task_id from evals/task-packs/<slug>/rubric.yaml
     # 2. Build anonymised submission (strip greetings, signatures, "as an AI" — per runbook 07:33-43)
     # 3. Randomise judge order (H2): rng.shuffle(judge_models_for_this_call)
-    # 4. Invoke Inspect AI multi_scorer:
-    #       scorer = multi_scorer(model_graded_qa(model=[...]), reducer=None)
-    #    OR if reducer=None unsupported: read per-judge entries from EvalLog.samples[0].scores
-    #       (which is a dict[str, Score] keyed by scorer name)
-    # 5. For each judge, build Judgment with rubric_scores + total_score
-    # 6. Return list[Judgment]
+    # 4. Build per-judge scorers with explicit max_tokens cap:
+    #       scorers = [
+    #           model_graded_qa(model=get_model(j, config=GenerateConfig(max_tokens=512)), template="...")
+    #           for j in judge_models_shuffled
+    #       ]
+    #    Pass as list to Task(scorer=scorers) — NOT multi_scorer()
+    # 5. Read per-judge entries from EvalLog.samples[0].scores
+    #       (dict[str, Score] keyed by auto-assigned scorer name)
+    #    Use explicit Scorer.named("judge_<model_family>") in production for debuggability
+    # 6. For each judge, build Judgment with rubric_scores + total_score
+    # 7. Return list[Judgment]
 ```
 
-**Per-judge access strategy**:
+**Per-judge access strategy (updated post-EVID-023)**:
 
-- **Primary path** (H1 holds): use `multi_scorer(model_graded_qa(model=[...]), reducer=None)` or the Inspect AI option that surfaces per-judge `Score` (see EVID-004 ref to `scorers.html`).
-- **Fallback path** (H1 partially holds — reducer is mandatory): build N separate `@scorer`-decorated functions, one per judge model; pass all N to the `Task(scorers=[s1, s2, s3])` argument; read per-judge results from `EvalLog.samples[0].scores` dict (keyed by scorer name).
+- **PRIMARY path** (confirmed working): pass a list of `model_graded_qa` scorer instances directly to `Task(scorer=[s1, s2, s3])`. Read per-judge results from `EvalLog.samples[0].scores` (dict keyed by scorer name). **MUST** cap `max_tokens` via `get_model(judge, config=GenerateConfig(max_tokens=512))` — default native max (65k for Claude Sonnet) causes HTTP 402 on OpenRouter keys with monthly budget limits (production hazard confirmed EVID-023).
+- **BROKEN — do not use**: `multi_scorer()` in `inspect_ai==0.3.46` crashes at runtime with `Object score does not have registry info`. Upstream issue filed at github.com/UKGovernmentBEIS/inspect_ai/issues/4027. Re-evaluate after upstream fix.
 
 **Acceptance criteria**:
 
 - Integration test with `respx`-mocked LiteLLM proxy returning 3 distinct judge responses → `JudgePanel.score()` returns 3 `Judgment` objects with distinct `judge_model_id` values + per-criterion rubric scores.
 - Position bias mitigation verified: same panel called twice on identical input produces different `judge_order` values across calls (within at most 6 permutations for 3 judges).
+- max_tokens guard test: `JudgePanel.__init__` with no explicit `max_tokens` override raises `ValueError("judge max_tokens must be capped explicitly — default native max causes HTTP 402 on OpenRouter")`.
 
 ### Slice C — Krippendorff α + bootstrap CI computation (FR-003, SC-1)
 
@@ -299,6 +315,18 @@ def aggregate(self, judgments: list[Judgment]) -> JudgeAggregation:
     Per docs/02-methodology/scoring.md: median (NOT mean) across judges.
     Per PRD-002 Q2 (decision): publication gate uses CI lower-bound,
     NOT point estimate.
+
+    median_total semantics (task-type-dependent):
+      - Documentation tasks: per scoring.md line 27 ("For each criterion,
+        take the median score across judges. Final score is the mean of
+        criterion medians"), median_total = mean(median_per_criterion.values()).
+        This is NOT the overall median of all judge total_scores.
+      - Coding / review tasks: median_total = weighted total per the
+        task-category scoring formula (correctness × 0.40 + coverage × 0.15
+        + ... — see docs/02-methodology/scoring.md). Each weight applied to
+        the per-criterion median before summing.
+      Task type is determined from task_id prefix (be_* / fe_* = coding/review;
+      doc_* = documentation).
 
     Args:
         judgments: list of N Judgment objects (one per judge). N must be
@@ -367,6 +395,7 @@ def aggregate(self, judgments: list[Judgment]) -> JudgeAggregation:
 - Golden test 2: perfectly-agreeing matrix (all judges identical scores) → α = 1.0, CI = [1.0, 1.0].
 - Golden test 3: orthogonal-disagreement matrix → α near 0, CI bracket includes 0.
 - Bootstrap-CI test: fixed seed produces deterministic CI bounds (regression-safe).
+- median_total test (doc task): 3 judges score 2 criteria; `median_total` == `mean([median(criterion_1_scores), median(criterion_2_scores)])`, NOT `median([j.total_score for j in judgments])`.
 
 ### Slice D — Calibration suite + identification probe (FR-004, FR-005, SC-3, SC-4)
 
@@ -491,48 +520,13 @@ if self._judge_panel is not None and result.eval_row.status == EvalStatus.SCORED
 
 ### Phase 3 Week 1 spike (H1 verification — Q1 decision dependency)
 
-**Spike script**: `apps/eval-core-py/scripts/inspect_ai_h1_spike.py` (NEW, ≤ 30 LOC, deleted after verdict).
+**COMPLETED 2026-05-24** — see EVID-023 for full results.
 
-**Pseudocode**:
+Key findings (3):
 
-```python
-"""Spike: verify Inspect AI multi_scorer surfaces per-judge Score objects.
-
-If this script's assertion fires, file ADR-006 (pivot to custom @scorer per
-judge) and revise RFC-002 Slice B accordingly.
-"""
-
-import asyncio
-from inspect_ai import Task, eval, Sample
-from inspect_ai.scorer import multi_scorer, model_graded_qa
-
-# Tiny one-sample task — does the model output contain "foo"?
-task = Task(
-    dataset=[Sample(input="Say 'foo'.", target="foo")],
-    scorer=multi_scorer(
-        scorers=[
-            model_graded_qa(model="openrouter/anthropic/claude-haiku-4-5", template="..."),
-            model_graded_qa(model="openrouter/openai/gpt-5-mini", template="..."),
-        ],
-        reducer=None,   # ← THE QUESTION: does Inspect AI honour reducer=None?
-    ),
-)
-log = asyncio.run(eval(task, model="openrouter/anthropic/claude-haiku-4-5"))
-
-# H1 assertion
-sample = log[0].samples[0]
-scores = sample.scores  # expected: dict[str, Score] with 2 entries — one per judge
-assert isinstance(scores, dict), f"H1 REFUTED — scores is {type(scores)}, not dict"
-assert len(scores) == 2, f"H1 REFUTED — got {len(scores)} per-judge entries, expected 2"
-print("H1 SUPPORTED — per-judge Score access available.")
-```
-
-**Verdicts**:
-
-- **H1 SUPPORTED** → proceed with Slice B as drafted; record EVID-{h1-spike} with verdict=supports, CL=3.
-- **H1 REFUTED** → file ADR-006 (reserved slot per PRD-002 Q1) "pivot from Inspect AI multi_scorer to custom @scorer per judge"; revise Slice B fallback path to primary; schedule slip ~1 week per PRD-002 Risks.
-
-**Budget**: ≤ $0.05 in real LLM spend (3 prompts × 2 judges = 6 cheap calls); spike runs on dev machine, not in CI.
+1. **`multi_scorer()` BROKEN** in `inspect_ai==0.3.46` — runtime crash `Object score does not have registry info`. Do not use until upstream fix (github.com/UKGovernmentBEIS/inspect_ai/issues/4027).
+2. **List-of-scorers path WORKS** — passing a list to `Task(scorer=[s1, s2, s3])` exposes per-judge `Score` objects in `sample.scores` (dict keyed by auto-assigned scorer name). H1 SUPPORTED via this path. ADR-006 NOT needed.
+3. **`max_tokens` production hazard** — judge `max_tokens` defaults to model native max (65k for Claude Sonnet). First spike run failed with HTTP 402 "requested up to 65536 tokens, can only afford 2537". **MUST** cap via `get_model(judge, config=GenerateConfig(max_tokens=512))` in `JudgePanel.__init__`.
 
 ## Test plan
 
@@ -544,7 +538,7 @@ print("H1 SUPPORTED — per-judge Score access available.")
 | Calibration | Synthetic 5-quality-level samples → MAD computed; MAD > 1.5 surfaces as `CalibrationFailedError` upstream | pytest + synthetic fixtures |
 | Cost | Dry-run smoke-grid estimate (45 evals × $0.012 candidate + $0.15 judge) ≤ $50 NFR-001 envelope | unit (no network) |
 | Regression | All existing 358 tests stay green after EvalRow extensions (default-None judge fields preserve back-compat) | pytest -q |
-| Spike (one-off, manual) | H1 verification — Inspect AI multi_scorer per-judge Score access | `apps/eval-core-py/scripts/inspect_ai_h1_spike.py` |
+| Spike (one-off, manual) | H1 verification — COMPLETED 2026-05-24, see EVID-023 | `apps/eval-core-py/scripts/inspect_ai_h1_spike.py` |
 
 **Test fixtures required** (new under `apps/eval-core-py/tests/fixtures/`):
 
@@ -585,7 +579,7 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 
 | Failure mode | Rollback action |
 |---|---|
-| **H1 spike refutes** (Inspect AI multi_scorer per-judge surface unavailable) | File ADR-006 (reserved). Slice B fallback path becomes primary (N separate `@scorer`-decorated functions). Schedule slips ~1 week. No code in main yet — pure RFC revision. |
+| **H1 spike refutes** (Inspect AI multi_scorer per-judge surface unavailable) | N/A — spike COMPLETED 2026-05-24 (EVID-023). H1 SUPPORTED via list-of-scorers. ADR-006 NOT filed. |
 | **Slice A merged but self-judging guard misses a route** (escape hatch slip) | Hotfix: extend `_normalise_model_family` regex; add the missing route to the unit test matrix; revert via a follow-up commit, not branch rewind. Critical-severity bug = immediate fix-forward. |
 | **Slice C Krippendorff α computation buggy on POLLMEVALS data** | Disable α gate at Phase 3 entry (run continues with α=None across all evals); manifest tagged `status="calibration-not-ready"`. Fix via follow-up commit; no destructive history rewrite. |
 | **Slice D calibration runner times out (NFR-003 breach)** | Reduce calibration sample count from 50 to 25 (5 levels × 5 samples); re-document threshold in PRD-002 update; ADR-005 capture rationale. |
@@ -603,10 +597,11 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 | **ADR-003** | `informs` | Judge diversity (3 vendor families) drove candidate lineup — judge panel inherits the same diversity constraint |
 | **ADR-004** | `informs` | MoleculerPy concurrency — Phase 3+ moves judge calls to separate `judge-svc` workers; this RFC's Phase 2C single-process is the migration baseline |
 | **ADR-005** | `informs` (FUTURE) | Median + CI-lower-bound gate rationale — being authored in parallel; this RFC cross-references the decision but does not block on the ADR's creation |
-| **ADR-006** | `informs` (RESERVED) | H1 refutation pivot — created only if Phase 3 Week 1 spike fails |
+| **ADR-006** | `informs` (RESERVED — NOT FILED) | H1 refutation pivot — NOT needed; spike confirmed list-of-scorers path works (EVID-023) |
 | **EVID-001** | `informs` | HELM uses mean across judges; POLLMEVALS uses median per scoring.md — this RFC implements that divergence |
 | **EVID-004** | `informs` | Inspect AI multi_scorer + model_graded_qa prior art is the foundation for Slice B |
 | **EVID-015** | `informs` | EvalCaller Protocol pattern — JudgePanel follows the same testability seam discipline |
+| **EVID-023** | `informs` | Phase 3 W1 H1 spike — confirms list-of-scorers path, documents multi_scorer breakage + max_tokens hazard |
 | **NOTE-002** | `informs` | Evidence Quality Standard — every EVID born from this RFC (calibration, α, probe, cost) carries explicit ADI + Trust Calculus |
 
 **Frozen methodology source-of-truth** (read-only, never edited by this RFC):
@@ -621,12 +616,13 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 | ID | Risk | Probability | Impact | Mitigation |
 |---|---|---|---|---|
 | R1 | **Cost amplification non-linear** — judge calls add 3× per eval; weekly run exceeds budget | Med | High | NFR-001 dollar ceiling enforced via BudgetGate; judge cost reserved upfront in Slice E; dry-run cost estimate before launch (per PRD-001 NFR-002 ratio gate) |
-| R2 | **Inspect AI multi_scorer per-judge surface unavailable** — H1 refuted | Med | Med | Phase 3 Week 1 spike (Implementation Phases § Phase 3 Week 1 spike); ADR-006 reserved for pivot; Slice B documents fallback (`@scorer` per judge + manual aggregation) |
+| R2 | **Inspect AI multi_scorer per-judge surface unavailable** — H1 refuted | **RESOLVED** (EVID-023) | Med | List-of-scorers path confirmed as PRIMARY. ADR-006 NOT filed. |
 | R3 | **Self-judging slip at runtime** — OpenRouter route `openrouter/anthropic/...` vs direct `anthropic/...` not caught by string-match | Low | Critical | Family-level normalisation in `_normalise_model_family`; cross-route unit tests cover all 5 ADR-003 lineup permutations; CI gate on test |
 | R4 | **Calibration drift between runs** — silent judge model update invalidates prior α/MAD baselines (EVID-002 Voyage lesson) | Med | High | Manifest stores `calibration_hash` (SHA256 of calibration sample set + per-judge MAD vector); weekly run compares hash vs previous; drift alert in Phase 4 |
 | R5 | **Judge unavailability mid-run** — vendor outage on 1 of 3 judges drops α confidence | Med | Med | Q3 degraded policy (Slice E): proceed at N-1, `alpha=None`, `judge_status=DEGRADED`; run-level abort if > 20% degraded; EVID logs every DEGRADED eval |
 | R6 | **α point ≥ 0.70 but CI lower-bound < 0.70** — first weekly can't publish | Med | Med | Decision Q2 (CI-lower-bound gate) is intentional; if refused, increase calibration sample size to tighten CI; publish "calibration-not-ready" status note instead of broken leaderboard |
 | R7 | **Cross-family preference leakage** — Anthropic/OpenAI/Google share pretrain data; judges not as independent as nominal families (arxiv 2502.01534) | Med | Med | ADR-003 3-family panel is v0.1 stance; v2.0 may add open-weight judges (Qwen, Llama) for true independence; EVID tracks self-enhancement bias on every weekly run |
+| R8 | **judge max_tokens default causes HTTP 402** — OpenRouter monthly budget exhausted on first real run | **MITIGATED** (EVID-023) | High | Mandatory `get_model(judge, config=GenerateConfig(max_tokens=512))` in `JudgePanel.__init__`; added to Slice B AC + Invariants |
 
 ## Out of Scope
 
@@ -641,9 +637,9 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 
 ## Next steps (Phase 3, T+2..T+4 weeks)
 
-1. **Week 1 (spike, ≤ 1 day)**: H1 verification — run `inspect_ai_h1_spike.py`; either ADR-006 or proceed.
-2. **Week 1-2 (Slice A + B)**: `JudgePanel` skeleton + self-judging guard + Inspect AI wiring + unit tests.
-3. **Week 2 (Slice C)**: Krippendorff α + bootstrap CI + golden-data tests.
+1. **Week 1 (spike)**: COMPLETED 2026-05-24 — EVID-023. List-of-scorers path confirmed; ADR-006 NOT needed.
+2. **Week 1-2 (Slice A + B)**: `JudgePanel` skeleton + self-judging guard + Inspect AI list-of-scorers wiring + unit tests (including max_tokens guard test).
+3. **Week 2 (Slice C)**: Krippendorff α + bootstrap CI + golden-data tests (including doc-task median_total test).
 4. **Week 3 (Slice D)**: Calibration runner + identification probe + synthetic-fixture tests; first real calibration session against 3 judges × 3 tasks → EVID-{calibration,α}.
 5. **Week 3-4 (Slice E)**: GridRunner integration; first end-to-end smoke run WITH judges (45 evals × 3 judges) → EVID-{cost,judge-smoke}.
 6. **Week 4**: Identification probe runs end-to-end → EVID-probe; SC-4 verified.
@@ -651,11 +647,5 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 
 ---
 
-*Status: draft. Activation requires: (a) Phase 3 Week 1 spike outcome captured as EVID, (b) PRD-002 R_eff ≥ 0.70 maintained, (c) Guardian gate review per NOTE-002 contract.*
-
-
-
-
-
-
+*Status: draft. Activation requires: (a) Phase 3 spike outcome captured as EVID-023 (DONE), (b) PRD-002 R_eff ≥ 0.70 maintained, (c) Guardian gate review per NOTE-002 contract.*
 
