@@ -71,4 +71,5 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "types-jsonschema>=4.26.0.20260518",
+    "types-PyYAML>=6.0",
 ]

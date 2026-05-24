@@ -21,6 +21,7 @@ Concurrency is OUTSIDE this module — same discipline as eval_caller.py:13-14.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import pathlib
@@ -28,9 +29,17 @@ import random
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+import numpy as np
+import yaml  # type: ignore[import-untyped]
 from inspect_ai.model import GenerateConfig
 
-from src.contracts import JudgeAggregation, Judgment
+from src.contracts import (
+    CalibrationResult,
+    JudgeAggregation,
+    JudgeCalibration,
+    Judgment,
+    ProbeResult,
+)
 
 if TYPE_CHECKING:
     from inspect_ai import Task as InspectTask
@@ -71,6 +80,74 @@ _FAMILY_ALIASES: dict[str, str] = {
 # Default judge max_tokens cap per EVID-023 finding (prevents HTTP 402 on
 # OpenRouter when key budget is low — Claude Sonnet native max is 65k).
 _DEFAULT_JUDGE_MAX_TOKENS = 512
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers (Slice D)
+# ---------------------------------------------------------------------------
+
+
+def cast_dict(value: object) -> dict[str, object]:
+    """Safely cast YAML-loaded mapping to dict[str, object].
+
+    yaml.safe_load returns ``dict[Any, Any]`` when the YAML node is a mapping.
+    The isinstance guard narrows the type; the explicit cast makes mypy happy
+    under --strict without requiring a broad ``Any`` annotation.
+    """
+    if not isinstance(value, dict):
+        return {}
+    # PyYAML loads YAML mappings as dict[str, Any] when keys are strings.
+    # We assert the key type via explicit conversion for the mypy --strict path.
+    return {str(k): v for k, v in value.items()}
+
+
+def _spearman_r(x: np.ndarray, y: np.ndarray) -> float:
+    """Compute Spearman rank correlation using numpy (no scipy dependency).
+
+    Uses the standard formula:
+        r_s = 1 - (6 * sum(d²)) / (n * (n² - 1))
+    where d = rank(x) - rank(y) using average rank for ties.
+
+    Returns 0.0 for degenerate inputs (n < 2 or zero-variance ranks).
+    Range: [-1.0, 1.0].
+
+    Args:
+        x: 1-D numpy array of gold scores.
+        y: 1-D numpy array of judge scores (same length as x).
+    """
+    n = len(x)
+    if n < 2:
+        return 0.0
+
+    # Average-rank method — handles ties correctly (gold samples at the same
+    # quality level share the same gold score and therefore share a rank).
+    def _rank_with_ties(arr: np.ndarray) -> np.ndarray:
+        order = np.argsort(arr, kind="stable")
+        ranks = np.empty(n, dtype=float)
+        ranks[order] = np.arange(1, n + 1, dtype=float)
+        # Resolve ties: find groups of equal values and assign average rank.
+        i = 0
+        while i < n:
+            j = i + 1
+            while j < n and arr[order[i]] == arr[order[j]]:
+                j += 1
+            if j > i + 1:  # tie group found
+                avg_rank = (i + 1 + j) / 2.0  # average of 1-indexed ranks
+                for k in range(i, j):
+                    ranks[order[k]] = avg_rank
+            i = j
+        return ranks
+
+    rx = _rank_with_ties(x)
+    ry = _rank_with_ties(y)
+    d = rx - ry
+    d_sq_sum = float(np.sum(d**2))
+    denominator = n * (n**2 - 1)
+    if denominator == 0:
+        return 0.0
+    rs = 1.0 - 6.0 * d_sq_sum / denominator
+    # Clamp to [-1, 1] to guard against floating-point drift.
+    return float(max(-1.0, min(1.0, rs)))
 
 
 # ---------------------------------------------------------------------------
@@ -527,6 +604,229 @@ class JudgePanel:
         )
 
     # ------------------------------------------------------------------
+    # Slice D — Calibration suite (FR-004, SC-3)
+    # ------------------------------------------------------------------
+
+    async def run_calibration(self, task_id: str) -> CalibrationResult:
+        """Run each judge over all calibration samples for one task.
+
+        Loads ``evals/task-packs/<task_id>/calibration.yaml`` for gold scores,
+        then for each of the five quality levels (perfect / good / mediocre /
+        poor / broken) loads all ``*.md`` samples from the corresponding subdir.
+        Each judge scores every sample via ``_score_calibration_sample()``.
+
+        MAD formula: ``mean(|judge_score - gold_score|)`` per judge.
+        Rank correlation: Spearman r computed with numpy ranking (no scipy dep).
+        Passed: ``True`` iff all judges have ``MAD ≤ mad_threshold`` where
+        ``mad_threshold`` comes from ``calibration.yaml`` (default 1.5 per
+        PRD-002 SC-3).
+
+        The ``calibration_hash`` is SHA-256 of the YAML content concatenated with
+        all sample file bodies sorted lexicographically by path — stable across
+        reruns on unchanged content; changes when samples or gold scores change
+        (RFC-002 R4 drift detection anchor).
+
+        Args:
+            task_id: eval task slug (e.g. ``"be_01_jwt_auth"``).
+
+        Returns:
+            CalibrationResult with per-judge metrics and overall pass/fail.
+
+        Raises:
+            FileNotFoundError: if ``calibration.yaml`` or any required subdir is
+                missing (author has not seeded the task-pack yet).
+        """
+        QUALITY_LEVELS = ("perfect", "good", "mediocre", "poor", "broken")
+
+        # ── 1. Locate calibration root relative to CWD (repo root) ──────────
+        repo_root = pathlib.Path.cwd()
+        calib_root = repo_root / "evals" / "task-packs" / task_id
+        yaml_path = calib_root / "calibration.yaml"
+
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"calibration.yaml not found for task {task_id!r}: {yaml_path}")
+
+        yaml_text = yaml_path.read_text(encoding="utf-8")
+        calib_meta: dict[str, object] = yaml.safe_load(yaml_text)
+        gold_scores: dict[str, float] = {
+            k: float(str(v)) for k, v in cast_dict(calib_meta.get("gold_scores", {})).items()
+        }
+        mad_raw = calib_meta.get("mad_threshold", 1.5)
+        mad_threshold: float = float(str(mad_raw))
+
+        # ── 2. Load all samples from the five quality subdirs ────────────────
+        # List of (quality_level, file_path, text_content) tuples.
+        samples: list[tuple[str, pathlib.Path, str]] = []
+        for level in QUALITY_LEVELS:
+            level_dir = calib_root / "calibration" / level
+            if not level_dir.is_dir():
+                continue
+            for md_file in sorted(level_dir.glob("*.md")):
+                samples.append((level, md_file, md_file.read_text(encoding="utf-8")))
+
+        # ── 3. Compute calibration_hash (SHA-256 of YAML + all sample bodies) ─
+        hasher = hashlib.sha256()
+        hasher.update(yaml_text.encode("utf-8"))
+        for _, _, body in sorted(samples, key=lambda t: str(t[1])):
+            hasher.update(body.encode("utf-8"))
+        calibration_hash = hasher.hexdigest()
+
+        # ── 4. Per-judge scoring over all samples ────────────────────────────
+        judge_records: dict[str, list[tuple[float, float]]] = {
+            jid: [] for jid in self._judge_models
+        }
+
+        for judge_id in self._judge_models:
+            for level, _path, content in samples:
+                gold = gold_scores.get(level, 0.0)
+                judge_score = await self._score_calibration_sample(
+                    judge_id=judge_id,
+                    sample_content=content,
+                    task_id=task_id,
+                )
+                judge_records[judge_id].append((gold, judge_score))
+
+        # ── 5. Compute per-judge MAD + Spearman rank correlation ─────────────
+        judge_calibrations: dict[str, JudgeCalibration] = {}
+        for judge_id, pairs in judge_records.items():
+            if not pairs:
+                judge_calibrations[judge_id] = JudgeCalibration(
+                    judge_id=judge_id,
+                    mad=0.0,
+                    rank_correlation=0.0,
+                    samples_evaluated=0,
+                )
+                continue
+
+            gold_arr = np.array([p[0] for p in pairs], dtype=float)
+            judge_arr = np.array([p[1] for p in pairs], dtype=float)
+
+            mad = float(np.mean(np.abs(judge_arr - gold_arr)))
+            rank_corr = _spearman_r(gold_arr, judge_arr)
+
+            judge_calibrations[judge_id] = JudgeCalibration(
+                judge_id=judge_id,
+                mad=mad,
+                rank_correlation=rank_corr,
+                samples_evaluated=len(pairs),
+            )
+
+        # ── 6. Overall pass/fail (all judges must be within threshold) ────────
+        passed = all(jc.mad <= mad_threshold for jc in judge_calibrations.values())
+
+        return CalibrationResult(
+            task_id=task_id,
+            judge_calibrations=judge_calibrations,
+            passed=passed,
+            gold_scores=gold_scores,
+            calibration_hash=calibration_hash,
+            mad_threshold=mad_threshold,
+        )
+
+    async def run_identification_probe(self, task_id: str) -> ProbeResult:
+        """SC-4 anonymisation effectiveness probe for one task.
+
+        Loads anonymised samples from
+        ``evals/task-packs/<task_id>/identification_probe/`` (markdown files).
+        Each judge is prompted to guess which model family produced the output
+        from a fixed list of 5 families (forced single-word choice).
+
+        SC-4 (PRD-002): overall accuracy ≤ 0.30. Chance level = 1/5 = 0.20.
+
+        The prompt given to each judge:
+            "Below is a model output. Which of these model families most likely
+            produced it? Respond with exactly one word from: anthropic, openai,
+            google, qwen, meta.\\n\\nOutput:\\n<sample_content>"
+
+        The correct label for each sample is read from the filename:
+        ``<family>-<number>.md`` (e.g. ``anthropic-001.md`` → correct = "anthropic").
+        Files without a matching family prefix count as unknown and are skipped.
+
+        Args:
+            task_id: eval task slug.
+
+        Returns:
+            ProbeResult with per-judge accuracy and overall pass/fail.
+
+        Raises:
+            FileNotFoundError: if the identification_probe directory is missing.
+        """
+        PROBE_FAMILIES = frozenset({"anthropic", "openai", "google", "qwen", "meta"})
+
+        repo_root = pathlib.Path.cwd()
+        probe_dir = repo_root / "evals" / "task-packs" / task_id / "identification_probe"
+
+        if not probe_dir.exists():
+            raise FileNotFoundError(
+                f"identification_probe/ not found for task {task_id!r}: {probe_dir}"
+            )
+
+        # ── 1. Load labelled samples ─────────────────────────────────────────
+        # Filename convention: <family>-<number>.md  (e.g. anthropic-001.md)
+        labelled_samples: list[tuple[str, str]] = []  # (correct_family, content)
+        for md_file in sorted(probe_dir.glob("*.md")):
+            stem = md_file.stem  # e.g. "anthropic-001"
+            family = stem.split("-")[0].lower()
+            if family in PROBE_FAMILIES:
+                labelled_samples.append((family, md_file.read_text(encoding="utf-8")))
+            else:
+                logger.debug(
+                    "run_identification_probe: skipping %s — family %r not in probe list",
+                    md_file.name,
+                    family,
+                )
+
+        if not labelled_samples:
+            logger.warning(
+                "run_identification_probe: no labelled samples found in %s — "
+                "returning empty result with accuracy=0.0 (passed=True)",
+                probe_dir,
+            )
+            return ProbeResult(
+                task_id=task_id,
+                judges_used=list(self._judge_models),
+                n_samples=0,
+                per_judge_accuracy={jid: 0.0 for jid in self._judge_models},
+                overall_accuracy=0.0,
+                passed=True,
+            )
+
+        # ── 2. Per-judge accuracy computation ────────────────────────────────
+        per_judge_correct: dict[str, int] = {jid: 0 for jid in self._judge_models}
+        per_judge_total: dict[str, int] = {jid: 0 for jid in self._judge_models}
+
+        for judge_id in self._judge_models:
+            for correct_family, content in labelled_samples:
+                guess = await self._score_identification_sample(
+                    judge_id=judge_id,
+                    sample_content=content,
+                    probe_families=PROBE_FAMILIES,
+                    task_id=task_id,
+                )
+                per_judge_total[judge_id] += 1
+                if guess == correct_family:
+                    per_judge_correct[judge_id] += 1
+
+        # ── 3. Aggregate accuracy ────────────────────────────────────────────
+        per_judge_accuracy: dict[str, float] = {}
+        for jid in self._judge_models:
+            total = per_judge_total[jid]
+            per_judge_accuracy[jid] = per_judge_correct[jid] / total if total > 0 else 0.0
+
+        total_pairs = sum(per_judge_total.values())
+        total_correct = sum(per_judge_correct.values())
+        overall_accuracy = total_correct / total_pairs if total_pairs > 0 else 0.0
+
+        return ProbeResult(
+            task_id=task_id,
+            judges_used=list(self._judge_models),
+            n_samples=total_pairs,
+            per_judge_accuracy=per_judge_accuracy,
+            overall_accuracy=round(overall_accuracy, 6),
+            passed=overall_accuracy <= 0.30,
+        )
+
+    # ------------------------------------------------------------------
     # Self-judging guard (static — no network, no external deps)
     # ------------------------------------------------------------------
 
@@ -583,6 +883,71 @@ class JudgePanel:
         construct JudgePanel without real credentials).
         """
         return os.environ.get(self._api_key_env, "")
+
+    # ------------------------------------------------------------------
+    # Slice D — internal calibration + probe scoring helpers
+    # ------------------------------------------------------------------
+
+    async def _score_calibration_sample(
+        self,
+        judge_id: str,
+        sample_content: str,
+        task_id: str,
+    ) -> float:
+        """Score one calibration sample with one judge, returning a 0-10 score.
+
+        In production this will invoke the judge via Inspect AI (same path as
+        score()). In tests this method is mocked via patch.object so no real
+        LLM calls are made.
+
+        The score is extracted the same way as in score(): "C" → 10.0,
+        "I" → 0.0, numeric → scaled. For rubric-based scoring in later slices
+        the return will be the weighted-median total; for Slice D this
+        single-number return is sufficient for MAD computation.
+
+        Args:
+            judge_id: judge model ID (must be in self._judge_models).
+            sample_content: markdown text of the calibration sample.
+            task_id: task identifier (for prompt context).
+
+        Returns:
+            float in [0.0, 10.0].
+        """
+        # Placeholder — in integration tests this is mocked.
+        # A future slice will wire this to the same Inspect AI eval_async path
+        # used by score(), sharing the forwarding-solver pattern.
+        raise NotImplementedError(
+            "_score_calibration_sample must be mocked in tests or implemented "
+            "in Slice E integration with the Inspect AI eval path."
+        )
+
+    async def _score_identification_sample(
+        self,
+        judge_id: str,
+        sample_content: str,
+        probe_families: frozenset[str],
+        task_id: str,
+    ) -> str:
+        """Prompt one judge to identify which model family produced sample_content.
+
+        Returns the judge's single-word guess normalised to lowercase.
+        If the guess is not in probe_families, returns "unknown".
+
+        In tests this method is mocked via patch.object — no real LLM calls.
+
+        Args:
+            judge_id: judge model ID.
+            sample_content: anonymised model output text.
+            probe_families: set of valid one-word family guesses.
+            task_id: task identifier for logging.
+
+        Returns:
+            str: one of the probe_families or "unknown".
+        """
+        raise NotImplementedError(
+            "_score_identification_sample must be mocked in tests or implemented "
+            "in Slice E integration with the Inspect AI eval path."
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -1,12 +1,15 @@
-"""Tests for RFC-002 Slice A + B: JudgePanel skeleton, self-judging guard, score().
+"""Tests for RFC-002 Slices A + B + C + D: JudgePanel scoring, calibration, probe.
 
 Coverage:
   - _normalise_model_family: all routing patterns from EVID-023 + RFC-002
   - _guard_self_judging: exact-ID, cross-route variant, different families
   - JudgePanel.__init__: validates guard wiring, empty judge list, successful construction
   - JudgePanel.score(): Slice B — Inspect AI list-of-scorers wiring (mocked)
-  - JudgePanel.aggregate(): still raises NotImplementedError (Slice C stub)
-  - Judgment / JudgeAggregation: pydantic field validation
+  - JudgePanel.aggregate(): Slice C — Krippendorff alpha + bootstrap CI
+  - JudgePanel.run_calibration(): Slice D — calibration MAD + Spearman rank corr
+  - JudgePanel.run_identification_probe(): Slice D — SC-4 anonymisation probe
+  - Judgment / JudgeAggregation / CalibrationResult / ProbeResult: pydantic validation
+  - _spearman_r: rank correlation helper (pure numpy, no scipy)
 """
 
 from __future__ import annotations
@@ -14,13 +17,20 @@ from __future__ import annotations
 import pathlib
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from src.contracts import JudgeAggregation, Judgment
-from src.orchestrator.judge_panel import JudgePanel, SelfJudgingError, _normalise_model_family
+from src.contracts import CalibrationResult, JudgeAggregation, Judgment, ProbeResult
+from src.orchestrator.judge_panel import (
+    JudgePanel,
+    SelfJudgingError,
+    _normalise_model_family,
+    _spearman_r,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers — build a minimal fake EvalResult for score() tests
@@ -934,3 +944,515 @@ class TestJudgeAggregationModel:
         agg = JudgeAggregation(**self._minimal_agg())  # type: ignore[arg-type]
         with pytest.raises(ValidationError):
             agg.judge_status = "DEGRADED"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# _spearman_r helper
+# ---------------------------------------------------------------------------
+
+
+class TestSpearmanR:
+    """Unit tests for the module-level _spearman_r helper (no scipy dep)."""
+
+    def test_perfect_positive_correlation(self) -> None:
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        assert abs(_spearman_r(x, y) - 1.0) < 1e-9
+
+    def test_perfect_negative_correlation(self) -> None:
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        assert abs(_spearman_r(x, y) - (-1.0)) < 1e-9
+
+    def test_known_correlation(self) -> None:
+        # gold order: perfect > good > mediocre > poor > broken
+        gold = np.array([9.0, 7.5, 5.0, 2.5, 0.5])
+        # slightly noisy judge scores that preserve exact same rank order
+        judge = np.array([8.8, 7.2, 5.3, 2.8, 0.6])
+        rs = _spearman_r(gold, judge)
+        assert abs(rs - 1.0) < 1e-9, f"expected 1.0 for rank-preserving scores, got {rs}"
+
+    def test_ties_handled(self) -> None:
+        # All same gold score — all three values tie at the same rank (2.0 avg).
+        # d = rank(gold) - rank(judge) = [2.0 - 1.0, 2.0 - 2.0, 2.0 - 3.0]
+        # = [1.0, 0.0, -1.0], sum(d²) = 2.0
+        # r_s = 1 - 6*2 / (3*(9-1)) = 1 - 12/24 = 0.5
+        # Most importantly: must not raise.
+        gold = np.array([5.0, 5.0, 5.0])
+        judge = np.array([4.0, 5.0, 6.0])
+        rs = _spearman_r(gold, judge)
+        assert isinstance(rs, float)
+        assert -1.0 <= rs <= 1.0
+
+    def test_degenerate_single_sample(self) -> None:
+        rs = _spearman_r(np.array([7.0]), np.array([7.0]))
+        assert rs == 0.0  # n < 2 → 0.0 by contract
+
+
+# ---------------------------------------------------------------------------
+# Slice D — run_calibration() tests
+# ---------------------------------------------------------------------------
+
+
+def _make_three_judge_panel() -> JudgePanel:
+    return JudgePanel(
+        judge_models=[
+            "claude-sonnet-4-6-judge",
+            "gpt-5-mini-judge",
+            "gemini-3-flash-judge",
+        ],
+        candidate_model_id="openrouter/meta-llama/llama-3.3-70b-instruct",
+        rubric_version="1.0",
+    )
+
+
+def _write_calibration_fixture(
+    tmp_path: pathlib.Path,
+    task_id: str,
+    samples_per_level: int = 2,
+) -> pathlib.Path:
+    """Create minimal calibration fixture under tmp_path/evals/task-packs/<task_id>/."""
+    GOLD = {"perfect": 9.0, "good": 7.5, "mediocre": 5.0, "poor": 2.5, "broken": 0.5}
+
+    pack_root = tmp_path / "evals" / "task-packs" / task_id
+    calib_root = pack_root / "calibration"
+    for level in GOLD:
+        level_dir = calib_root / level
+        level_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(samples_per_level):
+            (level_dir / f"sample-{i:03d}.md").write_text(
+                f"# {level} sample {i}\nContent for {task_id}.", encoding="utf-8"
+            )
+
+    yaml_content = (
+        f"task_id: {task_id}\n"
+        "rubric_version: '1.0'\n"
+        "gold_scores:\n"
+        + "".join(f"  {k}: {v}\n" for k, v in GOLD.items())
+        + "mad_threshold: 1.5\n"
+        f"n_samples_per_level: {samples_per_level}\n"
+    )
+    (pack_root / "calibration.yaml").write_text(yaml_content, encoding="utf-8")
+    return pack_root
+
+
+class TestRunCalibration:
+    """Tests for JudgePanel.run_calibration() — RFC-002 Slice D."""
+
+    GOLD: ClassVar[dict[str, float]] = {
+        "perfect": 9.0,
+        "good": 7.5,
+        "mediocre": 5.0,
+        "poor": 2.5,
+        "broken": 0.5,
+    }
+
+    # ── Test 1: calibration with scores close to gold → MAD ≤ 1.5, passed=True ─
+
+    @pytest.mark.asyncio
+    async def test_calibration_passes_when_scores_near_gold(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mock judge returning gold ± 0.3 → MAD ≤ 0.3, passed=True."""
+        _write_calibration_fixture(tmp_path, "be_01_jwt_auth", samples_per_level=2)
+        panel = _make_three_judge_panel()
+
+        # Each judge returns gold_score + small perturbation (well within 1.5 threshold).
+        call_count = {"n": 0}
+
+        async def _near_gold_score(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            task_id: str,
+        ) -> float:
+            call_count["n"] += 1
+            level = sample_content.split()[1]  # "# <level> sample <i>"
+            return self.GOLD.get(level, 5.0) + 0.3
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_calibration_sample", _near_gold_score):
+            result = await panel.run_calibration("be_01_jwt_auth")
+
+        assert isinstance(result, CalibrationResult)
+        assert result.task_id == "be_01_jwt_auth"
+        assert result.passed is True
+        for jc in result.judge_calibrations.values():
+            assert jc.mad <= 1.5, f"MAD {jc.mad} exceeds threshold for {jc.judge_id}"
+            assert jc.samples_evaluated == 10  # 5 levels x 2 samples each
+
+    # ── Test 2: calibration fails when judge has systematic +2.0 bias ────────────
+
+    @pytest.mark.asyncio
+    async def test_calibration_fails_when_mad_exceeds_threshold(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mock judge returning gold + 2.0 → MAD ≈ 2.0, passed=False."""
+        _write_calibration_fixture(tmp_path, "be_01_jwt_auth", samples_per_level=2)
+        panel = _make_three_judge_panel()
+
+        async def _biased_score(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            task_id: str,
+        ) -> float:
+            level = sample_content.split()[1]
+            raw = self.GOLD.get(level, 5.0) + 2.0
+            # Clamp to [0, 10] to stay within valid range.
+            return min(10.0, raw)
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_calibration_sample", _biased_score):
+            result = await panel.run_calibration("be_01_jwt_auth")
+
+        assert result.passed is False
+        # At least one judge (all three in this case) should have MAD > 1.5.
+        assert any(jc.mad > 1.5 for jc in result.judge_calibrations.values())
+
+    # ── Test 3: calibration_hash is deterministic for same content ───────────────
+
+    @pytest.mark.asyncio
+    async def test_calibration_hash_deterministic(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Same fixture + same scores → same calibration_hash on two runs."""
+        _write_calibration_fixture(tmp_path, "be_01_jwt_auth", samples_per_level=2)
+        panel = _make_three_judge_panel()
+
+        async def _fixed_score(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            task_id: str,
+        ) -> float:
+            level = sample_content.split()[1]
+            return self.GOLD.get(level, 5.0)
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_calibration_sample", _fixed_score):
+            result1 = await panel.run_calibration("be_01_jwt_auth")
+            result2 = await panel.run_calibration("be_01_jwt_auth")
+
+        assert result1.calibration_hash == result2.calibration_hash, (
+            "calibration_hash not deterministic for identical content"
+        )
+        assert len(result1.calibration_hash) == 64, "expected SHA-256 hex digest (64 chars)"
+
+    # ── Test 4: gold_scores round-trip from calibration.yaml ──────────────────────
+
+    @pytest.mark.asyncio
+    async def test_gold_scores_loaded_from_yaml(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CalibrationResult.gold_scores matches what was written to calibration.yaml."""
+        _write_calibration_fixture(tmp_path, "be_01_jwt_auth", samples_per_level=2)
+        panel = _make_three_judge_panel()
+
+        async def _noop(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            task_id: str,
+        ) -> float:
+            level = sample_content.split()[1]
+            return self.GOLD.get(level, 5.0)
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_calibration_sample", _noop):
+            result = await panel.run_calibration("be_01_jwt_auth")
+
+        assert result.gold_scores == self.GOLD
+
+    # ── Test 5: missing calibration.yaml raises FileNotFoundError ─────────────────
+
+    @pytest.mark.asyncio
+    async def test_missing_yaml_raises(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FileNotFoundError when calibration.yaml is absent."""
+        monkeypatch.chdir(tmp_path)
+        panel = _make_three_judge_panel()
+        with pytest.raises(FileNotFoundError, match=r"calibration\.yaml not found"):
+            await panel.run_calibration("nonexistent_task")
+
+    # ── Test 6: rank_correlation is 1.0 when judge preserves gold rank order ──────
+
+    @pytest.mark.asyncio
+    async def test_rank_correlation_perfect_for_rank_preserving_judge(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Judge that perfectly preserves gold rank order → rank_correlation ≈ 1.0."""
+        _write_calibration_fixture(tmp_path, "be_01_jwt_auth", samples_per_level=1)
+        panel = _make_three_judge_panel()
+
+        async def _rank_preserving(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            task_id: str,
+        ) -> float:
+            level = sample_content.split()[1]
+            # Slightly different scale but preserves rank order exactly.
+            return self.GOLD.get(level, 5.0) * 0.9 + 0.5
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_calibration_sample", _rank_preserving):
+            result = await panel.run_calibration("be_01_jwt_auth")
+
+        for jc in result.judge_calibrations.values():
+            assert jc.rank_correlation >= 0.99, (
+                "expected rank_correlation~=1.0 for rank-preserving judge, "
+                f"got {jc.rank_correlation}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Slice D — run_identification_probe() tests
+# ---------------------------------------------------------------------------
+
+
+def _write_probe_fixture(
+    tmp_path: pathlib.Path,
+    task_id: str,
+    samples_per_family: int = 5,
+    families: tuple[str, ...] = ("anthropic", "openai", "google", "qwen", "meta"),
+) -> pathlib.Path:
+    """Create identification_probe fixture under tmp_path/evals/task-packs/<task_id>/."""
+    probe_dir = tmp_path / "evals" / "task-packs" / task_id / "identification_probe"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    for family in families:
+        for i in range(samples_per_family):
+            (probe_dir / f"{family}-{i:03d}.md").write_text(
+                f"Output for task {task_id} by family {family}, sample {i}.",
+                encoding="utf-8",
+            )
+    return probe_dir
+
+
+class TestRunIdentificationProbe:
+    """Tests for JudgePanel.run_identification_probe() — RFC-002 Slice D, SC-4."""
+
+    FAMILIES = ("anthropic", "openai", "google", "qwen", "meta")
+
+    # ── Test 1: random guessing → accuracy ≈ 0.20, passed=True ──────────────────
+
+    @pytest.mark.asyncio
+    async def test_random_guessing_accuracy_below_threshold(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Judge guessing randomly → accuracy = 1/5 = 0.20 ≤ 0.30, passed=True."""
+        _write_probe_fixture(tmp_path, "be_01_jwt_auth", samples_per_family=5)
+        panel = _make_three_judge_panel()
+
+        # Deterministic "random" guesser: always returns the same wrong family.
+        # With 5 families x 5 samples = 25 samples per judge,
+        # always guessing "openai" gives 5 correct (openai samples) + 20 wrong = 20%.
+        async def _always_openai(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            probe_families: frozenset[str],
+            task_id: str,
+        ) -> str:
+            return "openai"
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_identification_sample", _always_openai):
+            result = await panel.run_identification_probe("be_01_jwt_auth")
+
+        assert isinstance(result, ProbeResult)
+        assert result.passed is True, f"expected passed=True, accuracy={result.overall_accuracy}"
+        # 5 families x 5 samples = 25 per judge; "openai" correct for 5/25 = 0.2
+        assert abs(result.overall_accuracy - 0.2) < 1e-6, (
+            f"expected 0.2, got {result.overall_accuracy}"
+        )
+
+    # ── Test 2: judges with 50% accuracy → passed=False ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_high_accuracy_probe_fails(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Judges correctly guessing half the samples → accuracy ≈ 0.5, passed=False."""
+        _write_probe_fixture(tmp_path, "be_01_jwt_auth", samples_per_family=10)
+        panel = _make_three_judge_panel()
+
+        # Judge reads the family name directly from sample text (cheating).
+        # Every sample file contains "by family <family>" — judge extracts it.
+        # This gives 100% accuracy. We simulate 50% by returning correct family
+        # for even-indexed samples and wrong family for odd-indexed ones.
+        sample_index: dict[str, int] = {"i": 0}
+
+        async def _half_correct(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            probe_families: frozenset[str],
+            task_id: str,
+        ) -> str:
+            # Extract actual family from content (strip punctuation from each word).
+            actual = "anthropic"
+            for raw_word in sample_content.split():
+                word = raw_word.strip(".,;:")
+                if word in probe_families:
+                    actual = word
+                    break
+            idx = sample_index["i"]
+            sample_index["i"] += 1
+            # Even samples: return the correct family (correct guess).
+            # Odd samples: return a wrong family (always incorrect).
+            wrong = next(f for f in probe_families if f != actual)
+            return actual if idx % 2 == 0 else wrong
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_identification_sample", _half_correct):
+            result = await panel.run_identification_probe("be_01_jwt_auth")
+
+        assert result.passed is False, (
+            f"expected passed=False for high accuracy, got {result.overall_accuracy}"
+        )
+        assert result.overall_accuracy > 0.30
+
+    # ── Test 3: empty probe dir → n_samples=0, passed=True ────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_empty_probe_dir_returns_zero_samples(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Empty identification_probe/ → n_samples=0, accuracy=0.0, passed=True."""
+        # Create empty probe dir (no .md files).
+        probe_dir = tmp_path / "evals" / "task-packs" / "be_01_jwt_auth" / "identification_probe"
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        panel = _make_three_judge_panel()
+
+        monkeypatch.chdir(tmp_path)
+        result = await panel.run_identification_probe("be_01_jwt_auth")
+
+        assert result.n_samples == 0
+        assert result.overall_accuracy == 0.0
+        assert result.passed is True
+
+    # ── Test 4: missing probe dir raises FileNotFoundError ────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_missing_probe_dir_raises(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FileNotFoundError when identification_probe/ is absent."""
+        monkeypatch.chdir(tmp_path)
+        panel = _make_three_judge_panel()
+        with pytest.raises(FileNotFoundError, match="identification_probe"):
+            await panel.run_identification_probe("nonexistent_task")
+
+    # ── Test 5: judges_used list matches panel construction ────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_judges_used_matches_panel(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ProbeResult.judges_used matches the judge_models from JudgePanel init."""
+        _write_probe_fixture(tmp_path, "be_01_jwt_auth", samples_per_family=2)
+        panel = _make_three_judge_panel()
+
+        async def _noop_guess(
+            self_panel: JudgePanel,
+            judge_id: str,
+            sample_content: str,
+            probe_families: frozenset[str],
+            task_id: str,
+        ) -> str:
+            return "anthropic"
+
+        monkeypatch.chdir(tmp_path)
+        with patch.object(JudgePanel, "_score_identification_sample", _noop_guess):
+            result = await panel.run_identification_probe("be_01_jwt_auth")
+
+        assert set(result.judges_used) == {
+            "claude-sonnet-4-6-judge",
+            "gpt-5-mini-judge",
+            "gemini-3-flash-judge",
+        }
+        assert set(result.per_judge_accuracy.keys()) == set(result.judges_used)
+
+
+# ---------------------------------------------------------------------------
+# CalibrationResult + ProbeResult pydantic model validation
+# ---------------------------------------------------------------------------
+
+
+class TestCalibrationResultModel:
+    """Minimal field validation for CalibrationResult contract."""
+
+    def _minimal_calib(self, **overrides: object) -> dict[str, object]:
+        from src.contracts import JudgeCalibration
+
+        base: dict[str, object] = {
+            "task_id": "be_01_jwt_auth",
+            "judge_calibrations": {
+                "gpt-5-mini-judge": JudgeCalibration(
+                    judge_id="gpt-5-mini-judge",
+                    mad=0.5,
+                    rank_correlation=0.95,
+                    samples_evaluated=10,
+                )
+            },
+            "passed": True,
+            "gold_scores": {"perfect": 9.0, "broken": 0.5},
+            "calibration_hash": "a" * 64,
+            "mad_threshold": 1.5,
+        }
+        base.update(overrides)
+        return base
+
+    def test_valid_calibration_result(self) -> None:
+        r = CalibrationResult(**self._minimal_calib())  # type: ignore[arg-type]
+        assert r.passed is True
+        assert r.mad_threshold == 1.5
+
+    def test_frozen_immutable(self) -> None:
+        r = CalibrationResult(**self._minimal_calib())  # type: ignore[arg-type]
+        with pytest.raises(ValidationError):
+            r.passed = False  # type: ignore[misc]
+
+    def test_negative_mad_threshold_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            CalibrationResult(**self._minimal_calib(mad_threshold=-0.1))  # type: ignore[arg-type]
+
+
+class TestProbeResultModel:
+    """Minimal field validation for ProbeResult contract."""
+
+    def _minimal_probe(self, **overrides: object) -> dict[str, object]:
+        base: dict[str, object] = {
+            "task_id": "be_01_jwt_auth",
+            "judges_used": ["gpt-5-mini-judge"],
+            "n_samples": 25,
+            "per_judge_accuracy": {"gpt-5-mini-judge": 0.2},
+            "overall_accuracy": 0.2,
+            "passed": True,
+        }
+        base.update(overrides)
+        return base
+
+    def test_valid_probe_result(self) -> None:
+        r = ProbeResult(**self._minimal_probe())  # type: ignore[arg-type]
+        assert r.passed is True
+        assert r.overall_accuracy == 0.2
+
+    def test_accuracy_above_1_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ProbeResult(**self._minimal_probe(overall_accuracy=1.1))  # type: ignore[arg-type]
+
+    def test_negative_accuracy_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ProbeResult(**self._minimal_probe(overall_accuracy=-0.1))  # type: ignore[arg-type]
+
+    def test_negative_n_samples_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ProbeResult(**self._minimal_probe(n_samples=-1))  # type: ignore[arg-type]
+
+    def test_frozen_immutable(self) -> None:
+        r = ProbeResult(**self._minimal_probe())  # type: ignore[arg-type]
+        with pytest.raises(ValidationError):
+            r.passed = False  # type: ignore[misc]
