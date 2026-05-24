@@ -276,11 +276,23 @@ def make_run_hash(
     return f"sha256:{digest}"
 
 
-# Hardcoded OpenRouter pricing snapshot per ADR-003 5-model lineup (2026-05-24).
-# Per-Mtoken USD. Cost = (input_tokens * ipt + output_tokens * opt) / 1_000_000.
-# When pricing drifts > 30%, refresh this dict (and file an EVID re NFR-001).
-# TODO(Phase 2D): replace with LiteLLM completion_cost() API per user 2026-05-25.
-_MODEL_PRICING: dict[str, tuple[Decimal, Decimal]] = {
+# Library-first cost path (per CLAUDE.md Library-first rule, 2026-05-25):
+# Primary: litellm.cost_per_token() — auto-updated with model price changes
+#         via LiteLLM's maintained model_cost map.
+# Fallback: hardcoded dict below — only when LiteLLM doesn't know the alias.
+# Aliases (LiteLLM proxy route names) -> canonical OpenRouter paths that
+# LiteLLM SDK recognises for cost lookup.
+_PROXY_ALIAS_TO_LITELLM_MODEL: dict[str, str] = {
+    "claude-sonnet-4-6": "openrouter/anthropic/claude-sonnet-4.6",
+    "gpt-5-mini": "openrouter/openai/gpt-5-mini",
+    "gemini-3-flash": "openrouter/google/gemini-3-flash-preview",
+    "qwen-3-14b": "openrouter/qwen/qwen3-14b",
+    "llama-3-3-70b": "openrouter/meta-llama/llama-3.3-70b-instruct",
+}
+
+# Fallback when litellm.cost_per_token() is unknown for the alias. Per-Mtoken USD.
+# Refresh when LiteLLM lookup misses for an alias we still want priced.
+_FALLBACK_PRICING_PER_MTOKEN: dict[str, tuple[Decimal, Decimal]] = {
     "claude-sonnet-4-6": (Decimal("3.00"), Decimal("15.00")),
     "gpt-5-mini": (Decimal("0.25"), Decimal("2.00")),
     "gemini-3-flash": (Decimal("0.075"), Decimal("0.30")),
@@ -290,8 +302,34 @@ _MODEL_PRICING: dict[str, tuple[Decimal, Decimal]] = {
 
 
 def _make_pricing_snapshot(model_id: str) -> PricingSnapshot:
-    """Build pricing snapshot per model. Falls back to zero for unknown models."""
-    ipt, opt = _MODEL_PRICING.get(model_id, (Decimal("0"), Decimal("0")))
+    """Build pricing snapshot via LiteLLM SDK (Library-first, CLAUDE.md 2026-05-25).
+
+    Primary: litellm.cost_per_token(model, prompt_tokens=1M, completion_tokens=1M)
+    gives per-Mtoken rates. Fallback to hardcoded dict only when LiteLLM doesn't
+    know the model (returns 0/0 or raises). Logs fallback events so we know to
+    refresh the lookup.
+    """
+    litellm_model = _PROXY_ALIAS_TO_LITELLM_MODEL.get(model_id, model_id)
+    try:
+        import litellm  # local import — heavy dep, only used for cost
+
+        prompt_cost_1m, completion_cost_1m = litellm.cost_per_token(
+            model=litellm_model,
+            prompt_tokens=1_000_000,
+            completion_tokens=1_000_000,
+        )
+        ipt = Decimal(str(prompt_cost_1m))
+        opt = Decimal(str(completion_cost_1m))
+        if ipt == 0 and opt == 0:
+            raise ValueError(f"cost_per_token returned 0/0 for {litellm_model!r}")
+    except Exception as exc:
+        logger.debug(
+            "litellm.cost_per_token miss for %s (litellm=%s, err=%s); using fallback",
+            model_id,
+            litellm_model,
+            exc,
+        )
+        ipt, opt = _FALLBACK_PRICING_PER_MTOKEN.get(model_id, (Decimal("0"), Decimal("0")))
     return PricingSnapshot(
         input_per_mtoken_usd=ipt,
         output_per_mtoken_usd=opt,
@@ -359,7 +397,8 @@ def build_initial_manifest(
 ) -> Manifest:
     """Build the initial (status=created) Manifest skeleton.
 
-    Each model gets its own pricing snapshot from _MODEL_PRICING dict.
+    Each model gets its own pricing snapshot via litellm.cost_per_token() lookup
+    (Library-first) with hardcoded fallback when LiteLLM doesn't know the alias.
     """
     return Manifest(
         schema_version=SCHEMA_VERSION_V1_0_0,

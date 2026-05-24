@@ -20,6 +20,10 @@ dependencies = [
     "opentelemetry-api>=1.29.0",
     "opentelemetry-sdk>=1.29.0",
     "opentelemetry-exporter-otlp-proto-http>=1.29.0",
+    # Library-first cost reconciliation (per CLAUDE.md, 2026-05-25).
+    # Used via `litellm.cost_per_token()` in scripts/smoke_run.py — auto-updates
+    # with model price changes from LiteLLM's maintained model_cost map.
+    "litellm>=1.50,<2",
 ]
 
 [project.optional-dependencies]
