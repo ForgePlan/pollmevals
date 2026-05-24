@@ -28,6 +28,14 @@ dependencies = [
     # Library-first per CLAUDE.md 2026-05-25; Context7 /terryyin/lizard confirmed API.
     # gitleaks is a system binary (NOT a Python dep) — detect via shutil.which().
     "lizard>=1.17,<2",
+    # Krippendorff's α inter-rater reliability — Phase 3 Slice C JudgePanel.aggregate().
+    # Library-first: Context7 resolved /aleph-alpha/krippendorff-aleph-alpha (different
+    # library); the standard `krippendorff` PyPI package (Thomas Grill) is the one
+    # pinned here — uses krippendorff.alpha(reliability_data=matrix, level_of_measurement=
+    # "ordinal") with numpy arrays. ADR-005: ordinal level, 2000-resample bootstrap CI.
+    "krippendorff>=0.7,<1",
+    # numpy is a transitive dep of krippendorff but pinned explicitly for bootstrap CI.
+    "numpy>=1.26,<3",
 ]
 
 [project.optional-dependencies]

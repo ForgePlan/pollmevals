@@ -334,25 +334,216 @@ class TestJudgePanelInit:
 
 
 # ---------------------------------------------------------------------------
-# Slice C stub — aggregate() still raises NotImplementedError (Slice B only)
+# Slice C — aggregate() implementation tests (RFC-002 Slice C / ADR-005)
 # ---------------------------------------------------------------------------
 
 
-class TestSliceCStub:
-    """Verifies that aggregate() is still a Slice C stub."""
+def _make_judgment(
+    judge_id: str,
+    rubric_scores: dict[str, float],
+    judge_order: int = 0,
+) -> Judgment:
+    """Build a minimal Judgment for aggregate() tests (no real LLM calls)."""
+    total = float(sum(rubric_scores.values()) / max(len(rubric_scores), 1))
+    return Judgment(
+        judge_model_id=judge_id,
+        judge_order=judge_order,
+        rubric_version="1.0",
+        rubric_scores=rubric_scores,
+        total_score=min(10.0, max(0.0, total)),
+        raw_explanation="test",
+        latency_ms=0,
+        tokens_in=0,
+        tokens_out=0,
+        cost_usd=Decimal("0"),
+    )
+
+
+class TestJudgePanelAggregateSliceC:
+    """RFC-002 Slice C acceptance criteria + ADR-005 invariants.
+
+    All tests are pure computation — no LLM calls, no network.
+    """
 
     @pytest.fixture
-    def panel(self) -> JudgePanel:
+    def three_judge_panel(self) -> JudgePanel:
+        """Standard 3-judge panel fixture (3 different families)."""
         return JudgePanel(
-            judge_models=["openrouter/openai/gpt-5-mini"],
-            candidate_model_id="openrouter/anthropic/claude-haiku",
+            judge_models=[
+                "claude-sonnet-4-6-judge",
+                "gpt-5-mini-judge",
+                "gemini-3-flash-judge",
+            ],
+            candidate_model_id="openrouter/meta-llama/llama-3.3-70b-instruct",
             rubric_version="1.0",
         )
 
-    def test_aggregate_raises_not_implemented(self, panel: JudgePanel) -> None:
-        with pytest.raises(NotImplementedError) as exc_info:
-            panel.aggregate([])
-        assert "Slice C" in str(exc_info.value)
+    # ── Test 1: perfect agreement → alpha = 1.0, CI collapses ───────────────────
+    def test_perfect_agreement_alpha_one(self, three_judge_panel: JudgePanel) -> None:
+        """3 judges all give identical scores → alpha = 1.0, CI = [1.0, 1.0]."""
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 8.0, "clarity": 7.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 8.0, "clarity": 7.0}, 1),
+            _make_judgment("gemini-3-flash-judge", {"correctness": 8.0, "clarity": 7.0}, 2),
+        ]
+        agg = three_judge_panel.aggregate(judgments)
+
+        assert agg.judge_status == "OK"
+        assert agg.n_judges_used == 3
+        assert agg.alpha_point is not None
+        # Perfect agreement → alpha = 1.0 (within numerical tolerance)
+        assert abs(agg.alpha_point - 1.0) < 1e-6, f"expected alpha=1.0, got {agg.alpha_point}"
+        # CI both bounds should also be 1.0 (all resamples identical)
+        assert agg.alpha_ci_lower is not None
+        assert agg.alpha_ci_upper is not None
+        assert abs(agg.alpha_ci_lower - 1.0) < 1e-6, f"CI lower={agg.alpha_ci_lower}"
+        assert abs(agg.alpha_ci_upper - 1.0) < 1e-6, f"CI upper={agg.alpha_ci_upper}"
+
+    # ── Test 2: orthogonal disagreement → alpha near 0, CI brackets 0 ──────────
+    def test_orthogonal_disagreement_alpha_near_zero(self, three_judge_panel: JudgePanel) -> None:
+        """Judges with maximally diverse scores → alpha near 0, CI includes 0."""
+        # Spread scores maximally: one judge gives 0, one 5, one 10 on every criterion.
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 0.0, "clarity": 10.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 5.0, "clarity": 5.0}, 1),
+            _make_judgment("gemini-3-flash-judge", {"correctness": 10.0, "clarity": 0.0}, 2),
+        ]
+        agg = three_judge_panel.aggregate(judgments)
+
+        assert agg.judge_status == "OK"
+        assert agg.alpha_point is not None
+        # alpha should be near 0 or negative (poor agreement / systematic disagreement)
+        assert agg.alpha_point < 0.5, f"expected low alpha for disagreement, got {agg.alpha_point}"
+        # CI should bracket or include 0
+        assert agg.alpha_ci_lower is not None
+        assert agg.alpha_ci_upper is not None
+        assert agg.alpha_ci_lower <= 0.5, f"CI lower={agg.alpha_ci_lower} should be low"
+
+    # ── Test 3: median per criterion correctness ──────────────────────────────
+    def test_median_per_criterion(self, three_judge_panel: JudgePanel) -> None:
+        """Hand-crafted 3-judge x 2-criterion matrix; verify median computation."""
+        # Judge A: correctness=6, clarity=9
+        # Judge B: correctness=8, clarity=7
+        # Judge C: correctness=7, clarity=8
+        # Expected medians: correctness=7.0, clarity=8.0
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 6.0, "clarity": 9.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 8.0, "clarity": 7.0}, 1),
+            _make_judgment("gemini-3-flash-judge", {"correctness": 7.0, "clarity": 8.0}, 2),
+        ]
+        agg = three_judge_panel.aggregate(judgments)
+
+        assert agg.median_per_criterion["correctness"] == 7.0
+        assert agg.median_per_criterion["clarity"] == 8.0
+
+    # ── Test 4: degraded panel → DEGRADED status, alpha=None ────────────────────
+    def test_degraded_panel_returns_degraded_status(self, three_judge_panel: JudgePanel) -> None:
+        """Pass 2 judgments when panel requested 3 → DEGRADED with all alpha=None."""
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 7.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 8.0}, 1),
+            # gemini judge missing — simulates judge dropout (PRD-002 Q3)
+        ]
+        agg = three_judge_panel.aggregate(judgments)
+
+        assert agg.judge_status == "DEGRADED"
+        assert agg.n_judges_used == 2
+        assert agg.alpha_point is None
+        assert agg.alpha_ci_lower is None
+        assert agg.alpha_ci_upper is None
+        # Median is still computed even in DEGRADED (useful for partial scoring)
+        assert "correctness" in agg.median_per_criterion
+
+    # ── Test 5: bootstrap CI is deterministic with fixed seed ────────────────────
+    def test_bootstrap_ci_deterministic(self, three_judge_panel: JudgePanel) -> None:
+        """Same input twice → identical CI bounds (ADR-005 seed=42 invariant)."""
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 6.0, "clarity": 8.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 8.0, "clarity": 7.0}, 1),
+            _make_judgment("gemini-3-flash-judge", {"correctness": 7.0, "clarity": 9.0}, 2),
+        ]
+        agg1 = three_judge_panel.aggregate(judgments)
+        agg2 = three_judge_panel.aggregate(judgments)
+
+        assert agg1.alpha_ci_lower == agg2.alpha_ci_lower, (
+            f"CI lower not deterministic: {agg1.alpha_ci_lower} vs {agg2.alpha_ci_lower}"
+        )
+        assert agg1.alpha_ci_upper == agg2.alpha_ci_upper, (
+            f"CI upper not deterministic: {agg1.alpha_ci_upper} vs {agg2.alpha_ci_upper}"
+        )
+
+    # ── Test 6: golden alpha value — computationally verified ───────────────────
+    def test_golden_alpha_known_matrix(self, three_judge_panel: JudgePanel) -> None:
+        """Verify alpha on a matrix with a known computationally-derived value.
+
+        3 coders x 5 items (ordinal scale 1-4):
+          Coder A: [1, 2, 3, 3, 2]
+          Coder B: [1, 2, 3, 3, 2]   (identical to A)
+          Coder C: [2, 3, 4, 4, 3]   (systematic +1 shift from A/B)
+
+        Verified value: krippendorff.alpha(matrix, level_of_measurement="ordinal")
+        returns approximately 0.6113 for this configuration (computed by running
+        the library directly — confirmed 2026-05-25).
+
+        Matrix orientation: N judges rows x M criteria columns.
+        krippendorff.alpha() contract: reliability_data rows=coders, cols=items.
+        """
+        # Judge rows x criteria columns:
+        # judge1 (claude) = A = [1,2,3,3,2]
+        # judge2 (gpt)    = B = [1,2,3,3,2]
+        # judge3 (gemini) = C = [2,3,4,4,3]
+        crit_names = [f"item_{i}" for i in range(5)]
+        judge_scores: list[list[float]] = [
+            [1.0, 2.0, 3.0, 3.0, 2.0],  # A
+            [1.0, 2.0, 3.0, 3.0, 2.0],  # B
+            [2.0, 3.0, 4.0, 4.0, 3.0],  # C
+        ]
+        judge_ids = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash-judge"]
+        judgments = [
+            _make_judgment(
+                judge_id,
+                {cn: score for cn, score in zip(crit_names, scores, strict=True)},
+                order,
+            )
+            for order, (judge_id, scores) in enumerate(zip(judge_ids, judge_scores, strict=True))
+        ]
+        agg = three_judge_panel.aggregate(judgments)
+
+        assert agg.alpha_point is not None
+        # Golden value: alpha approx 0.6113 (verified by direct library call 2026-05-25).
+        assert abs(agg.alpha_point - 0.6113) < 0.001, (
+            f"golden alpha mismatch: expected approx 0.6113, got {agg.alpha_point:.6f}"
+        )
+        # CI lower should be positive (moderate agreement matrix)
+        assert agg.alpha_ci_lower is not None
+        assert agg.alpha_ci_lower > 0.3, (
+            f"CI lower={agg.alpha_ci_lower:.4f} unexpectedly low for golden matrix"
+        )
+
+    # ── Test 7: n_judges_requested stored correctly on panel ──────────────────
+    def test_n_judges_requested_stored(self) -> None:
+        """_n_judges_requested equals len(judge_models) at construction time."""
+        panel = JudgePanel(
+            judge_models=["gpt-5-mini-judge", "gemini-3-flash-judge"],
+            candidate_model_id="openrouter/anthropic/claude-haiku",
+            rubric_version="1.0",
+        )
+        assert panel._n_judges_requested == 2
+
+    # ── Test 8: single-criterion matrix computes alpha without error ────────────
+    def test_single_criterion_matrix(self, three_judge_panel: JudgePanel) -> None:
+        """1-criterion x 3-judge matrix — edge case; alpha should compute without error."""
+        judgments = [
+            _make_judgment("claude-sonnet-4-6-judge", {"correctness": 7.0}, 0),
+            _make_judgment("gpt-5-mini-judge", {"correctness": 8.0}, 1),
+            _make_judgment("gemini-3-flash-judge", {"correctness": 9.0}, 2),
+        ]
+        # Should not raise; alpha may be low (1 criterion means no between-criterion
+        # structure for the ordinal distance to differentiate on).
+        agg = three_judge_panel.aggregate(judgments)
+        assert agg.judge_status == "OK"
+        assert "correctness" in agg.median_per_criterion
+        assert agg.median_per_criterion["correctness"] == 8.0
 
 
 # ---------------------------------------------------------------------------

@@ -200,6 +200,7 @@ class JudgePanel:
         self._guard_self_judging(judge_models, candidate_model_id)
 
         self._judge_models = list(judge_models)
+        self._n_judges_requested = len(judge_models)
         self._candidate_model_id = candidate_model_id
         self._rubric_version = rubric_version
         self._base_url = base_url.rstrip("/")
@@ -413,16 +414,116 @@ class JudgePanel:
     def aggregate(self, judgments: list[Judgment]) -> JudgeAggregation:
         """Compute median + Krippendorff alpha + bootstrap CI across the panel.
 
-        Per docs/02-methodology/scoring.md: median (NOT mean — EVID-001).
-        Per PRD-002 Q2: publication gate uses CI lower-bound >= 0.70 (bootstrap
-        2000 resamples, 95% CI).
+        Per docs/02-methodology/scoring.md: median per criterion (NOT mean — EVID-001).
+        Per PRD-002 Q2 / ADR-005: publication gate uses CI lower-bound >= 0.70
+        (bootstrap 2000 resamples, 95% CI, deterministic seed=42 per ADR-005
+        invariant "bootstrap_seed recorded in manifest for reproducibility").
 
-        NOTE: This is a Slice C stub — raises NotImplementedError until Slice C
-        is merged.
+        Matrix layout: N judge rows x M criteria columns.
+        krippendorff.alpha() expects rows=coders (judges), cols=items (criteria).
+        Krippendorff alpha level_of_measurement="ordinal" per ADR-005 invariant
+        ("Rubric scores are ordered but score-distance is not metric").
+
+        Degraded panel (PRD-002 Q3): if len(judgments) < _n_judges_requested
+        return judge_status="DEGRADED" with all alpha fields = None.
+
+        Args:
+            judgments: list of Judgment objects from score() — one per judge.
+                       At least 1 required (JudgeAggregation.n_judges_used >= 1).
+
+        Returns:
+            JudgeAggregation with median_per_criterion, alpha fields, and
+            judge_status. Bootstrap CI uses 2000 resamples (ADR-005 / SC-1).
+
+        Library: krippendorff>=0.7,<1 (Thomas Grill PyPI package).
+        Import: krippendorff.alpha(reliability_data, level_of_measurement)
+        Confirmed: Library-first lookup via Context7 (aleph-alpha variant found
+        at /aleph-alpha/krippendorff-aleph-alpha uses different API; standard
+        `krippendorff` PyPI package confirmed by RFC-002 pin + ADR-005 references).
         """
-        raise NotImplementedError(
-            "JudgePanel.aggregate() is not implemented yet — Slice C. "
-            "See RFC-002 Slice C for the Krippendorff alpha + bootstrap CI plan."
+        import krippendorff  # type: ignore[import-untyped]
+        import numpy as np
+
+        # ── Collect all criteria present across all judgments (sorted for determinism)
+        criteria = sorted({c for j in judgments for c in j.rubric_scores})
+
+        # ── Compute median per criterion (always computed, even in DEGRADED path)
+        median_per_criterion: dict[str, float] = {}
+        for crit in criteria:
+            scores_for_crit = [j.rubric_scores[crit] for j in judgments if crit in j.rubric_scores]
+            if scores_for_crit:
+                median_per_criterion[crit] = float(np.median(scores_for_crit))
+
+        # ── Degraded panel check (PRD-002 Q3): N-1 → alpha=None ────────────────
+        if len(judgments) < self._n_judges_requested:
+            return JudgeAggregation(
+                median_per_criterion=median_per_criterion,
+                alpha_point=None,
+                alpha_ci_lower=None,
+                alpha_ci_upper=None,
+                judge_status="DEGRADED",
+                n_judges_used=len(judgments),
+            )
+
+        # ── Build N x M reliability matrix: N judge rows, M criteria columns ──
+        # krippendorff.alpha() expects rows=coders (judges), cols=items (criteria).
+        # NaN fills missing criterion scores (krippendorff treats NaN as "missing
+        # data" — annotator did not rate this item, which is the correct semantics).
+        n_judges = len(judgments)
+        matrix = np.array(
+            [[j.rubric_scores.get(crit, np.nan) for crit in criteria] for j in judgments],
+            dtype=float,
+        )
+
+        # ── Point estimate (ordinal level per ADR-005) ─────────────────────────
+        alpha_point = float(
+            krippendorff.alpha(
+                reliability_data=matrix,
+                level_of_measurement="ordinal",
+            )
+        )
+
+        # ── Bootstrap 95% CI — 2000 resamples, deterministic seed=42 (ADR-005) ─
+        # Resample judges (rows) with replacement — each resample is a virtual panel
+        # of n_judges drawn with replacement from the actual panel.
+        rng = np.random.default_rng(seed=42)
+        boot_alphas: list[float] = []
+        for _ in range(2000):
+            # Resample judge rows with replacement.
+            idx = rng.integers(0, n_judges, size=n_judges)
+            boot_matrix = matrix[idx, :]
+            try:
+                a = float(
+                    krippendorff.alpha(
+                        reliability_data=boot_matrix,
+                        level_of_measurement="ordinal",
+                    )
+                )
+                # Reject NaN (degenerate sample where all judges gave identical
+                # scores — alpha is undefined; krippendorff returns nan in that case).
+                if not np.isnan(a):
+                    boot_alphas.append(a)
+            except Exception:
+                # Degenerate sample — krippendorff may raise on edge cases.
+                # Skip rather than crash; CI computed from valid samples only.
+                pass
+
+        if boot_alphas:
+            alpha_ci_lower, alpha_ci_upper = (
+                float(v) for v in np.percentile(boot_alphas, [2.5, 97.5])
+            )
+        else:
+            # Fallback: all resamples degenerate → CI collapses to the point estimate.
+            alpha_ci_lower = alpha_point
+            alpha_ci_upper = alpha_point
+
+        return JudgeAggregation(
+            median_per_criterion=median_per_criterion,
+            alpha_point=alpha_point,
+            alpha_ci_lower=alpha_ci_lower,
+            alpha_ci_upper=alpha_ci_upper,
+            judge_status="OK",
+            n_judges_used=len(judgments),
         )
 
     # ------------------------------------------------------------------

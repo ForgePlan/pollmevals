@@ -620,6 +620,18 @@ wheels = [
 ]
 
 [[package]]
+name = "krippendorff"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/1c/839234d9b9ca3c2c1f9445bb7f3022662face6cc6f9e3f915d8b7654dea7/krippendorff-0.8.2.tar.gz", hash = "sha256:f975bf4b5d93439d3264c4fc85a45d014aca9f5f9fca17f18fa2f3c89ee158ca", size = 18229 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/4f/597b65bc88a031ee68b459fec05f8b40a60c3c3f6d5cde5b1403d965d199/krippendorff-0.8.2-py3-none-any.whl", hash = "sha256:1922ff73f7caa5faab6237a1abcb4f3e6ab605e3f7d39acd7998176873b8cd57", size = 18616 },
+]
+
+[[package]]
 name = "librt"
 version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -971,8 +983,10 @@ dependencies = [
     { name = "httpx" },
     { name = "inspect-ai" },
     { name = "jsonschema" },
+    { name = "krippendorff" },
     { name = "litellm" },
     { name = "lizard" },
+    { name = "numpy" },
     { name = "openai" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
@@ -998,9 +1012,11 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "inspect-ai", specifier = "==0.3.46" },
     { name = "jsonschema", specifier = ">=4.20,<5" },
+    { name = "krippendorff", specifier = ">=0.7,<1" },
     { name = "litellm", specifier = ">=1.50,<2" },
     { name = "lizard", specifier = ">=1.17,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "numpy", specifier = ">=1.26,<3" },
     { name = "openai", specifier = ">=1.30,<2" },
     { name = "opentelemetry-api", specifier = ">=1.29.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.29.0" },
