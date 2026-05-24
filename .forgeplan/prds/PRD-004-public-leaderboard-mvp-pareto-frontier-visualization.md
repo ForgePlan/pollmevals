@@ -90,3 +90,4 @@ title: public leaderboard MVP — Pareto frontier visualization
 > **Next step (Phase 4, T+5 weeks)**: углубить — выбрать chart library, решить routing schema, design system tokens, hosting provider.
 
 
+

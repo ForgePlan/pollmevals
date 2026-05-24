@@ -571,16 +571,65 @@ forgeplan health                     # verify clean state
 
 ## File RAG — где что лежит (read these first when in doubt)
 
-| Вопрос | Файл |
+| Вопрос | Файл / artifact |
 |---|---|
-| **Что из dd.md уже сделано / не сделано?** | `forgeplan get NOTE-005` ← **canonical coverage map** dd.md ↔ artifacts |
-| Исходное ТЗ проекта (1785 lines) | `docs/old/dd.md` |
-| Что есть в проекте целиком? | `INDEX.md` (root) |
-| Что есть в docs/? | `docs/INDEX.md` |
+| **Что строим как продукт + CJM (5 stages × 4 personas) + 18 site pages + API contracts + gap effort estimates** | **`forgeplan get SPEC-002`** ← canonical product spec + journey map |
+| **Что из dd.md уже сделано / не сделано? Coverage matrix** | **`forgeplan get NOTE-005`** ← canonical dd.md ↔ artifacts mapping |
 | Полный каталог stacks/memory/tools/metrics dimensions | `forgeplan get NOTE-004` (expanded vision) |
-| Что в forgeplan сейчас? | `forgeplan list` / `forgeplan health` |
-| Glossary | `CONTEXT.md` |
-| Long-term memory | Hindsight MCP bank `pollmevals` |
+| Anti-gaming + contamination + drift policy | `forgeplan get NOTE-006` |
+| Исходное ТЗ проекта (1785 lines) | `docs/old/dd.md` (read-only seed) |
+| Что есть в проекте целиком? (file system map) | `INDEX.md` (root) |
+| Что есть в docs/? | `docs/INDEX.md` |
+| Что в forgeplan сейчас? (full artifact list) | `forgeplan list` / `forgeplan health` |
+| Domain glossary | `CONTEXT.md` |
+| Long-term memory across sessions | Hindsight MCP bank `pollmevals` |
+
+### Per-artifact responsibility map (quick reference)
+
+| Artifact | Отвечает за |
+|---|---|
+| **EPIC-001** | v0.1 launch — overall epic ownership, R_eff source-of-truth для project health |
+| **PRD-001** | Smoke run base — first 45-eval grid contract (3 tasks × 5 models × 3 seeds на raw-llm) |
+| **PRD-002** | Judge panel methodology — Q1-Q5 decisions (multi_scorer + median + CI gate + degraded + ID probe) |
+| **PRD-003** | Weekly cadence (draft) — operational reliability, cron, alerting |
+| **PRD-004** | Public leaderboard MVP (draft) — refined by SPEC-002 |
+| **PRD-005** | Release pipeline (draft) — assigned_number bot + sync workflow |
+| **PRD-006** | Tasks catalog expansion — 17 missing tasks roadmap (Waves 1+2+3) |
+| **RFC-001** | Orchestrator implementation plan на Inspect AI |
+| **RFC-002** | Judge panel layer implementation (5 Slices A-E) |
+| **ADR-001** | Concurrency model (semaphore + per-provider rate awareness) |
+| **ADR-002** | Reproduce semantics — evaluator-only (cached raw_output, never re-fire LLM) |
+| **ADR-003** | 5-model smoke lineup + provider routing |
+| **ADR-004** | MoleculerPy as distributed orchestrator (Phase 3+) |
+| **ADR-005** | Judge score aggregation — median reducer + bootstrap CI lower-bound gate |
+| **ADR-006** | Phase 1 14-model adoption (Cerebras + Runpod routes + cost matrix) |
+| **SPEC-001** | Manifest + EvalRow + ArtifactRef contracts |
+| **SPEC-002** | Product spec + CJM + 18 site pages + API contracts (refines PRD-004) |
+| **NOTE-001** | Crash recovery (append-only journal + atomic rename) |
+| **NOTE-002** | Evidence Quality Standard — ADI cycle + Trust Calculus per EVID (mandatory) |
+| **NOTE-003** | Observability stack seed (LGTM choice for PRD-003+) |
+| **NOTE-004** | Expanded vision catalog (12 stacks + 9 memory + 4 context + 8 indexing + 10 metrics) |
+| **NOTE-005** | dd.md ↔ artifacts coverage matrix (single source of truth для "что есть/нет") |
+| **NOTE-006** | Anti-gaming + contamination program (3 pillars + 3 policy decisions) |
+| **EVID-001..024** | Per-EVID specifics: prior art audits, Wave EVIDs, smoke run measurements |
+
+### When to consult what (3-second triage)
+
+```
+Question                                       →  Open
+─────────────────────────────────────────────────────────────────────
+"Что мы строим как продукт?"                   →  SPEC-002 (CJM + pages + API)
+"Что осталось дострить?"                        →  NOTE-005 (gap matrix)
+"Какие стеки тестируем?"                        →  NOTE-004 Section 1
+"Какие модели в lineup?"                        →  ADR-003 (smoke 5) + ADR-006 (full 14)
+"Как считаем quality / cost?"                   →  docs/02-methodology/scoring.md (frozen)
+"Как работает panel of judges?"                 →  PRD-002 + RFC-002 + ADR-005
+"Как защищаемся от gaming?"                     →  NOTE-006
+"Какой формат manifest?"                        →  SPEC-001
+"Как воспроизвести run?"                        →  ADR-002 + Makefile reproduce target
+"Куда смотрит конкретная страница на сайте?"    →  SPEC-002 § "API Contracts"
+"Что было решено в прошлой сессии?"             →  Hindsight memory_recall("project state")
+```
 
 ## Expanded vision (NOTE-004 canonical)
 
