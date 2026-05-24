@@ -1,62 +1,90 @@
 # LiteLLM proxy configuration for POLLMEVALS v0.1 smoke run
-# Routes all 5 models from ADR-003 via OpenRouter.
 #
-# All secrets are env-sourced: OPENROUTER_API_KEY, LITELLM_MASTER_KEY.
-# Never commit a literal API key in this file — use os.environ[] references only.
+# Routes 5 ADR-003 models via the most reliable backend per provider:
+# - 4 closed/popular models via OpenRouter (confirmed working via EVID-019 smoke)
+# - qwen-3-14b via HuggingFace router → Cerebras provider
+#   (EVID-019 confirmed qwen-3-14b NOT on OpenRouter; HF Inference Providers
+#   has Cerebras as backend per HF docs; LiteLLM speaks HF via openai-compatible
+#   custom base_url since HF router is OpenAI drop-in)
 #
+# Slug names confirmed by `make openrouter-smoke` 2026-05-24 (EVID-019).
+# Never commit a literal API key — use os.environ/* references only.
 # Pulled into the container via volume mount in docker-compose.litellm.yml.
 
 model_list:
-  # Slot 1 — Premium closed: Claude Sonnet 4.6 (Anthropic via OpenRouter)
+  # Slot 1 — Premium closed: Claude Sonnet 4.6 via OpenRouter
   - model_name: claude-sonnet-4-6
     litellm_params:
-      model: openrouter/anthropic/claude-sonnet-4-6
+      model: openrouter/anthropic/claude-sonnet-4.6
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
-  # Slot 2 — Mid closed: GPT-5 mini (OpenAI via OpenRouter)
+  # Slot 2 — Mid closed: GPT-5 mini via OpenRouter
+  # NOTE: GPT-5 family requires max_tokens >= 16 (reasoning tokens reserved);
+  # orchestrator must enforce minimum in request shape.
   - model_name: gpt-5-mini
     litellm_params:
       model: openrouter/openai/gpt-5-mini
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
-  # Slot 3 — Cheap closed: Gemini 3 Flash (Google via OpenRouter)
+  # Slot 3 — Cheap closed: Gemini 3 Flash via OpenRouter
+  # NOTE: resolved to :preview suffix (EVID-019); monitor production stability.
   - model_name: gemini-3-flash
     litellm_params:
-      model: openrouter/google/gemini-3-flash
+      model: openrouter/google/gemini-3-flash-preview
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
-  # Slot 4 — Open-weight fast: Qwen 3 14B on Cerebras hardware (via OpenRouter)
-  - model_name: qwen-3-14b-cerebras
+  # Slot 4 — Open-weight: Qwen 3 14B via HuggingFace router (auto-route)
+  # Diverges from OpenRouter (NOT on OR per EVID-019); HF picks best backend.
+  # LiteLLM treats HF router as OpenAI-compatible via custom base_url.
+  # Slug is CASE-SENSITIVE on HF Hub: `Qwen/Qwen3-14B` not `qwen/qwen3-14b`.
+  # NO provider suffix — HF auto-routes (`:cerebras` suffix rejected because
+  # Cerebras doesn't host Qwen3-14B specifically; default :fastest picks
+  # whichever backend hosts it, currently vLLM/Together/etc).
+  # Note: Qwen3 is a reasoning model — like gpt-5, requires max_tokens >= 16+
+  # (otherwise reasoning consumes whole budget, content returns null).
+  - model_name: qwen-3-14b
     litellm_params:
-      model: openrouter/cerebras/qwen-3-14b
-      api_key: os.environ/OPENROUTER_API_KEY
-      api_base: https://openrouter.ai/api/v1
+      model: openai/Qwen/Qwen3-14B
+      api_key: os.environ/HF_TOKEN
+      api_base: https://router.huggingface.co/v1
 
-  # Slot 5 — Open-weight large: Llama 4 70B on Runpod vLLM (via OpenRouter)
-  - model_name: llama-4-70b-runpod
+  # Slot 5 — Open-weight large: Llama via OpenRouter
+  # NOTE: resolved to meta-llama/llama-3.3-70b-instruct (EVID-019);
+  # llama-4-70b not yet broadly available, 3.3-70b is the closest stable variant.
+  - model_name: llama-3-3-70b
     litellm_params:
-      model: openrouter/runpod/llama-4-70b
+      model: openrouter/meta-llama/llama-3.3-70b-instruct
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
 # General proxy settings
 litellm_settings:
-  # Forward spend data to Postgres for cost attribution cross-check (RFC-001 § Cost)
-  # DATABASE_URL is optional; proxy works without it (cost data from /spend/logs API)
-  success_callback: []
-  failure_callback: []
-  # Disable telemetry — POLLMEVALS collects its own cost/token data
-  telemetry: false
-  # Request timeout matches RFC-001 error taxonomy: timeout > 300s → error_class=timeout
-  request_timeout: 300
+  # Prometheus metrics at GET /metrics — DB available so this works.
+  # ~15 metric families: litellm_spend_metric, litellm_total_tokens_metric,
+  # litellm_request_total_latency_metric, litellm_proxy_total_requests_metric,
+  # litellm_deployment_state, etc. Scraped by Prometheus per prometheus.yml.
+  callbacks:
+    - prometheus
+    - otel              # traces → OTEL collector → Tempo (via OTEL_ENDPOINT env)
+  success_callback:
+    - prometheus
+    - otel
+  failure_callback:
+    - prometheus
+    - otel
+  telemetry: false                # POLLMEVALS collects its own cost/token data
+  request_timeout: 300            # matches RFC-001 error_class=timeout boundary
+  drop_params: true               # silently drop unsupported params per-provider (e.g. temperature for GPT-5)
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  # Store spend data if DATABASE_URL is provided (optional for smoke run)
+  # DATABASE_URL required — current LiteLLM image rejects /chat/completions with
+  # `no_db_connection` HTTP 400 when DB unavailable. Postgres provisioned in
+  # docker-compose. Connection string built from POSTGRES_PASSWORD env.
   database_url: os.environ/DATABASE_URL
-  # Budget cap: orchestrator enforces $50 hard limit (NFR-001); proxy acts as soft backstop
+  # Budget cap (soft backstop; orchestrator enforces NFR-001 $50 hard limit via cost.py)
   max_budget: 50
   budget_duration: "30d"

@@ -1,43 +1,103 @@
-# LiteLLM proxy — Docker Compose for POLLMEVALS v0.1 smoke run
+# POLLMEVALS dev stack — Postgres + NATS + LiteLLM proxy
 #
-# Image pinned by digest per architect finding #5 (EVID-005 SWE-bench divergence):
-#   ghcr.io/berriai/litellm:main-stable@sha256:b3db76b5251485ab332bb91b30984991c6f53144b5c1c4371b4bd9766749e45f
-#   (pulled and inspected 2026-05-24; re-pin before each major release)
+# Images pinned by digest per architect finding #5 (EVID-005 SWE-bench divergence):
+#   ghcr.io/berriai/litellm:main-stable @ sha256:b3db76b5251485ab332bb91b30984991c6f53144b5c1c4371b4bd9766749e45f
+#   nats:2.10-alpine                    @ sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927
+#   postgres:16-alpine                  @ sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+#   (all docker-inspected; re-pin before each release)
+#
+# Postgres holds:
+#   - LiteLLM spend logs + budget tracking (required by current LiteLLM image
+#     even with master_key auth — without DB, all /chat/completions fail 400
+#     "no_db_connection")
+# NATS = MoleculerPy broker for Phase 3+ distributed orchestrator (ADR-004).
 #
 # Usage:
-#   source .env && docker compose -f infra/docker-compose.litellm.yml up -d
-#   OR use the helper scripts:
-#     infra/scripts/litellm-proxy-up.sh    — start with healthcheck wait
-#     infra/scripts/litellm-proxy-down.sh  — stop and remove
+#   make stack-up
+#   make stack-down
+#   make stack-status
 #
-# Required env vars (from .env or shell):
-#   OPENROUTER_API_KEY   — unified key for all 5 ADR-003 model routes
-#   LITELLM_MASTER_KEY   — proxy auth token (e.g. sk-local-pollmevals-dev)
-# Optional:
-#   DATABASE_URL         — Postgres for spend tracking (LiteLLM DB schema, separate from POLLMEVALS DB)
+# Required env (.env via Makefile include + export):
+#   OPENROUTER_API_KEY, HF_TOKEN, LITELLM_MASTER_KEY
+# Provided by compose defaults if unset:
+#   POSTGRES_PASSWORD (dev default — DO NOT use in production)
 
 version: "3.9"
 
 services:
+  # ───────────────────────────────────────────────────────────────────
+  # Postgres — LiteLLM spend tracking + future POLLMEVALS app data
+  # ───────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    container_name: pollmevals-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pollmevals
+      POSTGRES_USER: pollmevals
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-pollmevals_dev_password}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pollmevals_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pollmevals -d pollmevals"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ───────────────────────────────────────────────────────────────────
+  # NATS — message broker (Phase 3+ MoleculerPy transport per ADR-004)
+  # ───────────────────────────────────────────────────────────────────
+  nats:
+    image: nats:2.10-alpine@sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927
+    container_name: pollmevals-nats
+    restart: unless-stopped
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command:
+      - "--http_port"
+      - "8222"
+      - "--name"
+      - "pollmevals-nats"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ───────────────────────────────────────────────────────────────────
+  # LiteLLM proxy — unified routing
+  # ───────────────────────────────────────────────────────────────────
   litellm-proxy:
-    # Pinned by digest — architect finding #5 (EVID-005): tags are mutable, digests are not.
-    # Tag kept for human readability; digest is the enforced identity.
     image: ghcr.io/berriai/litellm:main-stable@sha256:b3db76b5251485ab332bb91b30984991c6f53144b5c1c4371b4bd9766749e45f
     container_name: pollmevals-litellm-proxy
     restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
 
     ports:
       - "4000:4000"
 
     environment:
-      # Required: passed from host env (never hardcoded here)
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      HF_TOKEN: "${HF_TOKEN}"
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}"
-      # Optional: enables per-eval spend tracking in Postgres
-      DATABASE_URL: "${DATABASE_URL:-}"
+      # Point to Postgres in same network — service name `postgres` resolves via Docker DNS
+      DATABASE_URL: "postgresql://pollmevals:${POSTGRES_PASSWORD:-pollmevals_dev_password}@postgres:5432/pollmevals"
+      # OTEL → otel-collector in same network (joined via networks.default external)
+      OTEL_EXPORTER: "otlp_http"
+      OTEL_ENDPOINT: "http://otel-collector:4318"
+      OTEL_SERVICE_NAME: "pollmevals-litellm"
 
     volumes:
-      # Mount LiteLLM config with all 5 ADR-003 model routes
       - ./litellm-config.yaml:/app/config.yaml:ro
 
     command:
@@ -49,15 +109,17 @@ services:
       - "1"
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      # Wolfi-based image has NO curl/wget; use python stdlib urllib
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=3).status==200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
 
-    # Default bridge network is sufficient for smoke run (single-machine)
-    # Orchestrator connects via host port 4000
+volumes:
+  pollmevals_pg_data:
+    name: pollmevals_pg_data
 
 networks:
   default:
-    name: pollmevals-litellm
+    name: pollmevals-dev

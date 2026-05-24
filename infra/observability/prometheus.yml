@@ -1,0 +1,30 @@
+# Prometheus config — scrapes LiteLLM /metrics + OTEL collector /metrics.
+# Visualized via Grafana data source.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: pollmevals-dev
+
+scrape_configs:
+  # LiteLLM proxy native Prometheus endpoint (built-in metrics: spend, tokens, latency)
+  # LiteLLM v latest requires auth on /metrics → bearer token = LITELLM_MASTER_KEY.
+  # Token below is the dev default (also in .env). For prod: rotate and use bearer_token_file.
+  - job_name: litellm
+    static_configs:
+      - targets: ["litellm-proxy:4000"]
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials: "sk-local-pollmevals-dev"
+
+  # OTEL collector's own metrics (collector internals)
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
+
+  # OTEL collector's prometheus exporter (metrics from POLLMEVALS orchestrator forwarded via OTLP)
+  - job_name: otel-pollmevals-metrics
+    static_configs:
+      - targets: ["otel-collector:8889"]

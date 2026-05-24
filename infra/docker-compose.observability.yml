@@ -1,0 +1,133 @@
+# POLLMEVALS observability stack — LGTM + OTEL collector
+#
+# Per NOTE-003 research seed + user direction 2026-05-24 ("запускай для телеметрии grafana stack").
+#
+# Images pinned by digest per architect finding #5:
+#   grafana/grafana             @ sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
+#   grafana/loki                @ sha256:58b60b901255c209d3455d8a1979a3f73d1d09686a0a858c2c93025a969eb550
+#   grafana/tempo               @ sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
+#   prom/prometheus             @ sha256:565ee86501224ebbb98fc10b332fa54440b100469924003359edf49cbce374bd
+#   otel/opentelemetry-collector-contrib @ sha256:d2da12c4336a79758826700be9e21ecf4a9f7d945b7f8a58ba55ee3fa45427c8
+#
+# Joins the same `pollmevals-dev` network as the LiteLLM/NATS/Postgres compose
+# so OTel collector can scrape LiteLLM and POLLMEVALS services can emit OTLP.
+#
+# Usage:
+#   make obs-up      — start LGTM+OTEL
+#   make obs-down    — stop
+#   make grafana     — open Grafana in browser
+#
+# Endpoints:
+#   Grafana:        http://localhost:3000 (admin/pollmevals_dev — set below)
+#   Prometheus UI:  http://localhost:9090
+#   Tempo:          http://localhost:3200 (API only)
+#   Loki:           http://localhost:3100 (API only)
+#   OTEL collector: http://localhost:4318 (OTLP HTTP), 4317 (OTLP gRPC)
+
+version: "3.9"
+
+services:
+  # ───────────────────────────────────────────────────────────────────
+  # OpenTelemetry Collector — receives OTLP, fans to Tempo/Prom/Loki
+  # ───────────────────────────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib@sha256:d2da12c4336a79758826700be9e21ecf4a9f7d945b7f8a58ba55ee3fa45427c8
+    container_name: pollmevals-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Collector's own metrics
+      - "8889:8889"   # Prometheus exporter for incoming OTLP metrics
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+
+  # ───────────────────────────────────────────────────────────────────
+  # Prometheus — metrics scraping + storage
+  # ───────────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus@sha256:565ee86501224ebbb98fc10b332fa54440b100469924003359edf49cbce374bd
+    container_name: pollmevals-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - pollmevals_prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Tempo — distributed tracing backend
+  # ───────────────────────────────────────────────────────────────────
+  tempo:
+    image: grafana/tempo@sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
+    container_name: pollmevals-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - pollmevals_tempo_data:/var/tempo
+    ports:
+      - "3200:3200"   # tempo HTTP
+
+  # ───────────────────────────────────────────────────────────────────
+  # Loki — log aggregation
+  # ───────────────────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki@sha256:58b60b901255c209d3455d8a1979a3f73d1d09686a0a858c2c93025a969eb550
+    container_name: pollmevals-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - pollmevals_loki_data:/loki
+    ports:
+      - "3100:3100"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Grafana — visualisation UI (data sources auto-provisioned)
+  # ───────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
+    container_name: pollmevals-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-pollmevals_dev}"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor traceQLStreaming metricsSummary
+      GF_INSTALL_PLUGINS: ""    # add e.g. grafana-piechart-panel here later
+    volumes:
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - pollmevals_grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+
+volumes:
+  pollmevals_prometheus_data:
+    name: pollmevals_prometheus_data
+  pollmevals_tempo_data:
+    name: pollmevals_tempo_data
+  pollmevals_loki_data:
+    name: pollmevals_loki_data
+  pollmevals_grafana_data:
+    name: pollmevals_grafana_data
+
+networks:
+  default:
+    name: pollmevals-dev
+    external: true   # joins the network created by docker-compose.litellm.yml
