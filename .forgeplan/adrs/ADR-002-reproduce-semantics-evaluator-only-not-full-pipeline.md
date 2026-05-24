@@ -155,3 +155,4 @@ Files directly implementing or constrained by this decision:
 - ADR-0002 legacy (run immutability — foundation)
 - Future Note or ADR: drift detection methodology (separate concern from reproduce)
 
+
