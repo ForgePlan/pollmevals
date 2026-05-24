@@ -573,9 +573,11 @@ forgeplan health                     # verify clean state
 
 | Вопрос | Файл |
 |---|---|
+| **Что из dd.md уже сделано / не сделано?** | `forgeplan get NOTE-005` ← **canonical coverage map** dd.md ↔ artifacts |
+| Исходное ТЗ проекта (1785 lines) | `docs/old/dd.md` |
 | Что есть в проекте целиком? | `INDEX.md` (root) |
 | Что есть в docs/? | `docs/INDEX.md` |
-| Полный каталог stacks/memory/tools/metrics dimensions | `forgeplan get NOTE-004` (canonical reference for expanded vision) |
+| Полный каталог stacks/memory/tools/metrics dimensions | `forgeplan get NOTE-004` (expanded vision) |
 | Что в forgeplan сейчас? | `forgeplan list` / `forgeplan health` |
 | Glossary | `CONTEXT.md` |
 | Long-term memory | Hindsight MCP bank `pollmevals` |

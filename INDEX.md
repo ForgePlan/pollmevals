@@ -8,7 +8,9 @@
 - Что есть в forgeplan/ → `forgeplan list` или `mcp__forgeplan__forgeplan_list`
 - Правила работы AI-агента → `CLAUDE.md`
 - Domain glossary → `CONTEXT.md`
-- Expanded vision catalog (stacks, memory, tools, metrics) → **`.forgeplan/notes/NOTE-004-*.md`** (canonical) или `forgeplan get NOTE-004`
+- **dd.md ↔ artifacts coverage map** (исходное ТЗ vs реализация) → **`forgeplan get NOTE-005`** (canonical, single source of truth)
+- Expanded vision catalog (stacks, memory, tools, metrics) → **`forgeplan get NOTE-004`**
+- Исходное ТЗ проекта (1785 lines) → `docs/old/dd.md` (read-only seed)
 
 ## Корень
 
