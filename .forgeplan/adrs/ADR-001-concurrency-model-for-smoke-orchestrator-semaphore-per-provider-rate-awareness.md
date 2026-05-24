@@ -2,7 +2,7 @@
 depth: standard
 id: ADR-001
 kind: adr
-last_modified_at: 2026-05-23T19:25:19.512324+00:00
+last_modified_at: 2026-05-24T10:17:20.049635+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: RFC-001
@@ -19,7 +19,7 @@ draft (proposed)
 
 ## Context
 
-POLLMEVALS smoke run выполняет 45 evals (3 tasks × 5 models × 3 seeds) через 5 моделей с разными провайдерами и rate limits. Inspect AI (EVID-004) sам не управляет concurrency между параллельными `inspect_eval()` invocations — это ответственность caller'а.
+POLLMEVALS smoke run выполняет 45 evals (3 tasks × 5 models × 3 seeds) через 5 моделей с разными провайдерами и rate limits. Inspect AI (EVID-004) сам не управляет concurrency между параллельными `inspect_eval()` invocations — это ответственность caller'а.
 
 Без явного решения:
 - Полная параллельность (45 одновременных HTTP calls) → rate limits → много failed evals → degraded smoke baseline (per PRD-001 ADI risk #1).
@@ -116,6 +116,36 @@ LiteLLM proxy остается responsibility'у inter-provider routing + per-ke
 - При переходе к weekly run (PRD-003) — обязательно переход на Option B или Option C
 - Concurrency решение влияет на total wall clock → influences NFR-002 (latency budget per eval); если smoke run > 1 hour, revisit это ADR
 
+## Invariants
+
+For this decision to remain valid, ALL of the following must stay true:
+
+- `asyncio.gather(*coros, return_exceptions=True)` is NEVER replaced with bare `await` or a loop that lets one exception cancel siblings — this is the FR-009 invariant enforced in `grid_runner.py:GridRunner.run()`.
+- `MAX_CONCURRENT_EVALS = 3` (module-level constant in `apps/eval-core-py/src/orchestrator/grid_runner.py`) is the single source of truth for the semaphore limit; no caller passes a different `max_concurrent` value in production without updating this ADR first.
+- Concurrency enforcement lives OUTSIDE `EvalCaller` — `eval_caller.py` is a thin Protocol with no semaphore logic. If concurrency ever moves inside `EvalCaller`, Option A's accounting breaks (nested semaphore, double-counting).
+- Budget abort (`BudgetGate.should_continue`) is checked BEFORE acquiring the semaphore (pre-semaphore check) AND again inside (post-semaphore check) — both checks in `GridRunner._run_single()` must remain in place to avoid in-flight over-spend.
+- The smoke run total stays ≤ 45 evals (5 models × 3 tasks × 1 stack × 3 seeds). If the grid grows past ~100 evals, the global semaphore approach must be revisited (option B becomes mandatory).
+
+## Rollback Plan
+
+If this decision is reversed (e.g., first smoke postmortem shows >10% rate-limit failures with N=3):
+
+1. **Bump N only (fast path)**: Edit `MAX_CONCURRENT_EVALS` in `apps/eval-core-py/src/orchestrator/grid_runner.py` line 37 — change `3` to `2`. Re-run smoke. No other changes needed. Update this ADR's outcome section.
+2. **Migrate to Option B (per-provider semaphores)**: Replace the single `self._semaphore = asyncio.Semaphore(max_concurrent)` in `GridRunner.__init__` with a `dict[str, asyncio.Semaphore]` keyed by provider prefix (first segment of `model_id` before `/`). Update `_run_single` to look up `self._semaphores[provider]`. Five-line change — no interface changes to `EvalCaller`, `GridSpec`, or `JournalWriter`.
+3. **Revert to Option C (if Option B also fails)**: Add `celery[redis]` to `apps/eval-core-py/pyproject.toml`; add Celery worker service to `docker-compose.yml`; extract `GridRunner._run_single` into a Celery task. This is a breaking change requiring new ADR.
+4. In all cases: create a new `EVID-NNN` with `evidence_type: measurement` recording the failure rate observed, link it `informs ADR-001`, and create a new ADR superseding this one before activating.
+
+## Affected Files
+
+Files directly implementing or constrained by this decision:
+
+- `apps/eval-core-py/src/orchestrator/grid_runner.py` — `MAX_CONCURRENT_EVALS = 3` constant (line 37); `GridRunner.__init__` semaphore construction (line 199); `GridRunner._run_single` pre/post semaphore budget checks; `asyncio.gather(..., return_exceptions=True)` call (line 300)
+- `apps/eval-core-py/src/orchestrator/eval_caller.py` — `EvalCaller` Protocol; concurrency is intentionally absent here (documented in module docstring)
+- `apps/eval-core-py/src/orchestrator/journal.py` — `JournalWriter.append` called per completed eval inside semaphore scope
+- `apps/eval-core-py/src/orchestrator/cost.py` — `BudgetGate.should_continue` called at both budget-check points in `_run_single`
+- `stacks/raw-llm/stack.yaml` — `limits.max_wall_clock_seconds: 300` (5 min per-eval timeout; × 3 concurrent = 15 min max in-flight at any time)
+- `apps/eval-core-py/tests/orchestrator/test_grid_runner.py` — tests must cover `return_exceptions=True` behavior and budget gate; any change to concurrency model requires test updates here
+
 ## Compliance
 
 - Соответствует PRD-001 FR-009 (failed evals stored), NFR-002 (per-eval timeout 5 min)
@@ -127,8 +157,4 @@ LiteLLM proxy остается responsibility'у inter-provider routing + per-ke
 - RFC-001 — uses this concurrency choice
 - PRD-001 — parent requirement
 - EVID-004 (Inspect AI) — confirms Inspect не managing concurrency for parallel `eval()` invocations
-
-
-
-
 

@@ -2,7 +2,7 @@
 depth: standard
 id: ADR-003
 kind: adr
-last_modified_at: 2026-05-23T19:26:59.729946+00:00
+last_modified_at: 2026-05-24T10:20:17.403116+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: RFC-001
@@ -104,7 +104,7 @@ models:
 1. Отложить smoke до восстановления (если single failure)
 2. Запустить в degraded mode с 4 models если провайдер down > 24h (mark в manifest status=degraded)
 
-**Reproducibility note**: если closed-API модель silently апдейтится между smoke and weekly run, это будет detected через drift в weekly Δ (separate ADR в PRD-003), НЕ через smoke reproduce (per ADR-002).
+**Reproducibility note**: если closed-API модель silently апдейтится между smoke and weekly run, это будет detected через drift в weekly Δ (separate concern, to be addressed in ADR for PRD-003), НЕ через smoke reproduce (per ADR-002).
 
 ## Consequences
 
@@ -121,9 +121,39 @@ models:
 - ❌ Lineup pinned для smoke — изменение моделей между smoke и weekly run = different manifest, different baseline. ОK для smoke proof-of-pipeline, но PRD-003 weekly должна re-evaluate model selection separately
 
 ### Neutral
-- Этот lineup для **smoke only**. Weekly run (PRD-003) может расширить до 7-10 models — decision deferred
-- Future model additions (Mistral, Cohere, Yi) — через ADR-XXX в weekly cadence, не через silent change в smoke
+- Этот lineup для **smoke only**. Weekly run (PRD-003) может расширить до 7-10 models — decision deferred to ADR for PRD-003
+- Future model additions (Mistral, Cohere, Yi) — через отдельный ADR в weekly cadence, не через silent change в smoke
 - Если pricing OpenRouter изменится для одной из моделей >2× между smoke и first weekly run — это flag для drift detection, не для re-selection
+
+## Invariants
+
+For this decision to remain valid, ALL of the following must stay true:
+
+- The `SMOKE_MODELS` list in `apps/eval-core-py/src/orchestrator/grid_runner.py` must match the five `provider_route` values defined in this ADR exactly. Any divergence means the manifest's `model_pins` will not reflect the chosen lineup — a direct violation of run reproducibility (SPEC-001 § model_pins, ADR-0002).
+- All five models are routed through **OpenRouter** (prefix `openrouter/`). Direct-vendor routes (e.g., `anthropic/claude-sonnet-4-6` without the `openrouter/` prefix) bypass unified cost-attribution and must not be used without a new ADR.
+- The lineup contains exactly **3 closed-API models** (Anthropic, OpenAI, Google) and **2 open-weight models** (Cerebras-hosted Qwen, Runpod-hosted Llama) — this balance is load-bearing for the POLLMEVALS thesis test and for PRD-002 judge-panel vendor diversity.
+- A **pre-flight check** (one prompt per provider_route) must execute before every smoke run invocation. Skipping the pre-flight and running a degraded 4-model grid without updating `manifest.status = "degraded"` violates the manifest contract (SPEC-001).
+- Model selection for the **weekly run (PRD-003) is a separate decision** — this ADR governs smoke only. Any expansion of `SMOKE_MODELS` beyond these 5 entries requires a new ADR, not a silent edit to `grid_runner.py`.
+
+## Rollback Plan
+
+If this decision is reversed (e.g., Cerebras or Runpod are unavailable at smoke time, or cost estimates prove significantly wrong):
+
+1. **Single provider failure (degraded mode)**: If one provider_route is down at smoke time, invoke `make smoke-run -- --degraded` which sets `manifest.status = "degraded"` and proceeds with 4 models. Update `SMOKE_MODELS` in `grid_runner.py` to remove the failing route. No new ADR needed for degraded-mode execution — it is pre-approved in the Decision Outcome above.
+2. **Replace one model slot**: If a model must be permanently swapped (e.g., Runpod vLLM unavailable for >1 week), create a new forgeplan evidence artifact (`evidence_type: measurement`) documenting the failure, then update `SMOKE_MODELS` in `grid_runner.py` and the `models` block in `stacks/raw-llm/stack.yaml`. Create a new ADR superseding this one — do not silently edit.
+3. **Revert to Option B (all-cheap)**: If cost overruns make the balanced lineup too expensive, replace the three closed models with cheaper tiers. This is a semantic change to the lineup requiring a new ADR. The weekly run decision is unaffected.
+4. **Full lineup change**: Replace `SMOKE_MODELS` constant in `grid_runner.py`; update `stacks/raw-llm/stack.yaml` `base_model_slug`; update manifest schema `model_pins` block; create new ADR superseding this one; record EVID with the cost/availability evidence that drove the change.
+
+## Affected Files
+
+Files directly constrained by this model lineup decision:
+
+- `apps/eval-core-py/src/orchestrator/grid_runner.py` — `SMOKE_MODELS` list (lines 335–341) must match this ADR's five `provider_route` strings exactly; `make_smoke_grid_spec()` factory uses this list
+- `stacks/raw-llm/stack.yaml` — `base_model_slug: configurable` and `execution.command: litellm` confirm the stack is model-agnostic; the five model slugs are injected at run time via manifest `model_pins`
+- `evals/tasks/be_01_jwt_auth/task.yaml`, `evals/tasks/fe_01_multistep_form/task.yaml`, `evals/tasks/doc_01_cli_readme/task.yaml` — task specs must be compatible with all 5 provider routes (no model-specific prompt engineering in smoke tasks)
+- `packages/contracts/` — JSON Schema for `RunManifest.model_pins` must accommodate all 5 provider_route strings; schema validation fires at run-start before any LLM calls
+- `docs/04-runbook/12-first-smoke-run-playbook.md` — references the 5-model lineup; must be kept in sync if lineup changes
+- `Makefile` — `make smoke-run` and `make demo-run` targets use the model list via `grid_runner.py`; `make demo-run` currently uses fixtures, not live routes, but the route names must still match for manifest validation
 
 ## Compliance
 
@@ -140,9 +170,5 @@ models:
 - EPIC-001 — Phase 1 deliverable
 - EVID-002 (MTEB contamination) — anti-contamination considerations
 - EVID-004 (Inspect AI provider routing) — provider_route format
-- Future ADR-XXX (PRD-003) — weekly run model selection (extend or revise)
-
-
-
-
+- Future ADR for PRD-003 — weekly run model selection (extend or revise this lineup)
 
