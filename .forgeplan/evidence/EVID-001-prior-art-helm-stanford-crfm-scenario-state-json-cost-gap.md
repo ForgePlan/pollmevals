@@ -111,3 +111,5 @@ Each run entry is `model=<provider>/<model-id>`. No L0-L8 layering. Cannot answe
 - Future Note: median vs mean rationale for PRD-002
 - NOTE-002 (Evidence Quality Standard — retrofit)
 
+
+

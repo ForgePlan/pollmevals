@@ -123,3 +123,4 @@ EvalLog: `.eval` binary (1/8 size of JSON, default v0.3.46+). Post-eval edits la
 - NOTE-002 (Evidence Quality Standard — retrofit)
 
 
+

@@ -172,3 +172,4 @@ Files directly constrained by this model lineup decision:
 - EVID-004 (Inspect AI provider routing) — provider_route format
 - Future ADR for PRD-003 — weekly run model selection (extend or revise this lineup)
 
+
