@@ -1,0 +1,63 @@
+# LiteLLM proxy — Docker Compose for POLLMEVALS v0.1 smoke run
+#
+# Image pinned by digest per architect finding #5 (EVID-005 SWE-bench divergence):
+#   ghcr.io/berriai/litellm:main-stable@sha256:b3db76b5251485ab332bb91b30984991c6f53144b5c1c4371b4bd9766749e45f
+#   (pulled and inspected 2026-05-24; re-pin before each major release)
+#
+# Usage:
+#   source .env && docker compose -f infra/docker-compose.litellm.yml up -d
+#   OR use the helper scripts:
+#     infra/scripts/litellm-proxy-up.sh    — start with healthcheck wait
+#     infra/scripts/litellm-proxy-down.sh  — stop and remove
+#
+# Required env vars (from .env or shell):
+#   OPENROUTER_API_KEY   — unified key for all 5 ADR-003 model routes
+#   LITELLM_MASTER_KEY   — proxy auth token (e.g. sk-local-pollmevals-dev)
+# Optional:
+#   DATABASE_URL         — Postgres for spend tracking (LiteLLM DB schema, separate from POLLMEVALS DB)
+
+version: "3.9"
+
+services:
+  litellm-proxy:
+    # Pinned by digest — architect finding #5 (EVID-005): tags are mutable, digests are not.
+    # Tag kept for human readability; digest is the enforced identity.
+    image: ghcr.io/berriai/litellm:main-stable@sha256:b3db76b5251485ab332bb91b30984991c6f53144b5c1c4371b4bd9766749e45f
+    container_name: pollmevals-litellm-proxy
+    restart: unless-stopped
+
+    ports:
+      - "4000:4000"
+
+    environment:
+      # Required: passed from host env (never hardcoded here)
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}"
+      # Optional: enables per-eval spend tracking in Postgres
+      DATABASE_URL: "${DATABASE_URL:-}"
+
+    volumes:
+      # Mount LiteLLM config with all 5 ADR-003 model routes
+      - ./litellm-config.yaml:/app/config.yaml:ro
+
+    command:
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+      - "--num_workers"
+      - "1"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    # Default bridge network is sufficient for smoke run (single-machine)
+    # Orchestrator connects via host port 4000
+
+networks:
+  default:
+    name: pollmevals-litellm

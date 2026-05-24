@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""validate-task-specs.py — POLLMEVALS task-spec validator.
+"""validate-stack-specs.py — POLLMEVALS stack-adapter spec validator.
 
-Walks ``evals/task-packs/*/task.yaml`` and validates each file against
-``packages/contracts/schemas/task.schema.json``.
+Walks ``stacks/*/stack.yaml`` and validates each file against
+``packages/contracts/schemas/stack.schema.json``.
 
-History
--------
-Originally imported ``pollmevals_eval_core.registry.load_task_specs`` which
-does not exist in the repository (orphan import, GitHub issue #1). Rewritten
-in this commit to use pure stdlib + pyyaml + jsonschema, removing the phantom
-dependency entirely.
+Implements GitHub issue #2: add a stack-spec validator mirroring the
+task-spec validator in structure and UX.
 
 Usage
 -----
 Run from the repo root::
 
-    python infra/scripts/validate-task-specs.py           # validate all
-    python infra/scripts/validate-task-specs.py --task be_01_jwt_auth
+    python infra/scripts/validate-stack-specs.py           # validate all
+    python infra/scripts/validate-stack-specs.py --stack raw-llm
 
 Via uv (no local install needed)::
 
     uv run --with pyyaml --with jsonschema \\
-        python infra/scripts/validate-task-specs.py
+        python infra/scripts/validate-stack-specs.py
 
 Install deps explicitly::
 
@@ -30,7 +26,7 @@ Install deps explicitly::
 
 Exit codes
 ----------
-0  All validated task specs are valid.
+0  All validated stack specs are valid.
 1  At least one spec failed validation (or no specs were found).
 """
 
@@ -52,7 +48,7 @@ except ImportError:  # pragma: no cover
         "ERROR: pyyaml is not installed.\n"
         "  pip install pyyaml jsonschema\n"
         "  OR: uv run --with pyyaml --with jsonschema "
-        "python infra/scripts/validate-task-specs.py",
+        "python infra/scripts/validate-stack-specs.py",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -64,7 +60,7 @@ except ImportError:  # pragma: no cover
         "ERROR: jsonschema is not installed.\n"
         "  pip install pyyaml jsonschema\n"
         "  OR: uv run --with pyyaml --with jsonschema "
-        "python infra/scripts/validate-task-specs.py",
+        "python infra/scripts/validate-stack-specs.py",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -73,12 +69,12 @@ except ImportError:  # pragma: no cover
 # Paths (resolved relative to THIS file so the script is CWD-agnostic).
 # ---------------------------------------------------------------------------
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
-_SCHEMA_PATH: Final[Path] = _REPO_ROOT / "packages" / "contracts" / "schemas" / "task.schema.json"
-_TASK_PACKS_ROOT: Final[Path] = _REPO_ROOT / "evals" / "task-packs"
+_SCHEMA_PATH: Final[Path] = _REPO_ROOT / "packages" / "contracts" / "schemas" / "stack.schema.json"
+_STACKS_ROOT: Final[Path] = _REPO_ROOT / "stacks"
 
 
 def _load_schema() -> dict[str, object]:
-    """Load and parse the task JSON Schema from disk."""
+    """Load and parse the stack JSON Schema from disk."""
     if not _SCHEMA_PATH.exists():
         print(f"ERROR: schema not found: {_SCHEMA_PATH}", file=sys.stderr)
         sys.exit(1)
@@ -86,15 +82,15 @@ def _load_schema() -> dict[str, object]:
         return json.load(fh)  # type: ignore[no-any-return]
 
 
-def validate_one(task_yaml: Path, schema: dict[str, object]) -> bool:
-    """Validate a single task.yaml file against *schema*.
+def validate_one(stack_yaml: Path, schema: dict[str, object]) -> bool:
+    """Validate a single stack.yaml file against *schema*.
 
     Prints a ``✓`` or ``✗`` line to stdout.
 
     Parameters
     ----------
-    task_yaml:
-        Absolute path to the task.yaml file.
+    stack_yaml:
+        Absolute path to the stack.yaml file.
     schema:
         Pre-loaded JSON Schema dict.
 
@@ -103,10 +99,10 @@ def validate_one(task_yaml: Path, schema: dict[str, object]) -> bool:
     bool
         ``True`` when the spec is valid, ``False`` otherwise.
     """
-    rel: str = str(task_yaml.relative_to(_REPO_ROOT))
+    rel: str = str(stack_yaml.relative_to(_REPO_ROOT))
 
     try:
-        with task_yaml.open(encoding="utf-8") as fh:
+        with stack_yaml.open(encoding="utf-8") as fh:
             data: object = yaml.safe_load(fh)
     except yaml.YAMLError as exc:
         print(f"  ✗ {rel}: YAML parse error — {exc}")
@@ -128,7 +124,7 @@ def validate_one(task_yaml: Path, schema: dict[str, object]) -> bool:
 
 
 def validate_all(schema: dict[str, object] | None = None) -> tuple[int, int]:
-    """Validate every ``task.yaml`` found under ``evals/task-packs/``.
+    """Validate every ``stack.yaml`` found under ``stacks/``.
 
     Parameters
     ----------
@@ -143,17 +139,17 @@ def validate_all(schema: dict[str, object] | None = None) -> tuple[int, int]:
     if schema is None:
         schema = _load_schema()
 
-    task_files: list[Path] = sorted(_TASK_PACKS_ROOT.glob("*/task.yaml"))
-    if not task_files:
-        print(f"WARNING: no task.yaml files found under {_TASK_PACKS_ROOT}", file=sys.stderr)
+    stack_files: list[Path] = sorted(_STACKS_ROOT.glob("*/stack.yaml"))
+    if not stack_files:
+        print(f"WARNING: no stack.yaml files found under {_STACKS_ROOT}", file=sys.stderr)
         return 0, 0
 
     passed: int = 0
-    for tf in task_files:
-        if validate_one(tf, schema):
+    for sf in stack_files:
+        if validate_one(sf, schema):
             passed += 1
 
-    return passed, len(task_files)
+    return passed, len(stack_files)
 
 
 # ---------------------------------------------------------------------------
@@ -163,16 +159,16 @@ def validate_all(schema: dict[str, object] | None = None) -> tuple[int, int]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Validate POLLMEVALS task-spec YAML files against the task JSON Schema.",
-        epilog=("Example: python infra/scripts/validate-task-specs.py --task be_01_jwt_auth"),
+        description="Validate POLLMEVALS stack-adapter YAML files against the stack JSON Schema.",
+        epilog=("Example: python infra/scripts/validate-stack-specs.py --stack raw-llm"),
     )
     parser.add_argument(
-        "--task",
+        "--stack",
         metavar="SLUG",
         default=None,
         help=(
-            "Validate a single task pack by its directory name under evals/task-packs/. "
-            "Omit to validate all task packs."
+            "Validate a single stack by its directory name under stacks/. "
+            "Omit to validate all stacks."
         ),
     )
     return parser
@@ -185,22 +181,22 @@ def main() -> None:
 
     schema = _load_schema()
 
-    if args.task is not None:
-        task_yaml = _TASK_PACKS_ROOT / args.task / "task.yaml"
-        if not task_yaml.exists():
+    if args.stack is not None:
+        stack_yaml = _STACKS_ROOT / args.stack / "stack.yaml"
+        if not stack_yaml.exists():
             print(
-                f"ERROR: {task_yaml} not found.\n"
-                f"  Available task packs: "
-                + ", ".join(p.name for p in sorted(_TASK_PACKS_ROOT.iterdir()) if p.is_dir()),
+                f"ERROR: {stack_yaml} not found.\n"
+                f"  Available stacks: "
+                + ", ".join(p.name for p in sorted(_STACKS_ROOT.iterdir()) if p.is_dir()),
                 file=sys.stderr,
             )
             sys.exit(1)
-        ok = validate_one(task_yaml, schema)
-        print(f"\n{'1/1' if ok else '0/1'} task spec valid")
+        ok = validate_one(stack_yaml, schema)
+        print(f"\n{'1/1' if ok else '0/1'} stack spec valid")
         sys.exit(0 if ok else 1)
 
     passed, total = validate_all(schema)
-    print(f"\n{passed}/{total} task specs valid")
+    print(f"\n{passed}/{total} stack specs valid")
     sys.exit(0 if passed == total and total > 0 else 1)
 
 

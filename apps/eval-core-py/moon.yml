@@ -1,56 +1,60 @@
 $schema: 'https://moonrepo.dev/schemas/project.json'
 
-# Python eval orchestrator — Inspect AI-compatible task model, LiteLLM
-# wrapper, evaluator sandbox, run manifest generator. Skeleton only;
-# package code lives in `src/pollmevals_eval_core/`.
+# Python evaluation orchestrator — Inspect AI-compatible task model, LiteLLM
+# wrapper, cost attribution, manifest writer, crash recovery.
+# Source lives in `src/`; tests in `tests/`.
 layer: 'application'
 language: 'python'
 
+toolchain:
+  python:
+    version: '3.12.0'
+
 project:
   name: 'eval-core-py'
-  description: 'Python eval orchestrator (skeleton).'
+  description: 'Python evaluation orchestrator (Inspect AI wrapper, RFC-001).'
 
 tasks:
-  install:
-    command: 'uv sync --package pollmevals-eval-core'
+  build:
+    command: 'uv sync'
+    toolchain: 'unstable_python'
     inputs:
       - 'pyproject.toml'
       - '/pyproject.toml'
 
   test:
-    command: 'uv run pytest tests/'
+    command: 'uv run pytest tests/ -v'
+    toolchain: 'unstable_python'
     inputs:
       - 'src/**/*.py'
       - 'tests/**/*.py'
       - 'pyproject.toml'
     deps:
-      - '~:install'
+      - '~:build'
 
   lint:
-    command: 'uv run ruff check src/ tests/'
+    command: 'uv run ruff check src/ tests/ && uv run mypy --strict src/'
+    toolchain: 'unstable_python'
     inputs:
       - 'src/**/*.py'
       - 'tests/**/*.py'
-      - '/pyproject.toml'
+      - 'pyproject.toml'
     deps:
-      - '~:install'
+      - '~:build'
 
   format:
     command: 'uv run ruff format src/ tests/'
+    toolchain: 'unstable_python'
     inputs:
       - 'src/**/*.py'
       - 'tests/**/*.py'
 
   typecheck:
-    command: 'uv run mypy src/'
+    command: 'uv run mypy --strict src/'
+    toolchain: 'unstable_python'
     inputs:
       - 'src/**/*.py'
       - 'pyproject.toml'
       - '/pyproject.toml'
     deps:
-      - '~:install'
-
-  demo-run:
-    command: 'uv run python -m pollmevals_eval_core.demo_run --tasks /evals/tasks --output /artifacts'
-    deps:
-      - '~:install'
+      - '~:build'

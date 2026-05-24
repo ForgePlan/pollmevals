@@ -2,7 +2,7 @@
 depth: standard
 id: EVID-003
 kind: evidence
-last_modified_at: 2026-05-23T19:29:21.395517+00:00
+last_modified_at: 2026-05-24T07:39:24.295152+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: PRD-001
@@ -21,85 +21,82 @@ verdict: supports
 congruence_level: 2
 evidence_type: audit
 
-## Summary
+## ADI cycle (per NOTE-002 — retrofit)
 
-External prior art review of EleutherAI's lm-evaluation-harness v0.4+ (Gao et al. 2021 + 2024 rewrite). Directly validates ADR-002 (evaluator-only reproduce) via the `--use_cache` SQLite mechanism, and informs POLLMEVALS to diverge from integer task versioning in favor of content-addressing.
+### Abduction — research questions framed as hypotheses
 
-## Key Findings
+- **H1**: lm-eval-harness uses content-addressed task versioning (hash-based, like POLLMEVALS plans) — silent task edits would invalidate previous results.
+- **H2**: lm-eval-harness uses manual integer versioning — task authors bump `version: N` when behavior changes; reproducibility relies on (YAML file + git commit) tuple.
+- **H3**: lm-eval-harness has a working solution for contamination detection that POLLMEVALS could adopt.
 
-### Task versioning — manual integer, not hash-based (POLLMEVALS DIVERGES)
+### Induction — verification per hypothesis
 
-Each YAML task config carries a plain `version:` integer field (e.g. `version: 3`). When a task is updated to fix a bug, maintainers manually increment the integer. The harness reports versions in result JSON so operators can detect mismatches between runs. There is **NO automatic hash-based change detection** — the recommended reproducibility contract is `(YAML file + git commit hash)`, not content-addressed task snapshots.
+| Prediction | Evidence | Outcome | H_i status |
+|---|---|---|---|
+| Y1 (content-addressed) | docs/task_guide.md: `version:` is an integer field manually bumped; no hash-based change detection | False | **H1 REFUTED** |
+| Y2 (manual integer + git pinning) | Same docs + v0.4.0 release notes: YAML registry + git commit hash is the recommended reproducibility contract; `--use_cache /path/to/sqlite_` for output replay | Confirmed exactly | **H2 SUPPORTED** — POLLMEVALS deliberately DIVERGES (content-addressed task_pack_sha256 in SPEC-001) |
+| Y3 (contamination solved) | Open LLM Leaderboard discussion #472 closed March 2025: detection tool `detect-pretrain-code` (perplexity-based) used; contaminated models flagged but NOT removed; merged models show ~5-8pt inflation with no remedy | Unsolved | **H3 REFUTED** — POLLMEVALS shouldn't promise to solve in v0.1 |
+
+## Trust Calculus per load-bearing claim
+
+| Claim | F | G | R | Sum | Notes |
+|---|---|---|---|---|---|
+| `--use_cache` SQLite mechanism = direct precedent for ADR-002 evaluator-only reproduce | 9 | 9 | 9 | 27/27 | F: documented mechanism with exact flag. G: SQLite per-rank DB, specific behavior (skip already-completed). R: lm-eval-harness official docs + issue thread #2548 confirming semantics. |
+| Task versioning is manual integer (`version: N`) — NOT content-addressed | 9 | 8 | 9 | 26/27 | F: explicit doc quotation. G: precise scheme. R: official docs (task_guide.md). |
+| Open LLM Leaderboard contamination unsolved as of March 2025 | 8 | 8 | 8 | 24/27 | F: official discussion thread closed without resolution. G: specific date + tools named. R: HF Space discussion (authoritative for that leaderboard). |
+| v0.4 rewrite (2024) replaced static Python registration with YAML registry | 8 | 8 | 9 | 25/27 | F: release notes. G: specific version + change description. R: GitHub release notes (authoritative). |
+| Merged-model inflation ~5-8 percentage points (DPO + merging) | 7 | 8 | 7 | 22/27 | F: stated as range. G: pct range. R: discussion thread analysis, not peer-reviewed paper. |
+| lm-eval-harness does NOT evaluate stacks (model-only) | 8 | 8 | 9 | 25/27 | F: explicit doc & architecture analysis. G: confirmed by no agent/multi-turn primitives. R: official repo. |
+
+**Decision strength**: average sum = 24.8/27 (92%). One 27/27 claim (`--use_cache` precedent — load-bearing for ADR-002). Weakest: merged-model inflation range (22/27).
+
+## Key Findings (preserved)
+
+### Task versioning — manual integer (POLLMEVALS DIVERGES)
+
+`version:` integer field, manually bumped. Contract: (YAML file + git commit hash). NO automatic hash-based detection.
+
+POLLMEVALS divergence: SPEC-001 `task_pack_sha256 = sha256(prompt + evaluator + gold)` — content-addressed. Closes silent-bug-fix gap.
 
 Source: <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/task_guide.md>.
 
-**POLLMEVALS divergence**: SPEC-001 uses `task_pack_sha256 = sha256(prompt + evaluator + gold)` — content-addressed. This closes the gap lm-eval-harness leaves open (silent bug fixes that re-use the same `version:` integer would be invisible to consumers).
+### `--use_cache` SQLite — DIRECT PRECEDENT for ADR-002
 
-### Reproducibility — `--use_cache` SQLite — DIRECT PRECEDENT for ADR-002
+`--use_cache /path/to/sqlite_` stores model completions in per-rank SQLite DB; on re-run, evaluator skips already-completed samples, re-scores from cache — model API NOT called. Intended workflow for metric-formula changes.
 
-The harness supports **true output-replay mode**:
+Sources: <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md>, <https://github.com/EleutherAI/lm-evaluation-harness/issues/2548>.
 
-```
-lm_eval --model openai --tasks mmlu --use_cache /path/to/sqlite_db
-```
+### Contamination — unresolved (validates EPIC-001 ER-5)
 
-`--use_cache /path/to/sqlite_` stores model completions in a per-rank SQLite DB. On a re-run with the same cache path, the evaluator **skips already-completed samples and re-scores from the cache** — the model API is NOT called again. `--log_samples` additionally serialises every prompt+completion to JSON for post-hoc metric recomputation.
-
-This means "re-run evaluator on cached outputs" IS possible and is the **intended workflow** for metric-formula changes.
-
-Sources:
-- <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md>
-- <https://github.com/EleutherAI/lm-evaluation-harness/issues/2548>
-
-**POLLMEVALS direct precedent**: ADR-002's evaluator-only reproduce IS exactly this pattern, just with content-addressed file storage instead of SQLite.
-
-### Contamination — unresolved problem (validates EPIC-001 ER-5 risk)
-
-The Open LLM Leaderboard team (running on lm-eval-harness) treats contamination as an **unsolved problem** as of the official discussion thread closure in March 2025. Primary detection tool: `detect-pretrain-code` (Shi et al. 2023, perplexity-based). Confirmed contaminated models are **flagged but NOT removed** from the leaderboard. No automated hash-rotation of test sets is in place; private benchmarks were discussed but not shipped as of that date.
-
-Merged models (DPO + merging) accumulate ~5-8pt inflation with no current systematic remedy.
+Open LLM Leaderboard discussion #472 closed March 2025 without definitive solution. `detect-pretrain-code` (Shi et al. 2023) flags but doesn't remove contaminated models. Merged models accumulate ~5-8pt inflation.
 
 Source: <https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard/discussions/472>.
 
 ### v0.4 rewrite (2024) — YAML-declared task registry
 
-The v0.4 rewrite replaced static Python task registration with YAML-declared task configs and a dynamic runtime registry (`ALL_TASKS` no longer compiled statically). This decouples task-definition changes from framework releases and allows task packs to live in separate repos.
+Replaced static Python registration with YAML configs + dynamic runtime registry. POLLMEVALS pattern alignment: `evals/task-packs/<slug>/task.yaml`.
 
-Source: <https://github.com/EleutherAI/lm-evaluation-harness/releases/tag/v0.4.0>.
+## Conclusions
 
-**POLLMEVALS pattern alignment**: `evals/task-packs/<slug>/task.yaml` follows this approach — task definitions are data, not code.
-
-## Implications for POLLMEVALS
-
-1. **ADR-002 has direct precedent** — `--use_cache` is exactly the pattern. No methodological controversy.
-2. **POLLMEVALS DIVERGES** from `version: <integer>` task versioning. Our content-addressed `task_pack_sha256` is structurally stronger.
-3. **Contamination is an industry-wide unsolved problem** — POLLMEVALS v0.1 should not promise to solve it. Worth captured: monthly n-gram overlap checks on `evals/task-packs/` against public datasets as a lightweight gate, with neural detection deferred to v1.0+.
-4. **lm-eval-harness does NOT evaluate stacks** — confirmed gap that POLLMEVALS fills. lm-eval-harness for raw model batch benchmarking; POLLMEVALS for stack evaluation.
+- **Surviving hypothesis**: H2 (manual integer + git pinning) — POLLMEVALS deliberately DIVERGES via content-addressed `task_pack_sha256`
+- **Decision strength**: 92% (one 27/27 — `--use_cache` precedent)
+- **POLLMEVALS implication**: ADR-002 has direct precedent (validation); SPEC-001 task pinning is STRONGER than lm-eval-harness (closes silent-bug gap)
+- **Contamination follow-up**: lightweight n-gram overlap monthly check on `evals/task-packs/` against public datasets in v0.1; defer neural detection to v1.0+
 
 ## Sources
 
-1. <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/task_guide.md> — Task VERSION semantics, YAML+git-commit contract
-2. <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md> — `--use_cache`, `--log_samples`, `--seed` flags
-3. <https://github.com/EleutherAI/lm-evaluation-harness/releases/tag/v0.4.0> — v0.4 rewrite: YAML registry, CachingLM
-4. <https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard/discussions/472> — Official contamination discussion
-5. <https://github.com/EleutherAI/lm-evaluation-harness/issues/2548> — `--use_cache` semantics confirmation
-
-## Confidence
-
-🟢 High for findings 1, 2, 4 (primary sources). 🟡 Medium for finding 3 (contamination state beyond March 2025 not confirmed; may have evolved).
-
-## Open Questions
-
-- Has Open LLM Leaderboard v2 shipped private rotating benchmarks post-March 2025? Not investigated.
-- Does lm-eval-harness v0.4.9 have community extensions for agent-level eval (tool calls, multi-turn)? Not investigated.
+1. <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/task_guide.md>
+2. <https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md>
+3. <https://github.com/EleutherAI/lm-evaluation-harness/releases/tag/v0.4.0>
+4. <https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard/discussions/472>
+5. <https://github.com/EleutherAI/lm-evaluation-harness/issues/2548>
 
 ## Related Artifacts
 
 - PRD-001 (informs — auto-linked)
 - ADR-002 (reproduce semantics — direct precedent)
 - SPEC-001 (`task_pack_sha256` — POLLMEVALS divergence from integer versioning)
-- EPIC-001 ER-5 (contamination risk — confirmed industry-wide)
+- EPIC-001 ER-5 (contamination risk confirmed industry-wide)
 - Future Note: monthly n-gram contamination check for `evals/task-packs/`
-
-
+- NOTE-002 (Evidence Quality Standard — retrofit)
 

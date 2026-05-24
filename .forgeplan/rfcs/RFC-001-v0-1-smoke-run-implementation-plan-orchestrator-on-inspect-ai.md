@@ -288,3 +288,8 @@ Crash detection: на старте `make smoke-run`, если `manifest.json` с
 
 
 
+
+
+
+
+

@@ -1,0 +1,62 @@
+# LiteLLM proxy configuration for POLLMEVALS v0.1 smoke run
+# Routes all 5 models from ADR-003 via OpenRouter.
+#
+# All secrets are env-sourced: OPENROUTER_API_KEY, LITELLM_MASTER_KEY.
+# Never commit a literal API key in this file — use os.environ[] references only.
+#
+# Pulled into the container via volume mount in docker-compose.litellm.yml.
+
+model_list:
+  # Slot 1 — Premium closed: Claude Sonnet 4.6 (Anthropic via OpenRouter)
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-6
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Slot 2 — Mid closed: GPT-5 mini (OpenAI via OpenRouter)
+  - model_name: gpt-5-mini
+    litellm_params:
+      model: openrouter/openai/gpt-5-mini
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Slot 3 — Cheap closed: Gemini 3 Flash (Google via OpenRouter)
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: openrouter/google/gemini-3-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Slot 4 — Open-weight fast: Qwen 3 14B on Cerebras hardware (via OpenRouter)
+  - model_name: qwen-3-14b-cerebras
+    litellm_params:
+      model: openrouter/cerebras/qwen-3-14b
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Slot 5 — Open-weight large: Llama 4 70B on Runpod vLLM (via OpenRouter)
+  - model_name: llama-4-70b-runpod
+    litellm_params:
+      model: openrouter/runpod/llama-4-70b
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+# General proxy settings
+litellm_settings:
+  # Forward spend data to Postgres for cost attribution cross-check (RFC-001 § Cost)
+  # DATABASE_URL is optional; proxy works without it (cost data from /spend/logs API)
+  success_callback: []
+  failure_callback: []
+  # Disable telemetry — POLLMEVALS collects its own cost/token data
+  telemetry: false
+  # Request timeout matches RFC-001 error taxonomy: timeout > 300s → error_class=timeout
+  request_timeout: 300
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # Store spend data if DATABASE_URL is provided (optional for smoke run)
+  database_url: os.environ/DATABASE_URL
+  # Budget cap: orchestrator enforces $50 hard limit (NFR-001); proxy acts as soft backstop
+  max_budget: 50
+  budget_duration: "30d"

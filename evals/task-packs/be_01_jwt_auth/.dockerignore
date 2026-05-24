@@ -1,0 +1,56 @@
+# .dockerignore — be_01_jwt_auth evaluator sandbox
+#
+# Excludes files that must not be baked into the Docker image:
+#   - Node package artifacts (large, reproducible via npm ci)
+#   - Git internals (expose host repo metadata)
+#   - Build output (stale, not needed at eval time)
+#   - Logs and editor files
+
+# Node / npm
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.pnp
+.pnp.js
+
+# TypeScript build output
+dist
+build
+out
+*.tsbuildinfo
+
+# Coverage and test artefacts
+coverage
+.nyc_output
+*.lcov
+
+# Next.js (not used here, but guard against accidental presence)
+.next
+
+# Editor and OS files
+.DS_Store
+*.swp
+*.swo
+.vscode
+.idea
+Thumbs.db
+
+# Git internals (never needed inside sandbox)
+.git
+.gitignore
+.gitattributes
+
+# Log files
+*.log
+logs
+
+# Environment files (secrets must never be baked in)
+.env
+.env.*
+!.env.example
+
+# CI / CD configs (not needed in sandbox)
+.github
+.gitlab-ci.yml

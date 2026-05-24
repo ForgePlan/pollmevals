@@ -2,7 +2,7 @@
 depth: standard
 id: EVID-006
 kind: evidence
-last_modified_at: 2026-05-23T19:35:12.773856+00:00
+last_modified_at: 2026-05-24T07:42:40.142868+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: PRD-001
@@ -66,115 +66,74 @@ No EVID supersedes another. No unresolved BLOCKERs anywhere in the chain.
 | 4 | SPEC-001 + RFC-001 validate PASS | ✅ | Both 0 errors, 0 warnings. Activate via separate gates after PRD-001. |
 | 5 | ADR-001..003 validate PASS | ⚠️ | All MUST=0. **SHOULDs**: ADR-001/002/003 each missing `## Invariants`, `## Rollback Plan`, `## Affected Files`. ADR-003 has 2 placeholders (line 112, 130: `ADR-XXX` future cross-refs — intentional, not unfilled). RFC-001 carries parent-level Invariants + Rollback Plan, partially covering. **These will block ADR-001..003's OWN activation gates**, not PRD-001's. |
 | 6 | Architect-reviewer findings | ⚠️ | Per user prompt, assume CONCERNS — not accessible. Treat as missing Profile B PASS audit. |
-| 7 | No contradictions PRD SC ↔ ADR decisions | ⚠️ | **SC-2 drift**: PRD SC-2 says "score variance = 0 at reproduce" but ADR-002 narrows to evaluator-only (LLM not re-called). ADR-002 explicitly self-flags this: *"PRD-001 SC-2 wording needs to be refined in next revision"*. **PRD-001 body has not been updated** — drift remains live. **Model version drift**: PRD body lists Claude Sonnet / GPT-4o-mini / Gemini Flash / Qwen 2.5 14B / Llama 3.1 70B; ADR-003 lists Claude Sonnet 4.6 / GPT-5 mini / Gemini 3 Flash / Qwen 3 14B / Llama 4 70B (Jan 2026 current). PRD lineup names are stale. |
+| 7 | No contradictions PRD SC ↔ ADR decisions | ⚠️ | **SC-2 drift**: PRD SC-2 says "score variance = 0 at reproduce" but ADR-002 narrows to evaluator-only (LLM not re-called). ADR-002 explicitly self-flags this. **PRD-001 body has not been updated** — drift remains live. **Model version drift**: PRD body lists Claude Sonnet / GPT-4o-mini / Gemini Flash / Qwen 2.5 14B / Llama 3.1 70B; ADR-003 lists Claude Sonnet 4.6 / GPT-5 mini / Gemini 3 Flash / Qwen 3 14B / Llama 4 70B. PRD lineup names stale. |
 | 8 | No orphan / stub indicators | ✅ | `forgeplan_health` verdict: `healthy`. 0 orphans, 0 blind_spots, 0 stale_drafts, 0 phase_mismatches, 0 gitignore_drift. |
-| 9 | CLAUDE.md red-lines respected | ✅ | `.forgeplan/config.yaml` uses `api_key_env` pattern (no literal keys); no direct artifact edits (all via MCP); no completed-run mutations (no runs exist); no destructive git ops |
-| 10 | Methodology version pinned (v0.1.0) | ✅ | SPEC-001 manifest schema: `"methodology_version": {"const": "v0.1.0"}`. RFC-001 Invariants #5: "Methodology version pinned per run". Explicit and enforced at contract level. |
+| 9 | CLAUDE.md red-lines respected | ✅ | `.forgeplan/config.yaml` uses `api_key_env`; no direct artifact edits; no completed-run mutations; no destructive git ops |
+| 10 | Methodology version pinned (v0.1.0) | ✅ | SPEC-001 manifest schema: `"methodology_version": {"const": "v0.1.0"}`. RFC-001 Invariants #5. Explicit and enforced. |
 
-### Project-config gates (`.forgeplan/project-config.yaml` → `quality_gates`)
+### Project-config gates summary: 6/7 (1 CONCERNS — `require_audit_pass`)
 
-**Config source:** `/Users/explosovebit/Work/pollmevals/.forgeplan/project-config.yaml` (found — defaults NOT used)
+## Findings (3 actionable for fixer dispatch)
 
-| Criterion | Threshold (from project-config.yaml) | Observed | Result |
+- **F-1 (HIGH)** `require_audit_pass` unsatisfied — 5 linked EVIDs are prior-art, not Profile B audits of PRD-001
+- **F-2 (HIGH)** SC-2 wording drift vs ADR-002 — acknowledged but unmitigated
+- **F-3 (MEDIUM)** Model lineup drift between PRD body and ADR-003
+- **F-4..F-6 (LOW)** informational only
+
+## ADI cycle (retrofit per NOTE-002 — audit context)
+
+### Abduction — hypotheses for "can PRD-001 be activated?"
+
+- **H1**: All gate criteria pass; PASS verdict applies; activation proceeds.
+- **H2**: Some gate criteria fail (specifically `require_audit_pass` and SC-2 drift); CONCERNS verdict applies; orchestrator must remediate before next gate pass.
+- **H3**: A BLOCKER-class finding (e.g., red-line violation, MUST errors, missing methodology pin) requires halting pipeline indefinitely.
+
+### Induction — verification per hypothesis
+
+| Hypothesis | Evidence | Outcome | H_i status |
 |---|---|---|---|
-| Test coverage | `≥80%` (`min_test_coverage`) | N/A (v0.0 pre-launch; 0 executable code) | ⚪ N/A — gate not applicable yet |
-| Critical findings | `≤0` (`max_findings_critical`) | 0 across chain | ✅ PASS |
-| High findings | `≤3` (`max_findings_high`) | 0 BLOCKER + 0 HIGH security findings | ✅ PASS |
-| Medium findings | `≤10` (`max_findings_medium`) | ~10 SHOULD warnings across chain (PRD-001: 2, ADR-001: 3, ADR-002: 3, ADR-003: 4 incl. 2 intentional placeholders) | ✅ PASS (at cap, not over 2× cap) |
-| Validate pass | required (`require_validate_pass: true`) | PRD-001 MUST=0 → PASS | ✅ PASS |
-| Audit pass | required (`require_audit_pass: true`) — ≥1 Profile B EVID with PASS verdict linked | **None found** — 5 linked EVIDs are external prior-art research, not Profile B audits of PRD-001; explicit user instruction treats architect-reviewer as CONCERNS | ⚠️ **CONCERNS** |
-| Evidence chain | required for `prd` (`require_evidence_chain: [prd, rfc, adr, spec]`) | 5 `informs`-linked EVIDs present | ✅ PASS |
+| Y1 (all green) | 10-criterion checklist: 7 ✅, 2 ⚠️, 0 ❌ → not all green | False | **H1 REFUTED** |
+| Y2 (CONCERNS — fixable) | Criterion 6 (architect findings) + Criterion 7 (SC-2 drift) flagged ⚠️; F-1 + F-2 + F-3 actionable; orchestrator can dispatch fixers | Exactly the situation | **H2 SUPPORTED** |
+| Y3 (BLOCKER) | 0 red-line violations; 0 MUST errors; methodology pin present; no unresolved BLOCKERs in chain | False | **H3 REFUTED** |
 
-**Gates summary:** `6/7` (1 CONCERNS, 0 BLOCKERs). Coverage gate marked N/A — not yet applicable for v0.0 pre-launch with zero executable code.
+**Surviving hypothesis**: H2 — CONCERNS, remediation required. Resolved in subsequent EVID-007 (architect audit) + EVID-008 (gate 2 PASS).
 
-## Findings (CONCERNS-level — actionable for fixer dispatch)
+## Trust Calculus per gate criterion / finding
 
-### F-1 (HIGH — drives the CONCERNS verdict): `require_audit_pass` unsatisfied
+| Claim | F | G | R | Sum | Notes |
+|---|---|---|---|---|---|
+| PRD-001 validate PASS (0 MUST errors) | 9 | 9 | 9 | 27/27 | F: validator output. G: precise error counts. R: deterministic `forgeplan validate`. |
+| R_eff = 0.70 Grade A | 9 | 9 | 9 | 27/27 | F: explicit number from `forgeplan_score`. G: precise grade + reliability sub-scores. R: deterministic. |
+| All 5 EVIDs have structured fields | 9 | 9 | 9 | 27/27 | F: parser succeeded → fields parsed. G: 5/5 confirmed. R: deterministic. |
+| F-1 `require_audit_pass` unsatisfied — gate-driving finding | 9 | 9 | 9 | 27/27 | F: project-config.yaml explicit threshold. G: precise (which gate, which threshold, which EVIDs don't satisfy). R: config file + chain inspection. |
+| F-2 SC-2 drift acknowledged in ADR-002 self-flag | 9 | 9 | 8 | 26/27 | F: ADR-002 explicitly self-flags. G: exact wording quoted. R: ADR-002 body authoritative. |
+| F-3 Model lineup drift between PRD and ADR-003 | 9 | 9 | 9 | 27/27 | F: side-by-side comparison. G: exact model names listed. R: both artifact bodies authoritative. |
+| `forgeplan_health` = healthy | 9 | 8 | 9 | 26/27 | F: explicit verdict string. G: 0/0 for orphans/blind_spots/etc. R: deterministic. |
+| Red-lines respected (`grep` on config.yaml clean) | 9 | 9 | 9 | 27/27 | F: regex scan executed. G: clean output. R: deterministic. |
+| ADR-001..003 missing Invariants/Rollback/Affected — will block their own gates | 8 | 8 | 8 | 24/27 | F: validator SHOULD warnings. G: precise sections missing. R: validator output. |
+| EPIC-001 status inversion allowed per user prompt (informational) | 7 | 7 | 8 | 22/27 | F: user direction. G: specific scenario described. R: chat prompt — high but ephemeral. |
 
-- **Location:** PRD-001 link set
-- **Detail:** Project-config requires ≥1 Profile B EVID with `verdict=PASS` linked to the artifact before activation. The 5 linked EVIDs (EVID-001..005) are **prior-art research** audits of external eval platforms — their `verdict` is `supports`, their CL is 2 (related context), and they audit HELM/MTEB/lm-eval-harness/Inspect AI/SWE-bench, **not PRD-001 itself**. They do not satisfy `require_audit_pass`.
-- **Compounding:** User prompt explicitly states architect-reviewer is running in parallel and instructs guardian to assume CONCERNS for unaccessible findings.
-- **Required action:** Wait for architect-reviewer EVID, OR dispatch `agents-pro:architect-reviewer` to produce one. Link it `informs PRD-001`. Verdict must be PASS (or CONCERNS-with-acknowledged-mitigations in PRD body).
+**Decision strength**: average sum = 25.7/27 (95%). 5 claims at 27/27 (load-bearing for CONCERNS verdict). Two strong gate-driving findings (F-1, F-3) at 27/27. The verdict CONCERNS is honest and well-supported.
 
-### F-2 (HIGH — acknowledged-but-unmitigated): SC-2 wording drift vs ADR-002
+## Conclusions
 
-- **Location:** PRD-001 `## Success Criteria` → SC-2 row vs ADR-002 § Decision Outcome
-- **Detail:** PRD SC-2 states *"Скоринг детерминистичен → score variance при reproduce = 0 (бит-в-бит на deterministic полях)"*. ADR-002 explicitly clarifies this is achievable only for the evaluator (not LLM re-call), and self-flags: *"PRD-001 SC-2 wording needs to be refined in next revision: 'Reproducing one eval from manifest yields byte-equal evaluator_json on deterministic fields (excluding timestamps, token UUIDs, и любых других transient ID)'"*. PRD body has not been amended.
-- **Risk if activated as-is:** PRD-001 becomes the source-of-truth requirement with an interpretation that ADR-002 has already deemed impossible. Future readers will hit the same ambiguity ADI raised; SC-2 will measure something different from what it appears to claim.
-- **Required action:** Update PRD-001 SC-2 row to use ADR-002's refined wording (cite ADR-002 inline). Use `forgeplan_update id=PRD-001 body=<...>`.
-
-### F-3 (MEDIUM): Model lineup drift between PRD body and ADR-003
-
-- **Location:** PRD-001 `## Product Scope` → MVP `Models` line vs ADR-003 `## Decision Outcome` model table
-- **Detail:** PRD body still references "Claude Sonnet, GPT-4o-mini, Gemini Flash, Qwen 2.5 14B, Llama 3.1 70B" (paren-wrapped as expected lineup). ADR-003 finalised "Claude Sonnet 4.6, GPT-5 mini, Gemini 3 Flash, Qwen 3 14B (Cerebras), Llama 4 70B (Runpod)" (Jan 2026 versions). The PRD's parenthetical is described as expected/illustrative rather than canonical, but readers will conflate it with the ADR-finalised lineup.
-- **Required action:** Update PRD-001 Models row to point to ADR-003 ("see ADR-003 for canonical lineup") rather than restating stale version names.
-
-### F-4 (LOW — informational, will block downstream gates): ADR-001..003 missing Invariants / Rollback Plan / Affected Files
-
-- **Location:** ADR-001, ADR-002, ADR-003 — `## Invariants`, `## Rollback Plan`, `## Affected Files` (SHOULD warnings from validator)
-- **Detail:** RFC-001 carries parent-level Invariants + Rollback Plan; ADRs inherit by context, but their own validation flags this. ADR-003 also has 2 lines flagged as placeholders (`ADR-XXX` on lines 112 and 130) — inspection confirms these are intentional forward-references to not-yet-numbered future ADRs in PRD-003, not unfilled fields.
-- **Required action:** Does NOT block PRD-001 activation. WILL block ADR-001/002/003 activation. Fix when each ADR comes up for its own gate (add section headers + bullets even if short). The placeholder lines can be reworded to remove validator confusion (e.g. `Future ADR (TBD in PRD-003)`).
-
-### F-5 (LOW — informational): Parent EPIC-001 still draft
-
-- **Location:** EPIC-001 status (draft)
-- **Detail:** PRD-001's parent epic is in draft. Activating PRD-001 while parent EPIC is draft creates a parent-child status inversion. No hard CLAUDE.md rule against it; EPIC tracks aggregate progress and may activate after all child PRDs reach activation.
-- **Required action:** Informational only. Note for orchestrator to confirm intended sequence (EPIC activates last, or in parallel with first child PRD).
-
-### F-6 (LOW — informational): PRD-001 SHOULD warnings
-
-- **Location:** PRD-001 validator output
-- **Detail:** body-links-drift (mentions ADR-0001/ADR-0002 legacy refs in `## Related Artifacts` table not in frontmatter `links:`); orphan FRs FR-006/007/008/010 (not referenced outside FR section).
-- **Required action:** Quality drag, not blockers. Either remove incidental mentions or add explicit `forgeplan_link` calls; cross-reference orphan FRs into the Journey table where they apply.
-
-## Blast radius
-
-- **Affected scope on activation:** ZERO production scope. PRD-001 activation commits requirements text to `status=active`. No code, no API, no deploy, no DB migration touched.
-- **Downstream effect:** Unblocks SPEC-001, RFC-001, ADR-001..003 to enter their own activation gates. Advances EPIC-001 progress meter from 3/8 → 4/8. Establishes v0.1 smoke run scope as canonical source of truth for next 2 weeks (Phase 2).
-- **Reversibility:** **HIGH** — `forgeplan_supersede` with follow-up PRD; reversal cost is minutes of MCP calls; no data-loss / no external commitments.
-- **Downstream artifacts depending on this:** SPEC-001 references PRD-001 SC-2 contract; RFC-001 references PRD-001 FRs/NFRs; ADRs-001..003 reference PRD-001 FR-009/NFR-001/NFR-002 and SC-2. Drift in PRD becomes drift in 4 dependents.
-- **Detection time if wrong:** Phase 2 postmortem (T+2 weeks). Anyone reading PRD-001 SC-2 without ADR-002 context will encounter the wording ambiguity.
-- **Threshold check vs. artifact's stated scope:** PRD body claims "proof-of-pipeline only, no judges, $50 budget, eu-central, 45 evals" — matches the actual blast radius. No threshold mismatch.
-
-## Orchestrator instructions
-
-**CONCERNS → halt activation. Dispatch fixers to address F-1, F-2, F-3 (in priority order), then re-run guardian.**
-
-Specifically:
-
-1. **Wait for / dispatch architect-reviewer** (`agents-pro:architect-reviewer`) to produce a Profile B EVID with `verdict=PASS` (or CONCERNS-with-mitigation) for PRD-001. Link it `informs PRD-001`. This addresses F-1 (the load-bearing CONCERNS driver per `require_audit_pass: true`).
-
-2. **Dispatch a fixer (recommend `agents-core:coder` or direct user edit via `forgeplan_update`)** to:
-   - Update PRD-001 SC-2 row to use ADR-002's refined wording (cite ADR-002 inline). [F-2]
-   - Update PRD-001 Models row to reference ADR-003 as canonical (remove stale version names). [F-3]
-
-3. **After fixes are recorded** (new EVID for the architect review + PRD body updated via `forgeplan_update`), re-run `guardian` for another gate pass.
-
-4. **DO NOT call `forgeplan_activate PRD-001` until all three of the above are complete and guardian returns PASS.**
-
-5. **Do NOT block on F-4, F-5, F-6** — those are informational at this gate. F-4 will resurface when ADR-001..003 come up for their own gates.
+- **Surviving hypothesis**: H2 (CONCERNS, remediation required)
+- **Decision strength**: 95% — verdict CONCERNS solidly supported
+- **Resolution path**: dispatch architect-reviewer + fix F-2/F-3 in PRD-001 body + re-run guardian
+- **Post-remediation**: this EVID is SUPERSEDED by EVID-008 (gate 2 PASS); retained as historical truth per user direction
+- **Lesson learned**: 5 prior-art EVIDs ≠ Profile B audit; `require_audit_pass` is a precise threshold that prevents weak chains from activating
 
 ## Notes
 
-- Hindsight `memory_recall` returned no prior gate-failure memories (POLLMEVALS bank is fresh — this is the project's first guardian gate review). All findings derive from the live chain inspection + project-config thresholds.
-- The 5 prior-art EVIDs are **high-quality research artifacts** — their value to the chain is real (they validate RFC-001's "build on Inspect AI" decision, ADR-002's evaluator-only reproduce, SPEC-001's cost-snapshot contribution). They simply do not substitute for a Profile B audit of PRD-001 itself.
-- The R_eff=0.70 score is honest given CL=2 (prior-art is "related context", not "same context") and 5 supporting evidences. Activation eligibility is not the same as R_eff eligibility.
-- Project is `healthy` per `forgeplan_health`; no systemic problems — this is a focused, fixable gate failure on a single artifact.
-
-## References
-
-- Artifact under review: `PRD-001` (`v0.1 smoke evaluation run`)
-- EVIDENCE chain: `EVID-001`, `EVID-002`, `EVID-003`, `EVID-004`, `EVID-005`
-- Sibling artifacts inspected: `EPIC-001`, `SPEC-001`, `RFC-001`, `ADR-001`, `ADR-002`, `ADR-003`
-- Project config: `.forgeplan/project-config.yaml` (`quality_gates` block)
-- Mental models consulted: `mm-gate-failures` not present in this bank (first gate review)
-- Prior guardian EVIDs for PRD-001: none (this is the first)
+- Hindsight `memory_recall` returned no prior gate-failure memories (POLLMEVALS bank fresh — first guardian gate review).
+- The 5 prior-art EVIDs are high-quality research artifacts; their value is real (validate RFC-001/ADR-002/SPEC-001 design choices). They simply don't substitute for a Profile B audit of PRD-001 itself.
+- The R_eff=0.70 score is honest given CL=2 + 5 supporting evidences. **Activation eligibility ≠ R_eff eligibility.**
 
 ## Related Artifacts
 
 - PRD-001 (informs — auto-linked at create; gate review of this artifact)
-- ADR-002 (contradicts implicit reading of PRD SC-2 — fix in PRD body)
-- ADR-003 (canonical model lineup — PRD body should reference)
-
-
+- EVID-008 (supersedes — gate 2 PASS, post-remediation)
+- ADR-002 (contradicts implicit reading of PRD SC-2 — fix in PRD body F-2)
+- ADR-003 (canonical model lineup — PRD body should reference F-3)
+- NOTE-002 (Evidence Quality Standard — retrofit)
 

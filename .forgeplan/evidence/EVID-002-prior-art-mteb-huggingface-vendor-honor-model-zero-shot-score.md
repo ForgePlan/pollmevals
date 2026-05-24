@@ -2,7 +2,7 @@
 depth: standard
 id: EVID-002
 kind: evidence
-last_modified_at: 2026-05-23T19:28:53.982824+00:00
+last_modified_at: 2026-05-24T07:38:53.796067+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: PRD-001
@@ -21,61 +21,72 @@ verdict: supports
 congruence_level: 2
 evidence_type: audit
 
-## Summary
+## ADI cycle (per NOTE-002 — retrofit)
 
-External prior art review of MTEB (Massive Text Embedding Benchmark, Muennighoff et al. 2022, "Maintaining MTEB" 2025). MTEB is relevant for **methodology and leaderboard hygiene**, not its task content (embeddings vs POLLMEVALS chat/coding/docs). Validates POLLMEVALS's sandbox-based verification approach and surfaces a structural fairness lesson from the January 2026 Voyage incident.
+### Abduction — research questions framed as hypotheses
 
-## Key Findings
+- **H1**: Major leaderboards (MTEB-class) perform cryptographic / technical verification of vendor-submitted scores.
+- **H2**: MTEB operates on a community honor model — submissions accepted on vendor's word for proprietary models, with documented caveat about silent model updates.
+- **H3**: Adding a private test set (RTEB-style) closes the honor-model gap without introducing structural fairness issues.
+
+### Induction — verification per hypothesis
+
+| Prediction | Evidence | Outcome | H_i status |
+|---|---|---|---|
+| Y1 (technical verification) | "Maintaining MTEB" paper (Muennighoff et al. 2025, arxiv 2506.21182) §Trust Model: "for proprietary models: no technical verification — it is a trust assumption documented explicitly" | False | **H1 REFUTED** |
+| Y2 (honor model + caveat) | Same paper: "submitter's word for proprietary models (API-served) with explicit caveat that 'the API may silently serve a different model version'"; open-weight pin revision hashes | Confirmed exactly as predicted | **H2 SUPPORTED** |
+| Y3 (private set closes gap) | RTEB rollout Jan 2026 → Voyage incident: co-developed private datasets, had advance access; private leaderboard column REMOVED after fairness scrutiny | Closes gap but introduces NEW gap (conflict-of-interest) | **H3 REFUTED** |
+
+## Trust Calculus per load-bearing claim
+
+| Claim | F | G | R | Sum | Notes |
+|---|---|---|---|---|---|
+| MTEB has no technical verification for proprietary model submissions | 8 | 8 | 9 | 25/27 | F: paper-authors' self-admission. G: scope precisely (proprietary only). R: peer-reviewed paper (arxiv preprint, but written by MTEB maintainers themselves). |
+| 24% EN / 46% FR datasets had train-test leaks (within MTEB's own corpus) | 9 | 9 | 9 | 27/27 | F: explicit percentages. G: precise (which datasets, which language splits). R: MTEB GitHub issue #1036 — first-party authoritative source. |
+| Zero-shot score `z = 1 − n_train/n_total` displayed (not gating) | 8 | 8 | 8 | 24/27 | F: formula stated. G: explicit display vs gate distinction. R: "Maintaining MTEB" paper. |
+| RTEB Voyage incident: task contributor had advance access; column removed Jan 2026 | 9 | 8 | 9 | 26/27 | F: documented in MTEB issue #3934. G: precise (which org, which dates). R: MTEB team's own issue tracker — authoritative. |
+| Rule: task contributors cannot submit models for own tasks | 7 | 7 | 8 | 22/27 | F: derived rule, not yet formal policy in MTEB. G: stated as principle. R: drawn from incident — strong inference but not yet doctrine. |
+
+**Decision strength**: average sum = 24.8/27 (92%). One 27/27 claim (24/46% leak rate from MTEB's own GitHub issue). Weakest: contributor-cannot-submit rule (22/27) — would strengthen if MTEB formalizes it in their submission guide.
+
+## Key Findings (preserved)
 
 ### Trust model — community honor with explicit caveats
 
-MTEB operates on a community-honor model: submissions arrive as GitHub PRs, maintainers do methodology peer-review, and results are **accepted on submitter's word for proprietary models** with an explicit caveat that "the API may silently serve a different model version." Open-weight models get stronger guarantees because revision hashes are pinned.
+MTEB operates on community honor: PR submissions + maintainer methodology review + accepted on submitter's word for proprietary models. Open-weight gets stronger guarantees (revision hashes pinned).
 
-### Contamination policy — zero-shot score as display, not gate
+### Contamination policy — zero-shot score as display
 
-MTEB does **not** hard-exclude models trained on benchmark-adjacent data. Instead it computes a **zero-shot score** `z = 1 − n_train/n_total` reflecting what fraction of benchmark datasets the model was NOT trained on, displayed alongside the main score. Initially MTEB filtered to 100%-zero-shot only; after community pushback relaxed to "contextual transparency" — show the score, let users decide.
-
-A July 2024 GitHub issue revealed that **24% of English datasets and 46% of French datasets contained train-test leaks within MTEB's own dataset splits** (not model training data). The team closed the issue without a documented remediation.
+`z = 1 − n_train/n_total` displayed alongside main score; initially filtered to 100% zero-shot only, after pushback relaxed to "contextual transparency". GitHub issue #1036 (July 2024): 24% EN / 46% FR datasets had train-test leaks within MTEB's own splits.
 
 Source: <https://github.com/embeddings-benchmark/mteb/issues/1036>.
 
-### Verification mechanism — open-weight vs proprietary asymmetry
+### Verification mechanism
 
-- **Open-weight models**: CI runs Pydantic schema validation, cross-platform tests (Linux/Windows, Python 3.9-3.12), mock-task regression checks, and version-pinned reproducibility (MTEB version + dataset version + model revision hash all recorded).
-- **Proprietary models**: no technical verification — it is a trust assumption documented explicitly in the "Maintaining MTEB" paper.
+Open-weight: CI runs Pydantic schema, Linux/Windows cross-platform tests, version-pinned reproducibility. Proprietary: no technical verification.
 
 Source: <https://arxiv.org/html/2506.21182v1>.
 
 ### Voyage incident (Jan 2026) — structural fairness lesson
 
-RTEB added a second trust layer — a sealed private test set evaluated exclusively by maintainers. This **immediately exposed a conflict-of-interest flaw**: Voyage co-developed the private datasets and had advance access. The private leaderboard column was removed.
-
-**Rule**: task contributors cannot submit models for evaluation on tasks they contributed.
+RTEB private test set → Voyage co-developed datasets, had advance access → private column removed. Rule: task contributors cannot submit models for evaluation on tasks they contributed.
 
 Sources: <https://github.com/embeddings-benchmark/mteb/issues/3934>, <https://thenewstack.io/exploring-rteb-a-new-benchmark-to-evaluate-embedding-models/>.
 
-## Implications for POLLMEVALS
+## Conclusions
 
-1. **POLLMEVALS deliberately diverges from honor model.** Eval execution happens inside our own sandbox; we capture `stdout/stderr/trace_json` as content-addressed artifacts. The eval engine is the authority, not vendor self-reports. This closes the gap MTEB acknowledges but has not solved.
-2. **"In-distribution fraction" as a display field** (modeled on MTEB's zero-shot score) is worth a future ADR — show, don't block, when a model's training data overlaps benchmark-adjacent corpora. Captured in EPIC-001 ER-5 risk.
-3. **Structural fairness rule** if/when POLLMEVALS accepts community task contributions: contributors cannot submit models on tasks they wrote. Worth capturing as a future ADR trigger.
+- **Surviving hypothesis**: H2 (honor model + explicit caveat) — POLLMEVALS deliberately diverges
+- **Decision strength**: 92%
+- **POLLMEVALS implication**: eval execution INSIDE own sandbox + content-addressed artifacts = eval engine, not vendor, is authority. Closes MTEB's known unsolved gap.
+- **Follow-up evidence needed**: monitor MTEB private-column restoration plan (no timeline as of Jan 2026 issue close)
 
 ## Sources
 
-1. <https://arxiv.org/html/2506.21182v1> — "Maintaining MTEB" 2025 (primary source for contamination policy, CI verification, weaknesses)
-2. <https://github.com/embeddings-benchmark/mteb/issues/1036> — 24% EN / 46% FR dataset leak rate (July 2024)
-3. <https://huggingface.co/blog/rteb> — RTEB introduction (private-dataset hybrid strategy)
-4. <https://github.com/embeddings-benchmark/mteb/issues/3934> — RTEB private-column removal (Jan 2026)
-5. <https://thenewstack.io/exploring-rteb-a-new-benchmark-to-evaluate-embedding-models/> — RTEB analysis
-
-## Confidence
-
-🟢 High — the 2025 "Maintaining MTEB" paper is the authors' own self-assessment, GitHub issues are primary-sourced, and the RTEB controversy is documented from the MTEB team's own tracker.
-
-## Open Questions
-
-- Whether MTEB's zero-shot score is computed automatically from training data cards on HF Hub, or relies entirely on submitter self-declaration — the paper is ambiguous on mechanics.
-- MTEB's plan for private-column restoration "from diverse organizations" has no stated timeline as of Jan 2026 issue close.
+1. <https://arxiv.org/html/2506.21182v1> — "Maintaining MTEB" 2025
+2. <https://github.com/embeddings-benchmark/mteb/issues/1036> — leak rates
+3. <https://huggingface.co/blog/rteb> — RTEB introduction
+4. <https://github.com/embeddings-benchmark/mteb/issues/3934> — Voyage incident
+5. <https://thenewstack.io/exploring-rteb-a-new-benchmark-to-evaluate-embedding-models/>
 
 ## Related Artifacts
 
@@ -83,6 +94,5 @@ Sources: <https://github.com/embeddings-benchmark/mteb/issues/3934>, <https://th
 - EPIC-001 ER-5 (in-distribution fraction risk)
 - Future ADR: structural fairness for community task contributions (v1.0+)
 - Future Note: "in-distribution fraction" display field design (PRD-004 leaderboard)
-
-
+- NOTE-002 (Evidence Quality Standard — retrofit)
 
