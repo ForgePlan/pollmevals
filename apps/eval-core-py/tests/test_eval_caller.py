@@ -15,6 +15,7 @@ Covers:
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import re
 from datetime import UTC
@@ -665,3 +666,130 @@ class TestFakeEvalCallerDeterministicOutputs:
         assert result1.eval_row is not None
         assert result2.eval_row is not None
         assert result1.eval_row.eval_id != result2.eval_row.eval_id
+
+
+# ---------------------------------------------------------------------------
+# 9. InspectEvalCaller -- raw_output persisted to disk (Phase 2D fix)
+# ---------------------------------------------------------------------------
+
+
+class TestInspectEvalCallerArtifactPersistence:
+    """Verify that artifact files are actually written to disk by InspectEvalCaller.
+
+    Regression tests for the pre-existing gap surfaced by Phase 2D Slice 1
+    evaluators: the manifest claimed a file:// URI but the file was never
+    written, causing LintEvaluator / ComplexityEvaluator / SecretScanEvaluator
+    to raise "No such file or directory".
+    """
+
+    @pytest.mark.asyncio
+    async def test_raw_output_file_exists_after_call(self, tmp_path: pathlib.Path) -> None:
+        """ArtifactRef.uri must point to a real file after a successful call."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        response_text = "Hello, this is the raw LLM output for testing."
+        mock_resp = _mock_openai_response(content=response_text)
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        raw_uri = result.eval_row.artifact_refs.raw_output.uri
+        assert raw_uri.startswith("file://"), f"URI must use file:// scheme, got: {raw_uri!r}"
+
+        raw_path = pathlib.Path(raw_uri[len("file://") :])
+        assert raw_path.exists(), f"raw_output file not found at {raw_path}"
+
+    @pytest.mark.asyncio
+    async def test_raw_output_file_content_matches_response(self, tmp_path: pathlib.Path) -> None:
+        """File content must equal the LLM response text exactly."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        response_text = "Exact response content for hash verification."
+        mock_resp = _mock_openai_response(content=response_text)
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        raw_uri = result.eval_row.artifact_refs.raw_output.uri
+        raw_path = pathlib.Path(raw_uri[len("file://") :])
+        assert raw_path.read_text(encoding="utf-8") == response_text
+
+    @pytest.mark.asyncio
+    async def test_sha256_in_filename_matches_content_hash(self, tmp_path: pathlib.Path) -> None:
+        """SHA-256 embedded in the filename must match the hash of the file content."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        response_text = "Content whose hash is checked in the filename."
+        mock_resp = _mock_openai_response(content=response_text)
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        raw_uri = result.eval_row.artifact_refs.raw_output.uri
+        raw_path = pathlib.Path(raw_uri[len("file://") :])
+
+        # SHA-256 must appear in the filename between '-' and '.'
+        stem = raw_path.stem  # e.g. "raw_output-<sha256>"
+        _, _, sha_in_filename = stem.partition("-")
+        expected_sha = hashlib.sha256(response_text.encode()).hexdigest()
+        assert sha_in_filename == expected_sha, (
+            f"SHA-256 in filename {sha_in_filename!r} != content hash {expected_sha!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_normalized_output_file_exists(self, tmp_path: pathlib.Path) -> None:
+        """normalized_output artifact must also be written to disk."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = _mock_openai_response(content="  padded content  ")
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        norm_uri = result.eval_row.artifact_refs.normalized_output.uri
+        norm_path = pathlib.Path(norm_uri[len("file://") :])
+        assert norm_path.exists(), f"normalized_output file not found at {norm_path}"
+
+    @pytest.mark.asyncio
+    async def test_evaluator_json_file_exists(self, tmp_path: pathlib.Path) -> None:
+        """evaluator_json artifact must also be written to disk."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = _mock_openai_response(content="some output")
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        eval_uri = result.eval_row.artifact_refs.evaluator_json.uri
+        eval_path = pathlib.Path(eval_uri[len("file://") :])
+        assert eval_path.exists(), f"evaluator_json file not found at {eval_path}"
+
+    @pytest.mark.asyncio
+    async def test_failed_call_also_writes_artifact_to_disk(self, tmp_path: pathlib.Path) -> None:
+        """Even on failure (500 response), artifact_refs must point to real files (FR-009)."""
+        caller = InspectEvalCaller(log_dir=tmp_path)
+        req = _make_request()
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 500
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_resp
+            result = await caller.call(req)
+
+        assert result.eval_row is not None
+        assert result.eval_row.status.value == "failed"
+        raw_uri = result.eval_row.artifact_refs.raw_output.uri
+        raw_path = pathlib.Path(raw_uri[len("file://") :])
+        assert raw_path.exists(), (
+            f"Failed eval must still write artifact file, not found at {raw_path}"
+        )

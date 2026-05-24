@@ -303,6 +303,59 @@ class InspectEvalCaller:
     # Private helpers
     # ------------------------------------------------------------------
 
+    def _write_artifact(
+        self,
+        eval_id: str,
+        label: str,
+        content: str,
+    ) -> ArtifactRef:
+        """Write content to disk and return a content-addressed ArtifactRef.
+
+        File is written to ``self._log_dir/<eval_id>/<label>-<sha256>.txt``.
+        The URI stored in the ArtifactRef is the absolute ``file://`` path so
+        that both smoke_run._resolve_artifact_path and evaluators can locate it
+        without knowing the repo root.
+
+        Args:
+            eval_id: The eval identifier — used as the subdirectory name.
+            label:   Artifact type label (raw_output, normalized_output, evaluator_json).
+            content: UTF-8 text content to persist.
+
+        Returns:
+            An ArtifactRef pointing to the written file.
+        """
+        sha256 = hashlib.sha256(content.encode()).hexdigest()
+        mime = "application/json" if label == "evaluator_json" else "text/plain"
+        ext = ".json" if label == "evaluator_json" else ".txt"
+        filename = f"{label}-{sha256}{ext}"
+        dest = self._log_dir / eval_id / filename
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
+        return ArtifactRef(
+            sha256=sha256,
+            size_bytes=len(content.encode()),
+            uri=f"file://{dest}",
+            mime_type=mime,
+        )
+
+    def _make_artifact_refs(
+        self,
+        eval_id: str,
+        raw_content: str,
+    ) -> EvalArtifactRefs:
+        """Write raw_output, normalized_output, and evaluator_json to disk.
+
+        All three artifacts are written using ``_write_artifact`` so that the
+        URIs in the returned EvalArtifactRefs point to real files on disk.
+        """
+        normalized = raw_content.strip()
+        evaluator = f'{{"eval_id":"{eval_id}","raw_len":{len(raw_content)}}}'
+        return EvalArtifactRefs(
+            raw_output=self._write_artifact(eval_id, "raw_output", raw_content),
+            normalized_output=self._write_artifact(eval_id, "normalized_output", normalized),
+            evaluator_json=self._write_artifact(eval_id, "evaluator_json", evaluator),
+        )
+
     def _make_failed_result(
         self,
         request: EvalRequest,
@@ -312,7 +365,9 @@ class InspectEvalCaller:
         detail: str,
     ) -> EvalResult:
         completed_at = datetime.now(UTC)
-        artifact_refs = _make_stub_artifact_refs(row_id)
+        # Write a minimal error-text artifact so the URI points to a real file.
+        error_text = f"FAILED: {error_class.value} — {detail}"
+        artifact_refs = self._make_artifact_refs(row_id, error_text)
         row = EvalRow(
             eval_id=row_id,
             model_id=request.model_id,
@@ -372,7 +427,7 @@ class InspectEvalCaller:
                 if isinstance(msg, dict):
                     raw_output = str(msg.get("content") or "")
 
-        artifact_refs = _make_stub_artifact_refs(row_id, raw_output)
+        artifact_refs = self._make_artifact_refs(row_id, raw_output)
         stats = EvalStats(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
