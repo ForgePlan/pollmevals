@@ -97,7 +97,7 @@ def _run_grid(
         journal.close()
         return result
 
-    return asyncio.get_event_loop().run_until_complete(_run())
+    return asyncio.run(_run())
 
 
 # ---------------------------------------------------------------------------
