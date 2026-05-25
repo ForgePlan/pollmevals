@@ -13,16 +13,18 @@ Concurrency is OUTSIDE EvalCaller — see eval_caller.py for the Protocol seam.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 
-from src.contracts import EvalStatus
+from src.contracts import ErrorClass, EvalStatus
 from src.orchestrator.cost import BudgetGate, PricingTuple, compute_cost
 from src.orchestrator.eval_caller import (
     EvalCaller,
@@ -31,6 +33,11 @@ from src.orchestrator.eval_caller import (
     compute_eval_id,
 )
 from src.orchestrator.journal import JournalWriter
+from src.orchestrator.judge_panel import (
+    JudgePanel,
+    JudgeUnavailableError,
+    SelfJudgingError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +134,10 @@ class GridRunResult:
     results: list[EvalResult | BaseException]
     total_cost_usd: Decimal
     budget_breach: bool
+    # RFC-002 Slice E: set True when > 20% of attempted evals end with
+    # judge_status=DEGRADED. The orchestrator entrypoint refuses to publish
+    # the run when this trips (manifest still written with status="degraded").
+    judge_panel_breach: bool = False
 
     def succeeded(self) -> list[EvalResult]:
         """Return only EvalResult entries with status == SCORED."""
@@ -197,12 +208,18 @@ class GridRunner:
         budget_gate: BudgetGate,
         pricing_snapshot: dict[str, PricingTuple],
         max_concurrent: int = MAX_CONCURRENT_EVALS,
+        judge_panel: JudgePanel | None = None,
+        judge_cost_estimate_per_eval: Decimal = Decimal("0.15"),
     ) -> None:
         self._caller = caller
         self._journal_writer = journal_writer
         self._budget_gate = budget_gate
         self._pricing_snapshot = pricing_snapshot
         self._semaphore = asyncio.Semaphore(max_concurrent)
+        # RFC-002 Slice E. Both default to no-judge mode so PRD-001 smoke runs
+        # construct GridRunner exactly as before.
+        self._judge_panel = judge_panel
+        self._judge_cost_estimate_per_eval = judge_cost_estimate_per_eval
         # Running cost accumulator.  Single event loop — no concurrent mutation
         # (asyncio is cooperative; only one coroutine runs at a time between
         # await points, so this is safe without a lock).
@@ -227,7 +244,12 @@ class GridRunner:
         hold the semaphore are allowed to complete (AC-3: "in-flight complete").
         """
         # AC-3: abort before attempting the eval if budget is exhausted.
-        if not self._budget_gate.should_continue(self._running_total):
+        # RFC-002 Slice E: reserve judge cost estimate upfront when a panel
+        # is configured, so we never start an eval we can't afford to judge.
+        projected_total = self._running_total + (
+            self._judge_cost_estimate_per_eval if self._judge_panel is not None else Decimal("0")
+        )
+        if not self._budget_gate.should_continue(projected_total):
             logger.info(
                 "Budget gate fired for eval_id=%s model=%s — skipping.",
                 request.eval_id,
@@ -238,7 +260,12 @@ class GridRunner:
         async with self._semaphore:
             # Second budget check inside the semaphore: another coroutine may
             # have exhausted the budget while we were waiting for a slot.
-            if not self._budget_gate.should_continue(self._running_total):
+            projected_total = self._running_total + (
+                self._judge_cost_estimate_per_eval
+                if self._judge_panel is not None
+                else Decimal("0")
+            )
+            if not self._budget_gate.should_continue(projected_total):
                 logger.info(
                     "Budget gate fired (post-semaphore) for eval_id=%s — skipping.",
                     request.eval_id,
@@ -290,6 +317,24 @@ class GridRunner:
 
                     self._running_total += row_cost
 
+                    # RFC-002 Slice E judge hook — invoke panel after candidate
+                    # SCORED, before journal append. Failures rewrite the row
+                    # via model_copy so the original eval_row.frozen=True invariant
+                    # is preserved (ADR-0002 immutability) and FR-009 is never
+                    # violated — the row reaches the journal regardless.
+                    if (
+                        self._judge_panel is not None
+                        and result.eval_row.status == EvalStatus.SCORED
+                    ):
+                        result = await self._invoke_judge_panel(result, request, span)
+                    elif self._judge_panel is not None:
+                        span.set_attribute("pollmevals.judge_skipped", "non_scored")
+
+                    # The hook always returns a result whose eval_row is non-None
+                    # (every error path preserves the row via model_copy). Assert
+                    # for the type-checker — None here would be a contract bug.
+                    assert result.eval_row is not None
+
                     # Record outcome attrs on the span.
                     span.set_attribute(
                         "pollmevals.final_score",
@@ -306,6 +351,98 @@ class GridRunner:
                     span.set_attribute("pollmevals.duration_ms", duration_ms)
 
                 return result
+
+    async def _invoke_judge_panel(
+        self,
+        result: EvalResult,
+        request: EvalRequest,
+        span: trace.Span,
+    ) -> EvalResult:
+        """RFC-002 Slice E judge hook with error-policy B.
+
+        Three exception classes, three outcomes — all preserve FR-009 (row
+        reaches the journal one way or another):
+
+        - ``JudgeUnavailableError`` (>= N-1 judges responded) — DEGRADED path:
+          aggregate(partial_judgments) returns ``judge_status="DEGRADED"`` with
+          ``alpha_*=None``. Row keeps ``status=SCORED``; downstream leaderboard
+          reports degraded confidence.
+        - ``SelfJudgingError`` (configuration violation — same vendor family
+          on candidate + judge) — row rewritten as ``FAILED`` with
+          ``error_class=CONTRACT_VIOLATION``. Candidate output is preserved
+          in ``artifact_refs`` but the eval does not contribute a score.
+        - Any other ``Exception`` (network crash, JSON parse, krippendorff
+          edge case, unexpected bug) — row rewritten as ``FAILED`` with
+          ``error_class=JUDGE_FAILURE``. Same preservation semantics.
+
+        On success: rebuilds the row via ``model_copy`` so ``frozen=True``
+        and ADR-0002 immutability hold. Adds actual judge cost (sum of
+        ``Judgment.cost_usd``) to the running total.
+        """
+        assert self._judge_panel is not None
+        assert result.eval_row is not None
+
+        try:
+            judgments = await self._judge_panel.score(result, request.task_id)
+            aggregation = self._judge_panel.aggregate(judgments)
+        except JudgeUnavailableError as exc:
+            judgments = exc.partial_judgments
+            aggregation = self._judge_panel.aggregate(judgments)
+            logger.warning(
+                "Judge panel degraded for eval_id=%s: %s (responded=%d/%d)",
+                request.eval_id,
+                exc,
+                len(judgments),
+                exc.n_judges_requested,
+            )
+        except SelfJudgingError as exc:
+            logger.error("SelfJudgingError eval_id=%s: %s", request.eval_id, exc)
+            span.set_attribute("pollmevals.judge_status", "self_judging_violation")
+            return dataclasses.replace(
+                result,
+                eval_row=result.eval_row.model_copy(
+                    update={
+                        "status": EvalStatus.FAILED,
+                        "error_class": ErrorClass.CONTRACT_VIOLATION,
+                        "error_detail": f"self-judging refused: {exc}",
+                    }
+                ),
+                completed_at=datetime.now(UTC),
+            )
+        except Exception as exc:
+            span.record_exception(exc)
+            span.set_attribute("pollmevals.judge_status", "judge_failure")
+            logger.exception("Judge layer crashed for eval_id=%s", request.eval_id)
+            return dataclasses.replace(
+                result,
+                eval_row=result.eval_row.model_copy(
+                    update={
+                        "status": EvalStatus.FAILED,
+                        "error_class": ErrorClass.JUDGE_FAILURE,
+                        "error_detail": f"judge layer crashed: {type(exc).__name__}: {exc}",
+                    }
+                ),
+                completed_at=datetime.now(UTC),
+            )
+
+        judge_cost = sum((j.cost_usd for j in judgments), Decimal("0"))
+        self._running_total += judge_cost
+        span.set_attribute("pollmevals.judge_status", aggregation.judge_status)
+        span.set_attribute("pollmevals.judge_n_used", aggregation.n_judges_used)
+        if aggregation.alpha_point is not None:
+            span.set_attribute("pollmevals.judge_alpha_point", aggregation.alpha_point)
+        span.set_attribute("pollmevals.judge_cost_usd", float(judge_cost))
+
+        return dataclasses.replace(
+            result,
+            eval_row=result.eval_row.model_copy(
+                update={
+                    "judgments": judgments,
+                    "judge_aggregate": aggregation,
+                }
+            ),
+            completed_at=datetime.now(UTC),
+        )
 
     async def run(self, spec: GridSpec) -> GridRunResult:
         """Execute the full evaluation grid defined by *spec*.
@@ -355,10 +492,36 @@ class GridRunner:
                 len(attempted),
             )
 
+        # RFC-002 Slice E — run-level degraded-panel abort. If > 20% of
+        # attempted evals end with judge_status="DEGRADED" the orchestrator
+        # entrypoint refuses to publish (manifest still written with
+        # status="degraded"). Threshold per RFC-002 Slice E §5.
+        judge_panel_breach = False
+        if self._judge_panel is not None and attempted:
+            n_degraded = sum(
+                1
+                for r in attempted
+                if isinstance(r, EvalResult)
+                and r.eval_row is not None
+                and r.eval_row.judge_aggregate is not None
+                and r.eval_row.judge_aggregate.judge_status == "DEGRADED"
+            )
+            degraded_ratio = n_degraded / len(attempted)
+            judge_panel_breach = degraded_ratio > 0.20
+            if judge_panel_breach:
+                logger.warning(
+                    "Judge panel breach: %d/%d evals (%.1f%%) ended DEGRADED — "
+                    "exceeds 20%% threshold; orchestrator should refuse publication.",
+                    n_degraded,
+                    len(attempted),
+                    degraded_ratio * 100,
+                )
+
         return GridRunResult(
             results=attempted,
             total_cost_usd=self._running_total,
             budget_breach=budget_breach,
+            judge_panel_breach=judge_panel_breach,
         )
 
 

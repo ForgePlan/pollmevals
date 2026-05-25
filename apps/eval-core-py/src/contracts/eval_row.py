@@ -18,6 +18,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .artifact_ref import ArtifactRef
+from .judge import JudgeAggregation, Judgment
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -50,6 +51,11 @@ class ErrorClass(StrEnum):
     TIMEOUT = "timeout"
     CONTRACT_VIOLATION = "contract_violation"
     SANDBOX_FAILURE = "sandbox_failure"
+    # Judge-layer crash (RFC-002 Slice E). The candidate produced output OK
+    # but the judge panel call or aggregation raised an unexpected exception
+    # (network, JSON parse, krippendorff failure, etc.). The row is preserved
+    # with status=FAILED instead of vanishing through asyncio.gather — FR-009.
+    JUDGE_FAILURE = "judge_failure"
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +131,10 @@ class EvalRow(BaseModel):
     stats: EvalStats
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    # Judge layer (RFC-002 Slice E). Both default-None: a smoke run without a
+    # configured JudgePanel still produces valid EvalRow objects.
+    judgments: list[Judgment] | None = None
+    judge_aggregate: JudgeAggregation | None = None
 
     @field_validator("final_score", mode="before")
     @classmethod
