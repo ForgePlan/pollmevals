@@ -13,6 +13,7 @@ Used by:
 
 from __future__ import annotations
 
+import errno
 import json
 import logging
 import mmap
@@ -201,7 +202,18 @@ class JournalWriter:
             return
         try:
             self._fh.flush()
-            os.fsync(self._fh.fileno())
+            try:
+                os.fsync(self._fh.fileno())
+            except OSError as e:
+                # fsync returns EINVAL on filesystems that do not support it
+                # (tmpfs on GitHub Actions runners, certain overlay mounts).
+                # Durability is undefined there anyway — log and continue.
+                if e.errno != errno.EINVAL:
+                    raise
+                logger.warning(
+                    "os.fsync returned EINVAL (likely tmpfs/non-durable fs); "
+                    "journal flushed but not fsynced"
+                )
         finally:
             self._fh.close()
             self._closed = True
