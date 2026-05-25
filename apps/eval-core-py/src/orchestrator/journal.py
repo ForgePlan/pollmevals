@@ -30,6 +30,26 @@ logger = logging.getLogger(__name__)
 
 tracer = trace.get_tracer(__name__)
 
+
+def _fsync_best_effort(fd: int) -> None:
+    """Call os.fsync(fd), tolerate EINVAL from filesystems that don't support it.
+
+    tmpfs (GitHub Actions /tmp), /dev/null on Linux, and certain overlay mounts
+    return EINVAL on fsync. Durability is undefined on those filesystems anyway —
+    the prior flush is the best we can do. Any other errno re-raises.
+    """
+    try:
+        os.fsync(fd)
+    except OSError as e:
+        if e.errno != errno.EINVAL:
+            raise
+        logger.warning(
+            "os.fsync returned EINVAL (fd=%d, likely tmpfs/non-durable fs); "
+            "buffer flushed but not synced",
+            fd,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -101,7 +121,7 @@ def _atomic_initialize(journal_path: Path) -> None:
     # Write an empty file to .tmp, fsync it, then rename atomically.
     with tmp_path.open("wb") as fh:
         fh.flush()
-        os.fsync(fh.fileno())
+        _fsync_best_effort(fh.fileno())
 
     os.rename(tmp_path, journal_path)
 
@@ -176,7 +196,7 @@ class JournalWriter:
             try:
                 self._fh.write(line.encode())
                 self._fh.flush()
-                os.fsync(self._fh.fileno())
+                _fsync_best_effort(self._fh.fileno())
             except OSError as exc:
                 span.record_exception(exc)
                 span.set_status(StatusCode.ERROR, str(exc))
@@ -202,18 +222,7 @@ class JournalWriter:
             return
         try:
             self._fh.flush()
-            try:
-                os.fsync(self._fh.fileno())
-            except OSError as e:
-                # fsync returns EINVAL on filesystems that do not support it
-                # (tmpfs on GitHub Actions runners, certain overlay mounts).
-                # Durability is undefined there anyway — log and continue.
-                if e.errno != errno.EINVAL:
-                    raise
-                logger.warning(
-                    "os.fsync returned EINVAL (likely tmpfs/non-durable fs); "
-                    "journal flushed but not fsynced"
-                )
+            _fsync_best_effort(self._fh.fileno())
         finally:
             self._fh.close()
             self._closed = True
