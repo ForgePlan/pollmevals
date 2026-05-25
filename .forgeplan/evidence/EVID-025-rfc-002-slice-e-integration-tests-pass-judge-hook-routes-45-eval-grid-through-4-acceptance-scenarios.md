@@ -9,7 +9,7 @@ links:
   relation: informs
 - target: PRD-002
   relation: informs
-status: draft
+status: active
 title: RFC-002 Slice E integration tests pass — judge hook routes 45-eval grid through 4 acceptance scenarios
 ---
 
@@ -105,5 +105,6 @@ Two test layers cover the slice:
 | Local execution | `uv run --project apps/eval-core-py pytest apps/eval-core-py/tests/ -q` → 520 passed, 1 skipped, 0 regressions |
 | mypy strict | `uv run mypy --strict apps/eval-core-py/src/` → 0 issues, 22 files |
 | Recorded | 2026-05-25, autorun mode (`/fpl-skills:autorun`) |
+
 
 
