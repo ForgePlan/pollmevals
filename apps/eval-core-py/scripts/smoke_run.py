@@ -70,6 +70,7 @@ from src.evaluators import (  # noqa: E402
     Evaluator,
     LintEvaluator,
     SecretScanEvaluator,
+    TypeSafetyEvaluator,
 )
 from src.evaluators.protocol import EvaluatorResult  # noqa: E402
 from src.orchestrator.cost import BudgetGate  # noqa: E402
@@ -510,6 +511,7 @@ _EVALUATORS: list[Evaluator] = [
     LintEvaluator(),
     ComplexityEvaluator(),
     SecretScanEvaluator(),
+    TypeSafetyEvaluator(),
 ]
 
 
