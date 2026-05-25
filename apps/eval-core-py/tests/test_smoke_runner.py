@@ -334,7 +334,7 @@ class TestPostmortemTemplate:
 
         content = path.read_text(encoding="utf-8")
         # 4 evals, all scored
-        assert "4/4" in content
+        assert "4/4" in content, f"missing '4/4' in postmortem; full content:\n{content}"
 
     def test_postmortem_with_failures(self, tmp_path: Path) -> None:
         grid_result = _run_grid(
