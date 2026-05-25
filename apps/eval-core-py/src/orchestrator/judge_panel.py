@@ -167,6 +167,37 @@ class SelfJudgingError(ValueError):
     """
 
 
+class JudgeUnavailableError(Exception):
+    """Raised by JudgePanel.score() when fewer than N judges responded but >= N-1.
+
+    Carries the partial list of judgments that DID return so the caller
+    (GridRunner judge hook) can pass them to JudgePanel.aggregate() — the
+    DEGRADED path under PRD-002 Q3: proceed at N-1 with judge_status=DEGRADED
+    and alpha=None for that eval.
+
+    If fewer than N-1 judges respond, the panel raises a plain RuntimeError
+    instead: the eval cannot satisfy the publication-policy minimum (>= 3
+    judges per judge-policy.md), so the orchestrator records the row as
+    FAILED rather than DEGRADED.
+
+    Attributes:
+        partial_judgments: List of Judgment objects from judges that responded.
+            Always `len < n_judges_requested` and `len >= n_judges_requested - 1`.
+        n_judges_requested: Configured panel size.
+        message: Human-readable summary including which judge dropped out.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        partial_judgments: list[Judgment],
+        n_judges_requested: int,
+    ) -> None:
+        super().__init__(message)
+        self.partial_judgments = partial_judgments
+        self.n_judges_requested = n_judges_requested
+
+
 # ---------------------------------------------------------------------------
 # Family normalisation (static, no network)
 # ---------------------------------------------------------------------------
