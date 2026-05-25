@@ -9,13 +9,15 @@ Phase 2D Slice 1 exports:
   ComplexityEvaluator -- lizard cyclomatic complexity wrapper
   SecretScanEvaluator -- gitleaks secret-detection wrapper
 
-Phase 2D Slice 2 (static-only first cut, per NOTE-007):
-  TypeSafetyEvaluator -- tsc --noEmit --strict --pretty false wrapper
-                         (correctness / coverage deferred to a dedicated
-                          Docker-sandbox session)
+Phase 2D Slice 2 (per NOTE-007 static/dynamic boundary):
+  TypeSafetyEvaluator   -- static, host-side: tsc --noEmit --strict
+  CorrectnessEvaluator  -- dynamic, sandboxed: vitest run --reporter=json
+  CoverageEvaluator     -- dynamic, sandboxed: vitest run --coverage --reporter=json
 """
 
 from .complexity_evaluator import ComplexityEvaluator
+from .correctness_evaluator import CorrectnessEvaluator
+from .coverage_evaluator import CoverageEvaluator
 from .lint_evaluator import LintEvaluator
 from .protocol import Evaluator, EvaluatorResult
 from .secret_scan_evaluator import SecretScanEvaluator
@@ -23,6 +25,8 @@ from .type_safety_evaluator import TypeSafetyEvaluator
 
 __all__ = [
     "ComplexityEvaluator",
+    "CorrectnessEvaluator",
+    "CoverageEvaluator",
     "Evaluator",
     "EvaluatorResult",
     "LintEvaluator",

@@ -36,6 +36,12 @@ dependencies = [
     "krippendorff>=0.7,<1",
     # numpy is a transitive dep of krippendorff but pinned explicitly for bootstrap CI.
     "numpy>=1.26,<3",
+    # Docker SDK — Phase 2D Slice 2 part 2 SandboxRun helper.
+    # Library-first per CLAUDE.md; Context7 /docker/docker-py confirmed
+    # client.containers.run() with read_only, tmpfs, network_mode=none,
+    # mem_limit, cap_drop, security_opt, pids_limit kwargs match the
+    # frozen sandbox policy verbatim (docs/04-runbook/09-sandbox-security.md).
+    "docker>=7.1,<8",
 ]
 
 [project.optional-dependencies]
