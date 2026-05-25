@@ -20,11 +20,14 @@ from decimal import Decimal
 from typing import Protocol, runtime_checkable
 
 import httpx
+from opentelemetry import trace
 
 from src.contracts.eval_row import EvalRow
 from src.contracts.pins import PricingSnapshot
 
 logger = logging.getLogger(__name__)
+
+tracer = trace.get_tracer(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -319,18 +322,26 @@ class CostReconciler:
         # Avoid division by zero: use max of both values floored at $0.01
         denominator = max(orch, litellm, Decimal("0.01"))
         delta_pct = abs(orch - litellm) / denominator
+        delta_usd = orch - litellm
 
-        if delta_pct > self._threshold:
-            message = (
-                f"⚠️ cost reconcile delta {delta_pct:.1%} > "
-                f"threshold {self._threshold:.0%}: "
-                f"orchestrator={orch}, litellm={litellm}. "
-                f"Taking max (pessimistic).\n"
-            )
-            sys.stderr.write(message)
-            return max(orch, litellm)
+        span_attrs: dict[str, float] = {
+            "pollmevals.cost.expected_usd": float(orch),
+            "pollmevals.cost.actual_usd": float(litellm),
+            "pollmevals.cost.delta_usd": float(delta_usd),
+        }
 
-        return orch
+        with tracer.start_as_current_span("cost.reconcile_litellm", attributes=span_attrs):
+            if delta_pct > self._threshold:
+                message = (
+                    f"⚠️ cost reconcile delta {delta_pct:.1%} > "
+                    f"threshold {self._threshold:.0%}: "
+                    f"orchestrator={orch}, litellm={litellm}. "
+                    f"Taking max (pessimistic).\n"
+                )
+                sys.stderr.write(message)
+                return max(orch, litellm)
+
+            return orch
 
 
 # ---------------------------------------------------------------------------

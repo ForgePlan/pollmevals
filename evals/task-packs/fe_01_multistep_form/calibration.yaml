@@ -1,0 +1,10 @@
+task_id: fe_01_multistep_form
+rubric_version: "1.0"
+gold_scores:
+  perfect: 9.0
+  good: 7.5
+  mediocre: 5.0
+  poor: 2.5
+  broken: 0.5
+mad_threshold: 1.5
+n_samples_per_level: 10

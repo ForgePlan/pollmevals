@@ -2,7 +2,7 @@
 depth: standard
 id: NOTE-003
 kind: note
-last_modified_at: 2026-05-24T08:57:50.057401+00:00
+last_modified_at: 2026-05-25T08:14:52.365465+00:00
 last_modified_by: claude-code/2.1.150
 links:
 - target: PRD-003
@@ -130,7 +130,4 @@ These claims will be sharpened in ADR-005.
 - LiteLLM proxy (infra/docker-compose.litellm.yml) — instrumentation target
 - NOTE-002 (Evidence Quality Standard — informs how observability data will be reported in future EVIDs)
 - Future ADR-005 (this Note's graduation target)
-
-
-
 

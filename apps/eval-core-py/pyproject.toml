@@ -9,9 +9,33 @@ license = { text = "MIT" }
 dependencies = [
     # Exact pin per RFC-001 RR-1 — never use >= or ~= for this dep.
     "inspect-ai==0.3.46",
+    # openai is an optional dep of inspect-ai required by the openai/ provider
+    # prefix (used to route candidate + judge calls through the LiteLLM proxy).
+    # RFC-002 Slice B / Phase 3 W1 H1 spike dependency.
+    "openai>=1.30,<2",
     "pydantic>=2.5,<3",
     "httpx>=0.27,<1",
     "jsonschema>=4.20,<5",
+    # OTel instrumentation — Phase 2C
+    "opentelemetry-api>=1.29.0",
+    "opentelemetry-sdk>=1.29.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.29.0",
+    # Library-first cost reconciliation (per CLAUDE.md, 2026-05-25).
+    # Used via `litellm.cost_per_token()` in scripts/smoke_run.py — auto-updates
+    # with model price changes from LiteLLM's maintained model_cost map.
+    "litellm>=1.50,<2",
+    # Multi-language cyclomatic complexity — Phase 2D Slice 1 ComplexityEvaluator.
+    # Library-first per CLAUDE.md 2026-05-25; Context7 /terryyin/lizard confirmed API.
+    # gitleaks is a system binary (NOT a Python dep) — detect via shutil.which().
+    "lizard>=1.17,<2",
+    # Krippendorff's α inter-rater reliability — Phase 3 Slice C JudgePanel.aggregate().
+    # Library-first: Context7 resolved /aleph-alpha/krippendorff-aleph-alpha (different
+    # library); the standard `krippendorff` PyPI package (Thomas Grill) is the one
+    # pinned here — uses krippendorff.alpha(reliability_data=matrix, level_of_measurement=
+    # "ordinal") with numpy arrays. ADR-005: ordinal level, 2000-resample bootstrap CI.
+    "krippendorff>=0.7,<1",
+    # numpy is a transitive dep of krippendorff but pinned explicitly for bootstrap CI.
+    "numpy>=1.26,<3",
 ]
 
 [project.optional-dependencies]
@@ -47,4 +71,5 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "types-jsonschema>=4.26.0.20260518",
+    "types-PyYAML>=6.0",
 ]

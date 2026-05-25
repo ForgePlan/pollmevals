@@ -1,58 +1,104 @@
-name: ci
+name: CI
+
+# Mirrors lefthook.yml local checks (secret-scan, format-py, ruff lint, mypy --strict, pytest).
+# Library-first per CLAUDE.md — uses established Marketplace actions; no inline scripts where
+# an action exists. TypeScript jobs (apps/api, apps/site) deferred until those packages land;
+# forgeplan-validate is already enforced locally via lefthook (skipped in CI for now).
 
 on:
-  pull_request:
-    branches: [main]
   push:
+    branches: ["**"]
+  pull_request:
     branches: [main]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  moon-ci:
-    name: moon ci (affected projects)
+  python-quality:
+    name: Python quality (eval-core-py)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.2"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync eval-core-py (with dev extras)
+        run: uv sync --project apps/eval-core-py --extra dev
+
+      - name: Ruff lint
+        run: uv run --project apps/eval-core-py ruff check apps/eval-core-py/
+
+      - name: Ruff format check
+        run: uv run --project apps/eval-core-py ruff format --check apps/eval-core-py/
+
+      - name: Mypy --strict
+        run: uv run --project apps/eval-core-py mypy --strict apps/eval-core-py/src/
+
+      - name: Pytest
+        run: uv run --project apps/eval-core-py pytest apps/eval-core-py/tests/ -q
+
+  schema-validation:
+    name: Schema validation (tasks + stacks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.2"
+          enable-cache: true
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate task specs
+        run: uv run --with pyyaml --with jsonschema python infra/scripts/validate-task-specs.py
+
+      - name: Validate stack specs
+        run: uv run --with pyyaml --with jsonschema python infra/scripts/validate-stack-specs.py
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
+      # gitleaks-action@v2 requires a paid license for GitHub Organizations.
+      # We install the gitleaks CLI directly — same scanner, free, no license.
+      # Safe: GITLEAKS_VERSION is a hardcoded literal, not external input.
+      - name: Install gitleaks CLI
+        env:
+          GITLEAKS_VERSION: 8.21.2
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.18.0
-          cache: pnpm
-
-      - name: Install Node deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: 0.10.2
-          enable-cache: true
-
-      - name: Setup Python (via uv)
-        run: uv python install 3.12.0
-
-      - name: Install Python deps
-        if: ${{ hashFiles('uv.lock') != '' }}
-        run: uv sync --frozen
-
-      # moon ci auto-detects affected projects from git history.
-      # On pull_request it diffs against the base ref; on push to main it runs all.
-      - name: Run moon ci
-        run: pnpm exec moon ci --color
+      - name: Run gitleaks detect
+        run: gitleaks detect --source . --no-banner --redact --verbose

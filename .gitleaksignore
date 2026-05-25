@@ -1,0 +1,22 @@
+# .gitleaksignore — known false positives, scoped by commit fingerprint.
+#
+# Format per line: <commit-sha>:<file-path>:<rule-id>:<line>
+#
+# Each entry suppresses ONE specific historical occurrence. Adding a fingerprint
+# here is NOT a blanket exemption — if the same pattern appears in a future
+# commit it will still trip gitleaks. That's the point: fingerprint = "we saw
+# this exact case, classified it as a false positive, here's why."
+#
+# Before adding a fingerprint: verify the secret is genuinely fake (placeholder
+# in docs / test fixture) AND that the canonical project pattern would have
+# avoided it (env var / .env reference). If the underlying example is fixable
+# in the current tree, sanitize it instead of adding an ignore.
+
+# Example master_key placeholder in LiteLLM proxy documentation.
+# Original example used literal "sk-pollmevals-master-key" — a placeholder
+# string, never a real key. Sanitized in commit 4d30ecb to "$LITELLM_MASTER_KEY"
+# (env var pattern matching project red-line "api_key_env, not literal").
+# These two historical commits remain in `docs/old/` and `docs/00-research/`
+# archives and would only be removed by history rewrite — not worth it.
+a1ce7415fb2ea89b56059009cdc8a6d141343a99:docs/old/pollmevals-research 2/examples/litellm-config.yaml:curl-auth-header:165
+d138496d7446edf59089e6cc7c81aa264a538dc2:docs/00-research/examples/litellm-config.yaml:curl-auth-header:165

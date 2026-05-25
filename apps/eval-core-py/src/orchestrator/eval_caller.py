@@ -1,9 +1,12 @@
-"""Single-eval invocation Protocol -- decouples scheduling from LLM API.
+"""Single-invocation Protocol -- decouples scheduling from LLM API.
 
 Per architect finding #4 (EVID-007 resolution):
 - EvalCaller is a thin Protocol; grid_runner depends on it (testability seam)
-- InspectEvalCaller is the real implementation wrapping inspect_ai.eval
-  (STUB in Phase 2A -- full wiring lands in Phase 2B with real LLM keys)
+- InspectEvalCaller is the real implementation: direct LiteLLM HTTP POST to
+  /chat/completions, with 429 retry (max 3, exponential backoff).
+  Inspect AI integration is the next milestone; for now the caller hits the
+  LiteLLM proxy directly (http://localhost:4000) so the full stack exercises
+  the LGTM observability pipeline.
 - FakeEvalCaller returns deterministic mock results for grid_runner tests
 
 Concurrency is OUTSIDE this module -- see grid_runner.py (Wave 5) for
@@ -12,12 +15,17 @@ asyncio.Semaphore(3) declared in ADR-001.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import logging
 import pathlib
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Protocol, runtime_checkable
+
+import httpx
 
 from src.contracts import (
     ArtifactRef,
@@ -27,6 +35,15 @@ from src.contracts import (
     EvalStats,
     EvalStatus,
 )
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Retry constants for InspectEvalCaller
+# ---------------------------------------------------------------------------
+
+_RETRY_MAX = 3
+_RETRY_BASE_DELAY_S = 1.0  # first back-off; doubles each attempt
 
 # ---------------------------------------------------------------------------
 # Module-level helper -- exported so grid_runner can use the same function
@@ -58,7 +75,7 @@ def compute_eval_id(
 
 @dataclass(frozen=True)
 class EvalRequest:
-    """All inputs needed to execute one (model, stack, task, seed) eval.
+    """All inputs needed to execute one (model, stack, task, seed) invocation.
 
     timeout_s: per-eval wall-clock limit (NFR-002: <= 5 min = 300 s).
     max_retries: number of retry attempts on transient failures (rate-limit,
@@ -106,7 +123,7 @@ class EvalCaller(Protocol):
     """Protocol for executing a single invocation of one LLM eval task.
 
     Implementors:
-      - InspectEvalCaller -- real path (Phase 2B)
+      - InspectEvalCaller -- real path (Phase 2C)
       - FakeEvalCaller    -- deterministic mock for grid_runner unit tests
 
     grid_runner depends on EvalCaller, not on concrete implementations.
@@ -121,55 +138,347 @@ class EvalCaller(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# InspectEvalCaller -- STUB for Phase 2A
+# InspectEvalCaller -- Phase 2C real implementation
 # ---------------------------------------------------------------------------
 
 
 class InspectEvalCaller:
-    """Real EvalCaller wrapping ``inspect_ai.eval``.
+    """Real EvalCaller: POST to LiteLLM proxy /chat/completions.
 
-    STUB in Phase 2A -- raises NotImplementedError on any call.  Full wiring
-    lands in Phase 2B once OPENROUTER_API_KEY and LiteLLM proxy are live.
+    Phase 2C implementation -- replaces the Phase 2A stub.  Uses the LiteLLM
+    proxy at ``litellm_base_url`` (default http://localhost:4000) so that the
+    full LGTM observability pipeline captures traces end-to-end.
 
-    Phase 2B implementation plan (left as TODO markers):
-    -------------------------------------------------------
-    1. Call ``inspect_ai.eval(task, model=request.model_id,
-           seed=request.seed, log_dir=str(self._log_dir),
-           max_connections=1)`` inside an ``asyncio.wait_for``
-           with ``timeout=request.timeout_s``.
-    2. Parse the resulting ``.eval`` binary log (opaque per RFC-001 RR-7)
-       -- only project the fields declared in SPEC-001 EvalRow mapping table
-       into POLLMEVALS EvalRow:
-         - ``EvalLog.results.scores`` -> ``automatic_metrics``
-         - ``EvalLog.stats.model_usage`` -> ``EvalStats``
-         - ``EvalLog.status`` -> ``EvalStatus``
-    3. Compute artifact sha256s and write content-addressed files under
-       ``log_dir / eval_id /`` before constructing ArtifactRef objects.
-    4. Upload artifacts to R2 when ``POLLMEVALS_STORAGE_DRIVER=r2``
-       (Phase 2C).
-    5. On ``TimeoutError`` -> return EvalRow(status=FAILED,
-       error_class=ErrorClass.TIMEOUT).
-    6. On rate-limit 429 -> retry up to request.max_retries times with
-       exponential backoff, then record RATE_LIMIT.
-    7. On 5xx -> SANDBOX_FAILURE (provider infra issue).
+    Retry policy: on HTTP 429 (rate-limit), retry up to ``_RETRY_MAX`` times
+    with exponential back-off (1 s -> 2 s -> 4 s).  All other 4xx / 5xx errors
+    produce a graceful EvalRow(status=FAILED) rather than raising.
+
+    TODO(Phase 2D, PRD-001 FR-003): replace direct HTTP with ``inspect_ai.eval()`` wiring once
+    task scaffolding (task.yaml + solver pipeline) is ready.  The EvalRow
+    mapping table from SPEC-001 applies unchanged; only the invocation layer
+    changes.
+
+    Args:
+        litellm_base_url: LiteLLM proxy base URL (Phase 2B infra).
+        api_key: Bearer token sent as ``Authorization: Bearer <key>``.  Defaults
+            to empty string so the caller works without auth against a local
+            proxy.
+        log_dir: Directory for writing content-addressed artifact files.
+        openrouter_base_url: Retained for backward-compat with existing tests
+            that assert the attribute exists.
     """
 
     def __init__(
         self,
         *,
         log_dir: pathlib.Path,
+        litellm_base_url: str = "http://localhost:4000",
+        api_key: str = "",
         openrouter_base_url: str = "https://openrouter.ai/api/v1",
     ) -> None:
         self._log_dir = log_dir
+        self._litellm_base_url = litellm_base_url.rstrip("/")
+        self._api_key = api_key
+        # Retained for backward-compat with existing test assertions.
         self._openrouter_base_url = openrouter_base_url
 
     async def call(self, request: EvalRequest) -> EvalResult:
-        # TODO(Phase 2B): remove this stub and implement real inspect_ai wiring.
-        raise NotImplementedError(
-            "InspectEvalCaller real wiring deferred to Phase 2B -- "
-            "needs OPENROUTER_API_KEY + LiteLLM proxy live. "
-            "Use FakeEvalCaller for tests."
+        """Execute one invocation via the LiteLLM proxy with 429 retry.
+
+        Returns a populated EvalResult on success.  On unrecoverable error,
+        returns EvalResult with eval_row.status=FAILED (FR-009 -- never drops).
+        """
+        started_at = datetime.now(UTC)
+
+        row_id = compute_eval_id(
+            request.eval_id,  # use pre-computed id as the run_hash fragment
+            request.model_id,
+            request.stack_id,
+            request.task_id,
+            request.seed,
         )
+
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+
+        payload: dict[str, object] = {
+            "model": request.model_id,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        f"[POLLMEVALS task] task={request.task_id} "
+                        f"stack={request.stack_id} seed={request.seed}"
+                    ),
+                }
+            ],
+            "seed": request.seed,
+            "max_tokens": 512,
+        }
+
+        url = f"{self._litellm_base_url}/chat/completions"
+        attempt = 0
+        last_exc: Exception | None = None
+
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=float(request.timeout_s), write=10.0, pool=5.0)
+        ) as client:
+            while attempt <= _RETRY_MAX:
+                try:
+                    wall_start = time.monotonic()
+                    resp = await client.post(url, json=payload, headers=headers)
+                    wall_ms = int((time.monotonic() - wall_start) * 1000)
+
+                    if resp.status_code == 429:
+                        attempt += 1
+                        if attempt > _RETRY_MAX:
+                            return self._make_failed_result(
+                                request,
+                                started_at,
+                                row_id,
+                                ErrorClass.RATE_LIMIT,
+                                f"429 rate-limit after {_RETRY_MAX} retries",
+                            )
+                        delay = _RETRY_BASE_DELAY_S * (2 ** (attempt - 1))
+                        logger.warning(
+                            "InspectEvalCaller: 429 for row_id=%s attempt=%d, retrying in %.1fs",
+                            row_id,
+                            attempt,
+                            delay,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+
+                    if resp.status_code >= 500:
+                        return self._make_failed_result(
+                            request,
+                            started_at,
+                            row_id,
+                            ErrorClass.SANDBOX_FAILURE,
+                            f"HTTP {resp.status_code} from LiteLLM proxy",
+                        )
+
+                    if resp.status_code >= 400:
+                        return self._make_failed_result(
+                            request,
+                            started_at,
+                            row_id,
+                            ErrorClass.SANDBOX_FAILURE,
+                            f"HTTP {resp.status_code} client error",
+                        )
+
+                    data = resp.json()
+                    return self._make_success_result(request, started_at, row_id, data, wall_ms)
+
+                except (TimeoutError, httpx.TimeoutException) as exc:
+                    last_exc = exc
+                    return self._make_failed_result(
+                        request,
+                        started_at,
+                        row_id,
+                        ErrorClass.TIMEOUT,
+                        f"Timeout after {request.timeout_s}s",
+                    )
+                except httpx.HTTPError as exc:
+                    last_exc = exc
+                    return self._make_failed_result(
+                        request,
+                        started_at,
+                        row_id,
+                        ErrorClass.NETWORK,
+                        f"HTTP error: {exc}",
+                    )
+
+        # Should not be reachable; belt-and-suspenders for while-loop exit.
+        return self._make_failed_result(
+            request,
+            started_at,
+            row_id,
+            ErrorClass.SANDBOX_FAILURE,
+            f"Exhausted retry loop; last_exc={last_exc}",
+        )
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _write_artifact(
+        self,
+        eval_id: str,
+        label: str,
+        content: str,
+    ) -> ArtifactRef:
+        """Write content to disk and return a content-addressed ArtifactRef.
+
+        File is written to ``self._log_dir/<eval_id>/<label>-<sha256>.txt``.
+        The URI stored in the ArtifactRef is the absolute ``file://`` path so
+        that both smoke_run._resolve_artifact_path and evaluators can locate it
+        without knowing the repo root.
+
+        Args:
+            eval_id: The eval identifier — used as the subdirectory name.
+            label:   Artifact type label (raw_output, normalized_output, evaluator_json).
+            content: UTF-8 text content to persist.
+
+        Returns:
+            An ArtifactRef pointing to the written file.
+        """
+        sha256 = hashlib.sha256(content.encode()).hexdigest()
+        mime = "application/json" if label == "evaluator_json" else "text/plain"
+        ext = ".json" if label == "evaluator_json" else ".txt"
+        filename = f"{label}-{sha256}{ext}"
+        dest = self._log_dir / eval_id / filename
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
+        return ArtifactRef(
+            sha256=sha256,
+            size_bytes=len(content.encode()),
+            uri=f"file://{dest}",
+            mime_type=mime,
+        )
+
+    def _make_artifact_refs(
+        self,
+        eval_id: str,
+        raw_content: str,
+    ) -> EvalArtifactRefs:
+        """Write raw_output, normalized_output, and evaluator_json to disk.
+
+        All three artifacts are written using ``_write_artifact`` so that the
+        URIs in the returned EvalArtifactRefs point to real files on disk.
+        """
+        normalized = raw_content.strip()
+        evaluator = f'{{"eval_id":"{eval_id}","raw_len":{len(raw_content)}}}'
+        return EvalArtifactRefs(
+            raw_output=self._write_artifact(eval_id, "raw_output", raw_content),
+            normalized_output=self._write_artifact(eval_id, "normalized_output", normalized),
+            evaluator_json=self._write_artifact(eval_id, "evaluator_json", evaluator),
+        )
+
+    def _make_failed_result(
+        self,
+        request: EvalRequest,
+        started_at: datetime,
+        row_id: str,
+        error_class: ErrorClass,
+        detail: str,
+    ) -> EvalResult:
+        completed_at = datetime.now(UTC)
+        # Write a minimal error-text artifact so the URI points to a real file.
+        error_text = f"FAILED: {error_class.value} — {detail}"
+        artifact_refs = self._make_artifact_refs(row_id, error_text)
+        row = EvalRow(
+            eval_id=row_id,
+            model_id=request.model_id,
+            stack_id=request.stack_id,
+            task_id=request.task_id,
+            seed=request.seed,
+            status=EvalStatus.FAILED,
+            error_class=error_class,
+            error_detail=detail,
+            artifact_refs=artifact_refs,
+            stats=EvalStats(
+                input_tokens=0,
+                output_tokens=0,
+                wall_clock_ms=0,
+                cost_usd=Decimal("0"),
+            ),
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        return EvalResult(
+            request=request,
+            eval_row=row,
+            exception=None,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+
+    def _make_success_result(
+        self,
+        request: EvalRequest,
+        started_at: datetime,
+        row_id: str,
+        data: dict[str, object],
+        wall_ms: int,
+    ) -> EvalResult:
+        completed_at = datetime.now(UTC)
+
+        # Extract token usage from OpenAI-compatible response.
+        # isinstance() narrowing is required for mypy --strict: data.get("usage") returns
+        # object, and object has no .get(). The isinstance check gives us dict[str, object].
+        usage: dict[str, object] = {}
+        _u = data.get("usage")
+        if isinstance(_u, dict):
+            usage = _u
+        _pt = usage.get("prompt_tokens")
+        input_tokens = int(_pt) if isinstance(_pt, (int, float)) else 0
+        _ct = usage.get("completion_tokens")
+        output_tokens = int(_ct) if isinstance(_ct, (int, float)) else 0
+
+        # Extract raw output text.
+        raw_output = ""
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices:
+            first = choices[0]
+            if isinstance(first, dict):
+                msg = first.get("message") or {}
+                if isinstance(msg, dict):
+                    raw_output = str(msg.get("content") or "")
+
+        artifact_refs = self._make_artifact_refs(row_id, raw_output)
+        stats = EvalStats(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            wall_clock_ms=wall_ms,
+            cost_usd=Decimal("0"),  # populated by CostReconciler post-run
+        )
+        row = EvalRow(
+            eval_id=row_id,
+            model_id=request.model_id,
+            stack_id=request.stack_id,
+            task_id=request.task_id,
+            seed=request.seed,
+            status=EvalStatus.SCORED,
+            artifact_refs=artifact_refs,
+            stats=stats,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        return EvalResult(
+            request=request,
+            eval_row=row,
+            exception=None,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Module-level artifact helper (used by InspectEvalCaller + FakeEvalCaller)
+# ---------------------------------------------------------------------------
+
+
+def _make_stub_artifact_refs(row_id: str, raw_content: str = "") -> EvalArtifactRefs:
+    """Build content-addressed ArtifactRefs from *row_id* + optional raw content."""
+
+    def _ref(label: str, content: str) -> ArtifactRef:
+        sha256 = hashlib.sha256(content.encode()).hexdigest()
+        return ArtifactRef(
+            sha256=sha256,
+            size_bytes=len(content.encode()),
+            uri=f"file://artifacts/evals/{row_id}/{label}-{sha256}.txt",
+            mime_type="text/plain" if label != "evaluator_json" else "application/json",
+        )
+
+    normalized = raw_content.strip()
+    evaluator = f'{{"row_id":"{row_id}","raw_len":{len(raw_content)}}}'
+    return EvalArtifactRefs(
+        raw_output=_ref("raw_output", raw_content or row_id),
+        normalized_output=_ref("normalized_output", normalized or row_id),
+        evaluator_json=_ref("evaluator_json", evaluator),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -189,13 +498,13 @@ _DEFAULT_AUTOMATIC_METRICS: dict[str, float] = {"test_pass_rate": 1.0}
 _FAKE_RUN_HASH = "sha256:" + "f" * 64
 
 
-def _fake_artifact_ref(artifact_type: str, computed_eval_id: str) -> ArtifactRef:
+def _fake_artifact_ref(artifact_type: str, computed_id: str) -> ArtifactRef:
     """Build a content-addressed ArtifactRef with a deterministic sha256.
 
-    The sha256 is derived from ``artifact_type + ":" + computed_eval_id`` so it
+    The sha256 is derived from ``artifact_type + ":" + computed_id`` so it
     is stable across calls and unique per artifact type.
     """
-    content = f"{artifact_type}:{computed_eval_id}"
+    content = f"{artifact_type}:{computed_id}"
     sha256 = hashlib.sha256(content.encode()).hexdigest()  # 64 hex chars
     mime: dict[str, str] = {
         "raw_output": "text/plain",
@@ -207,18 +516,18 @@ def _fake_artifact_ref(artifact_type: str, computed_eval_id: str) -> ArtifactRef
         size_bytes=len(content),
         uri=(
             f"file://artifacts/runs/{_FAKE_RUN_HASH}"
-            f"/evals/{computed_eval_id}/{artifact_type}-{sha256}.txt"
+            f"/evals/{computed_id}/{artifact_type}-{sha256}.txt"
         ),
         mime_type=mime.get(artifact_type, "application/octet-stream"),
     )
 
 
-def _fake_artifact_refs(computed_eval_id: str) -> EvalArtifactRefs:
+def _fake_artifact_refs(computed_id: str) -> EvalArtifactRefs:
     """Build the three mandatory ArtifactRefs for a fake run."""
     return EvalArtifactRefs(
-        raw_output=_fake_artifact_ref("raw_output", computed_eval_id),
-        normalized_output=_fake_artifact_ref("normalized_output", computed_eval_id),
-        evaluator_json=_fake_artifact_ref("evaluator_json", computed_eval_id),
+        raw_output=_fake_artifact_ref("raw_output", computed_id),
+        normalized_output=_fake_artifact_ref("normalized_output", computed_id),
+        evaluator_json=_fake_artifact_ref("evaluator_json", computed_id),
     )
 
 

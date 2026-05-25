@@ -51,13 +51,103 @@ model_list:
       api_key: os.environ/HF_TOKEN
       api_base: https://router.huggingface.co/v1
 
-  # Slot 5 — Open-weight large: Llama via OpenRouter
+  # Slot 5 — Open-weight large: Llama via OpenRouter (fallback; Cerebras primary below)
   # NOTE: resolved to meta-llama/llama-3.3-70b-instruct (EVID-019);
   # llama-4-70b not yet broadly available, 3.3-70b is the closest stable variant.
+  # ADR-006: keep as OpenRouter fallback; Cerebras primary is llama-3-3-70b-cerebras.
   - model_name: llama-3-3-70b
     litellm_params:
       model: openrouter/meta-llama/llama-3.3-70b-instruct
       api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # ── ADR-006 Phase 1 additions — OpenRouter closed APIs ──────────────────────
+
+  # Claude Opus 4.7 via OpenRouter
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4.7
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # GPT-5 (full) via OpenRouter
+  - model_name: gpt-5
+    litellm_params:
+      model: openrouter/openai/gpt-5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Gemini 2.5 Pro via OpenRouter
+  - model_name: gemini-2-5-pro
+    litellm_params:
+      model: openrouter/google/gemini-2.5-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Grok 4 via OpenRouter
+  - model_name: grok-4
+    litellm_params:
+      model: openrouter/x-ai/grok-4
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # DeepSeek V3.5 via OpenRouter
+  - model_name: deepseek-v3-5
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v3.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # ── ADR-006 Phase 1 additions — Cerebras direct (fast open-weight) ───────────
+
+  # Llama 3.3 70B via Cerebras (primary; OpenRouter llama-3-3-70b is fallback)
+  - model_name: llama-3-3-70b-cerebras
+    litellm_params:
+      model: cerebras/llama3.3-70b
+      api_key: os.environ/CEREBRAS_API_KEY
+
+  # Qwen3 32B via Cerebras
+  - model_name: qwen-3-32b
+    litellm_params:
+      model: cerebras/qwen-3-32b
+      api_key: os.environ/CEREBRAS_API_KEY
+
+  # GLM-4.7 via Cerebras
+  - model_name: glm-4-7
+    litellm_params:
+      model: cerebras/glm-4.7
+      api_key: os.environ/CEREBRAS_API_KEY
+
+  # gpt-oss-120B via Cerebras
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: cerebras/gpt-oss-120b
+      api_key: os.environ/CEREBRAS_API_KEY
+
+  # ── ADR-006 Phase 1 additions — Runpod vLLM (self-hosted) ───────────────────
+
+  # Qwen 2.5 72B via Runpod vLLM (OpenAI-compatible endpoint)
+  # api_base must point to the Runpod pod endpoint (set RUNPOD_VLLM_API_BASE in .env).
+  - model_name: qwen-2-5-72b
+    litellm_params:
+      model: hosted_vllm/Qwen/Qwen2.5-72B-Instruct
+      api_base: os.environ/RUNPOD_VLLM_API_BASE
+      api_key: os.environ/RUNPOD_VLLM_API_KEY
+
+  # ── Judge routes (RFC-002 Phase 3 W1 H1 spike + future JudgePanel) ──────────
+  # Separate routes billed to OPENROUTER_API_KEY_JUDGE for billing isolation
+  # per RFC-002 NFR-005. Naming convention: <base-model>-judge.
+  # Added 2026-05-24 for Phase 3 W1 H1 spike.
+  - model_name: claude-sonnet-4-6-judge
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4.6
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: gpt-5-mini-judge
+    litellm_params:
+      model: openrouter/openai/gpt-5-mini
+      api_key: os.environ/OPENROUTER_API_KEY_JUDGE
       api_base: https://openrouter.ai/api/v1
 
 # General proxy settings

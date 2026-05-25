@@ -1,0 +1,38 @@
+schema_version: pollmevals.stack.v1
+slug: pi
+name: Pi Terminal Coding Harness
+base_model_slug: configurable
+agent_cli: pi
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: true
+  L2_tools: true
+  L3_skills: true
+  L4_file_memory: true
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: false
+  L8_framework: null
+execution:
+  mode: repository_patch
+  command: pi
+  args: []
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+limits:
+  max_wall_clock_seconds: 600
+  max_tool_calls: 50
+  max_input_tokens: 50000
+  max_output_tokens: 10000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace

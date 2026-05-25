@@ -1,0 +1,8 @@
+# guides/INDEX
+
+Local index of the project's process guides. These guides are the author's
+canonical baseline — the source of truth for process. Don't duplicate their
+content elsewhere — link to the files below.
+
+- [CLAUDE-MD-GUIDE.ru.md](CLAUDE-MD-GUIDE.ru.md) — how to write `CLAUDE.md` accounting for LLM weaknesses (U-curve attention, cry-wolf, dilution, redundancy cost).
+- [GIT-FLOW-GUIDE.ru.md](GIT-FLOW-GUIDE.ru.md) — Git Flow + Conventional Commits + PR process + SemVer + safety rules against AI-driven destruction.

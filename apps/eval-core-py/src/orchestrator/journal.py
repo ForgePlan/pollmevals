@@ -13,6 +13,7 @@ Used by:
 
 from __future__ import annotations
 
+import errno
 import json
 import logging
 import mmap
@@ -22,7 +23,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
 
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
+
 logger = logging.getLogger(__name__)
+
+tracer = trace.get_tracer(__name__)
+
+
+def _fsync_best_effort(fd: int) -> None:
+    """Call os.fsync(fd), tolerate EINVAL from filesystems that don't support it.
+
+    tmpfs (GitHub Actions /tmp), /dev/null on Linux, and certain overlay mounts
+    return EINVAL on fsync. Durability is undefined on those filesystems anyway —
+    the prior flush is the best we can do. Any other errno re-raises.
+    """
+    try:
+        os.fsync(fd)
+    except OSError as e:
+        if e.errno != errno.EINVAL:
+            raise
+        logger.warning(
+            "os.fsync returned EINVAL (fd=%d, likely tmpfs/non-durable fs); "
+            "buffer flushed but not synced",
+            fd,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -95,7 +121,7 @@ def _atomic_initialize(journal_path: Path) -> None:
     # Write an empty file to .tmp, fsync it, then rename atomically.
     with tmp_path.open("wb") as fh:
         fh.flush()
-        os.fsync(fh.fileno())
+        _fsync_best_effort(fh.fileno())
 
     os.rename(tmp_path, journal_path)
 
@@ -150,17 +176,31 @@ class JournalWriter:
         if self._closed:
             raise RuntimeError("JournalWriter is closed")
 
-        try:
-            line = json.dumps(row, default=str) + "\n"
-        except (TypeError, ValueError) as exc:
-            raise JournalCorruptionError(f"Failed to serialize row to JSON: {exc}") from exc
+        entry_id = str(row.get("eval_id", ""))
+        entry_type = str(row.get("status", "unknown"))
+        span_attrs: dict[str, str | int] = {
+            "pollmevals.journal.entry_type": entry_type,
+            "pollmevals.journal.entry_id": entry_id,
+        }
 
-        try:
-            self._fh.write(line.encode())
-            self._fh.flush()
-            os.fsync(self._fh.fileno())
-        except OSError as exc:
-            raise JournalCorruptionError(f"Failed to write/fsync journal entry: {exc}") from exc
+        with tracer.start_as_current_span("journal.append", attributes=span_attrs) as span:
+            try:
+                line = json.dumps(row, default=str) + "\n"
+            except (TypeError, ValueError) as exc:
+                span.record_exception(exc)
+                span.set_status(StatusCode.ERROR, str(exc))
+                raise JournalCorruptionError(f"Failed to serialize row to JSON: {exc}") from exc
+
+            span.set_attribute("pollmevals.journal.size_bytes", len(line.encode()))
+
+            try:
+                self._fh.write(line.encode())
+                self._fh.flush()
+                _fsync_best_effort(self._fh.fileno())
+            except OSError as exc:
+                span.record_exception(exc)
+                span.set_status(StatusCode.ERROR, str(exc))
+                raise JournalCorruptionError(f"Failed to write/fsync journal entry: {exc}") from exc
 
     def append_many(self, rows: Iterable[dict[str, object]]) -> None:
         """Append multiple rows, each with its own fsync.
@@ -182,7 +222,7 @@ class JournalWriter:
             return
         try:
             self._fh.flush()
-            os.fsync(self._fh.fileno())
+            _fsync_best_effort(self._fh.fileno())
         finally:
             self._fh.close()
             self._closed = True
