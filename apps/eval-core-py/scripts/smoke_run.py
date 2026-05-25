@@ -67,6 +67,8 @@ from src.contracts import (  # noqa: E402
 )
 from src.evaluators import (  # noqa: E402
     ComplexityEvaluator,
+    CorrectnessEvaluator,
+    CoverageEvaluator,
     Evaluator,
     LintEvaluator,
     SecretScanEvaluator,
@@ -512,6 +514,8 @@ _EVALUATORS: list[Evaluator] = [
     ComplexityEvaluator(),
     SecretScanEvaluator(),
     TypeSafetyEvaluator(),
+    CorrectnessEvaluator(),
+    CoverageEvaluator(),
 ]
 
 

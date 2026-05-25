@@ -1,0 +1,13 @@
+{
+  "name": "pollmevals-eval-ts-sandbox",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned TypeScript + Vitest toolchain for the pollmevals dynamic-evaluator sandbox image. Library-first per CLAUDE.md; versions verified via Context7 /vitest-dev/vitest + /microsoft/typescript on 2026-05-25.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "typescript": "5.9.3",
+    "vitest": "3.2.4",
+    "@vitest/coverage-v8": "3.2.4"
+  }
+}
