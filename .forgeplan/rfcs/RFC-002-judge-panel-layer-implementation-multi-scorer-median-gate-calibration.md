@@ -649,3 +649,4 @@ If the RFC-002 implementation fails, rollback paths are scoped per slice:
 
 *Status: draft. Activation requires: (a) Phase 3 spike outcome captured as EVID-023 (DONE), (b) PRD-002 R_eff ≥ 0.70 maintained, (c) Guardian gate review per NOTE-002 contract.*
 
+
