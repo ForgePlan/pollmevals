@@ -4,7 +4,12 @@ id: NOTE-007
 kind: note
 last_modified_at: 2026-05-25T18:51:30.049815+00:00
 last_modified_by: claude-code/2.1.150
-status: draft
+links:
+- target: PRD-001
+  relation: informs
+- target: RFC-001
+  relation: informs
+status: active
 title: Evaluator architecture split — static (no sandbox) vs dynamic (Docker) on execution boundary
 ---
 
@@ -80,4 +85,7 @@ Until then, the pattern is reversible: a single re-orgization can move all evalu
 - `docs/02-methodology/security-sandbox.md` v0.1.0 frozen — sandbox policy
 - `docs/04-runbook/09-sandbox-security.md` — sandbox runtime spec (Docker rootless v0.1 → gVisor/Kata v0.3 → Firecracker v1.0)
 - Future ADR-007 (reserved if this Note graduates)
+
+
+
 
