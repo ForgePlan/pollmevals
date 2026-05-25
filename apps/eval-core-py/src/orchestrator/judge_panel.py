@@ -30,7 +30,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import numpy as np
-import yaml  # type: ignore[import-untyped]
+import yaml
 from inspect_ai.model import GenerateConfig
 
 from src.contracts import (
