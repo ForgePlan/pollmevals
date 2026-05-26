@@ -1,0 +1,167 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
+# Judge rubric for doc_01_cli_readme — used by JudgePanel under PRD-002.
+#
+# Documentation tasks are judge-only (no host-side evaluator). Each criterion
+# is scored 0-10 by every judge. Median per criterion is computed in
+# JudgeAggregation; the final score is the mean of the five criterion medians
+# (per docs/02-methodology/scoring.md "Documentation tasks").
+#
+# Anchors specify the 0 / 5 / 10 reference points. Judges interpolate.
+# Judges receive this rubric + the candidate README. They do NOT see the gold
+# README, the calibration labels, the rubric internals beyond what is in this
+# file, or the candidate's model identity (anonymisation pipeline per
+# docs/04-runbook/07-judge-panel.md).
+
+schema_version: pollmevals.rubric.v1
+task_id: doc_01_cli_readme
+rubric_version: "1.0"
+sourcing: own  # ADR-007 Tier 1
+license:
+  spec: CC-BY-SA-4.0
+  content: MIT
+
+# 5 criteria, equal weight. Sum of weights = 1.0. Matches the "Documentation
+# tasks" formula in scoring.md verbatim: mean of criterion medians.
+criteria:
+
+  structural_completeness:
+    weight: 0.20
+    description: |
+      Are all eight required top-level sections present, in the prescribed
+      order: Overview, Installation, Quick start, Commands, Configuration,
+      Troubleshooting, Contributing, Licence. Inside Commands, is every
+      subcommand from the contract (list, show, validate, run) documented
+      under its own level-3 heading.
+    anchors:
+      0: |
+        Fewer than four of the eight top-level sections present, OR the
+        Commands section is missing entirely, OR sections are arbitrarily
+        reordered with no rationale.
+      5: |
+        Six or seven of the eight sections present. Commands section exists
+        but is missing one subcommand or omits flags/examples for one of
+        them. Order roughly matches the prescribed one.
+      10: |
+        All eight sections present in the prescribed order. Every subcommand
+        has its own level-3 heading. Each subcommand entry documents flags,
+        at least one example, and exit codes. Configuration documents every
+        env var listed in the contract.
+
+  factual_accuracy:
+    weight: 0.20
+    description: |
+      Does the README invent nothing that contradicts the contract? Flags
+      and subcommand names must match the prompt verbatim. Exit codes must
+      match the documented mapping. Env-var names must match. Default values
+      must match. Catalog URL must match. No hallucinated dependencies, no
+      hallucinated commands, no invented features.
+    anchors:
+      0: |
+        Multiple invented subcommands or flags. Wrong default catalog URL.
+        Wrong exit code mapping. Contradicts the contract on two or more
+        points.
+      5: |
+        Mostly accurate but contains one factual error: one wrong flag name,
+        or one wrong exit code, or one env var with the wrong default, or
+        one example that no longer matches the surrounding prose.
+      10: |
+        Zero factual errors. Every flag, exit code, env var, default value
+        and example aligns with the contract. Where the contract is
+        ambiguous, the README picks a consistent interpretation and applies
+        it throughout.
+
+  clarity:
+    weight: 0.20
+    description: |
+      Is the prose scannable, concrete, and free of marketing fluff? A reader
+      arriving at a section should grasp it in seconds. No "we will explore",
+      no "welcome to", no "this document is intended to". Headings name the
+      content (not "Overview" — "What this tool does"). Tables / lists used
+      where appropriate. Each example shows expected output where relevant.
+    anchors:
+      0: |
+        Wall-of-text paragraphs. Filler phrases dominate. Examples lack
+        context. Headings are vague ("Stuff", "More info"). Inconsistent
+        voice (sometimes first person plural, sometimes imperative).
+      5: |
+        Readable; one or two filler sentences or vague headings. Most
+        examples are concrete; one or two are abstract or missing expected
+        output. Voice mostly consistent.
+      10: |
+        Every section is scannable. Imperative voice ("Run X to do Y").
+        Tables/lists chosen over prose where structure helps. Examples show
+        invocation AND expected output. Zero filler.
+
+  actionability:
+    weight: 0.20
+    description: |
+      Can a new user follow the README and succeed in under five minutes?
+      Quick start is copy-paste runnable. Installation covers each declared
+      delivery channel (binary, Homebrew, Docker). Each subcommand example
+      is self-contained — paste it into a shell and it works (given the
+      stated prerequisites). Troubleshooting names a concrete symptom and
+      the concrete fix.
+    anchors:
+      0: |
+        Quick start is missing or only describes what the tool will do
+        someday. Installation is vague ("download the binary"). Examples
+        reference variables defined nowhere. Troubleshooting is generic
+        ("check your config").
+      5: |
+        Quick start exists and works for one install channel; the others are
+        sketched. Most subcommand examples are runnable; one or two depend
+        on undocumented prior state. Troubleshooting covers one or two real
+        failure modes plus generic advice.
+      10: |
+        Quick start runs end-to-end in <2 minutes. All three install
+        channels documented with copy-pasteable commands. Every subcommand
+        example is self-contained. Troubleshooting covers the top four
+        failure modes (auth, network, schema, sandbox) with the exact error
+        message and the exact fix.
+
+  consistency:
+    weight: 0.20
+    description: |
+      Are terminology, formatting, and conventions uniform throughout? Same
+      flag style (`--config` vs `-c`) is used consistently. Code blocks have
+      consistent language hints. Env vars are referenced by the same name in
+      every section. Tool name (`pollmevals fetch-task`) is spelled the
+      same way every time. Tables share a column convention.
+    anchors:
+      0: |
+        Tool is called three different things. Some subcommands use
+        backticks, others italic. Flags appear with and without leading
+        dashes. Code blocks lack language hints. Different subcommands
+        format their exit codes differently.
+      5: |
+        Mostly consistent; one or two stragglers (one heading capitalised
+        differently, one env var referenced two ways, one code block missing
+        the language hint).
+      10: |
+        Perfect surface consistency. One canonical spelling for the tool
+        name, one flag style, one heading capitalisation rule, one table
+        layout, one code-block language hint per language used.
+
+# Output JSON shape the judge must produce. JudgePanel.score() expects this
+# exact key set per RFC-002 Slice B.
+output_schema:
+  rubric_scores:
+    structural_completeness: 0..10
+    factual_accuracy: 0..10
+    clarity: 0..10
+    actionability: 0..10
+    consistency: 0..10
+  total_score: 0..10  # mean of the five criterion scores (equal weight)
+  reasoning: |
+    Free-text explanation, 200 chars max per criterion. Cited evidence from
+    the candidate README (section heading or line number).
+
+# Anonymisation contract per docs/04-runbook/07-judge-panel.md. The judge
+# never sees these strings (Anti-SLOP Reviewer Agent strips them before
+# the prompt is rendered to the judge).
+anonymisation_strip:
+  - "/\\bas an AI\\b/i"
+  - "/\\bI'm Claude\\b/i"
+  - "/\\bI'm GPT\\b/i"
+  - "/\\bI'm Gemini\\b/i"
+  - "/Anthropic|OpenAI|Google DeepMind/i"

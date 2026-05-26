@@ -1,10 +1,27 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
+# Calibration manifest for doc_01_cli_readme. Expected scores per band are
+# the target medians the judge panel should produce on each sample.
+# Verified empirically once judge wiring lands (G2 gate per RFC-003).
+
 task_id: doc_01_cli_readme
 rubric_version: "1.0"
+
+# Target judge-panel score (mean of 5 criterion medians) per band.
 gold_scores:
-  perfect: 9.0
+  perfect: 9.5
   good: 7.5
-  mediocre: 5.0
-  poor: 2.5
-  broken: 0.5
+  mediocre: 5.5
+  poor: 3.0
+  broken: 0.8
+
+# Acceptable mean absolute deviation per judge on the calibration set.
+# Threshold for publication per docs/02-methodology/judge-policy.md.
 mad_threshold: 1.5
-n_samples_per_level: 10
+
+# v0.1 baseline: 5 per band (25 total). v0.2 target: 10 per band (50 total).
+n_samples_per_level: 5
+v0_2_target_per_level: 10
+
+# Provenance per RFC-003 G1 (gate enforced via grep on sample headers).
+sourcing: own
+license: MIT

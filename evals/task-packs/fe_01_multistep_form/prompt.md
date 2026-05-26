@@ -1,3 +1,4 @@
+<!-- source: own-authored 2026-05-26 by gogocat (license: MIT) -->
 # Prompt for fe_01_multistep_form
 
 The canonical prompt is defined in `task.yaml` under `prompt_template`.

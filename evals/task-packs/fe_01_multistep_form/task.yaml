@@ -1,3 +1,4 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
 schema_version: pollmevals.task.v1
 id: fe_01
 slug: accessible-multistep-form-persisted-draft
@@ -5,23 +6,97 @@ version: "1.0"
 category: frontend
 difficulty: medium
 language: typescript-react
+
+# Sourcing tier per ADR-007. own = all artefacts authored in-tree under MIT.
+sourcing: own
+
 description: |
-  Build a React multi-step form with validation, persisted draft state, accessible keyboard navigation and clear loading/error/empty states.
+  Build an accessible 3-step React form (personal info → address → review)
+  that validates per-field on blur, persists the draft to sessionStorage
+  between steps, manages focus on step transitions, announces state changes
+  to screen readers via a live region, and exposes deterministic
+  loading / error / success states on submission. Output must be
+  axe-core clean (no serious/critical violations) and keyboard-navigable
+  end to end.
+
 prompt_template: |
-  Implement the component and tests. Use React, TypeScript and Testing Library. Output only the code files separated by filename comments.
+  You will implement an accessible multi-step React form in TypeScript.
+
+  Hard requirements:
+    1. Three steps: (a) personal info (name + email), (b) address
+       (street + city + zip), (c) review + submit. Steps are linear:
+       Next advances, Back returns. The user cannot skip forward past
+       an invalid step.
+    2. Each input has a visible <label> bound by htmlFor / id. The
+       container uses semantic landmarks (<form>, <fieldset>, <legend>).
+       No div-as-button; use real <button type="...">.
+    3. Validation runs on blur per field. Errors render in an element
+       referenced by aria-describedby on the failing input. The input
+       sets aria-invalid="true" while invalid. Submission is blocked
+       while the visible step has any error.
+    4. Draft state persists across page reload via sessionStorage under
+       a stable key ("fe01:multistep-form:draft"). On mount, the draft
+       is hydrated. On every field change, the draft is updated.
+    5. Focus moves to the first focusable control of the new step when
+       Next or Back is clicked. Focus moves to the first error when
+       submission is blocked by validation.
+    6. A polite aria-live region announces step transitions
+       ("Step 2 of 3, address") and the submission outcome
+       ("Submission successful" / "Submission failed: …").
+    7. The submit handler exposes deterministic UI states:
+       idle | loading | success | error. The submit button shows a
+       loading affordance (aria-busy="true") and is disabled while
+       loading. Errors restore the form to idle, not lose data.
+
+  Public API surface:
+    export interface MultiStepFormProps {
+      onSubmit: (data: FormData) => Promise<void>;
+      initialData?: Partial<FormData>;
+    }
+    export interface FormData {
+      name: string;
+      email: string;
+      street: string;
+      city: string;
+      zip: string;
+    }
+    export function MultiStepForm(props: MultiStepFormProps): JSX.Element;
+
+  Constraints:
+    - One TSX file under workspace/solution.tsx. No additional dependencies
+      beyond those pinned in package.json (react 19, react-dom 19).
+    - tsc --strict --noEmit must pass.
+    - eslint must report zero warnings under the provided config.
+    - All tests in tests.spec.tsx must pass (you do not see them — they
+      are hidden until publication).
+    - axe-core must report 0 serious / critical violations on every step.
+    - File size ≤ 200 lines; cyclomatic complexity per function ≤ 6.
+
+  Output only the code for solution.tsx. No prose, no markdown fences.
+
 success_criteria:
-  - Component tests pass.
-  - Keyboard navigation works.
-  - Draft state persists.
-  - axe-core accessibility check has no serious violations.
-  - No race conditions in async validation.
+  - All hidden tests in tests.spec.tsx pass via vitest + jsdom.
+  - axe-core run on every step returns 0 serious / critical violations.
+  - TypeScript strict mode passes with no `any`, no `as` casts on user input.
+  - eslint reports zero warnings.
+  - Cyclomatic complexity per function is at or below 6 (lizard).
+  - sessionStorage round-trip preserves the full draft across remount.
+  - Pattern-compliance judge median score is at least 7/10.
+
+# Evaluator commands are executed by the host-side evaluator chain. The
+# Docker-sandboxed CorrectnessEvaluator runs vitest inside the eval-ts image.
 evaluator_commands:
-  - npm test --silent
-  - npm run test:a11y
-  - tsc --noEmit --strict
-expected_tokens_in: 1000
-expected_tokens_out: 2200
+  - npx vitest run --reporter=json --coverage
+  - tsc --noEmit --strict workspace/solution.tsx
+  - npx eslint --max-warnings=0 workspace/solution.tsx
+
+expected_tokens_in: 1400
+expected_tokens_out: 2400
 expected_wall_clock_seconds: 60-180
+
+# Score weights per docs/02-methodology/scoring.md "frontend task" formula:
+# 0.35 correctness + 0.20 accessibility + 0.15 coverage + 0.10 type_safety
+# + 0.10 ux_states + 0.10 pattern_match
 weight_components:
   correctness: 0.35
   accessibility: 0.20
@@ -29,14 +104,34 @@ weight_components:
   type_safety: 0.10
   ux_states: 0.10
   pattern_match: 0.10
-calibration_set:
-  perfect_score_example:
-    code_uri: ./gold/fe_01/v1.0/calibration/perfect.tsx
-    expected_score: 9.5
-  mediocre_score_example:
-    code_uri: ./gold/fe_01/v1.0/calibration/mediocre.tsx
-    expected_score: 5.0
-  broken_example:
-    code_uri: ./gold/fe_01/v1.0/calibration/broken.tsx
-    expected_score: 0.5
-license: CC-BY-SA-4.0
+
+# Calibration sample layout. See ./calibration/<level>/sample-{001..005}.tsx.
+# Expected final_score (0-10) populated by Anti-SLOP Reviewer Agent after
+# evaluator wiring runs in Task #23. n_samples_per_level=5 per RFC-003
+# v0.1 baseline; v0.2 target is 10 per level for judge MAD < 1.5 stability.
+calibration:
+  schema: 5-level
+  n_samples_per_level: 5
+  total_samples: 25
+  v0_2_target_per_level: 10
+  layout: ./calibration/<level>/sample-{001..005}.tsx
+  levels:
+    perfect:
+      expected_final_score_range: [9.0, 10.0]
+      description: production-ready, all requirements met, axe-clean, idiomatic React 19
+    good:
+      expected_final_score_range: [7.0, 8.5]
+      description: works, minor flaw (one missed announcement, slightly noisy markup, suboptimal focus order)
+    mediocre:
+      expected_final_score_range: [4.5, 6.5]
+      description: works on happy path; multiple a11y or state-management gaps; some tests fail
+    poor:
+      expected_final_score_range: [2.0, 4.0]
+      description: renders but fundamentally inaccessible or stateful only in memory (no sessionStorage)
+    broken:
+      expected_final_score_range: [0.0, 1.5]
+      description: does not compile, or compiles but no a11y at all (div-as-button, no labels)
+
+license:
+  spec: CC-BY-SA-4.0
+  code: MIT

@@ -1,38 +1,174 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
 schema_version: pollmevals.task.v1
 id: doc_01
-slug: readme-for-open-source-cli
+slug: readme-for-pollmevals-fetch-task-cli
 version: "1.0"
 category: docs
 difficulty: easy
 language: markdown
+
+# Sourcing tier per ADR-007. own = all artefacts authored in-tree under MIT.
+sourcing: own
+
 description: |
-  Write a README for an open-source CLI tool. The README must explain what the CLI does, installation, quick start, configuration, commands, examples, troubleshooting and contribution rules.
+  Write a production-grade README.md for an imaginary CLI tool named
+  `pollmevals fetch-task`. The tool retrieves and validates POLLMEVALS task
+  packs from a remote catalog and runs them locally for development. The
+  README must explain what the tool does, how to install it, a copy-pasteable
+  quick start, each subcommand (`list`, `show`, `validate`, `run`) with its
+  flags + exit codes + an example, configuration via env vars and a YAML
+  config file, troubleshooting for the four most common failure modes, a
+  contributing pointer, and the licence line. Tone is reference-grade
+  technical writing — no marketing prose, no "we will explore", no welcome
+  paragraphs.
+
+  The candidate sees only the prompt (`prompt.md`). They do NOT see the gold
+  README, the calibration samples, or the rubric. Judges score against
+  `rubric.yaml`.
+
 prompt_template: |
-  Write a complete README.md for the described CLI. Use concise technical writing. Output only Markdown.
+  You are writing the README.md for a command-line tool called
+  `pollmevals fetch-task`. The tool retrieves POLLMEVALS evaluation task
+  packs from a remote catalog, validates them against the local schema, and
+  runs them inside a sandboxed evaluator. It is shipped as a single static
+  binary plus a Homebrew tap and a Docker image.
+
+  Tool contract:
+
+    Binary name:      pollmevals-fetch-task  (entry point: `pollmevals fetch-task`)
+    Catalog endpoint: https://catalog.pollmevals.dev (override with POLLMEVALS_CATALOG_URL)
+    Schema:           JSON Schema Draft 2020-12, bundled in the binary
+    Config file:      $XDG_CONFIG_HOME/pollmevals/fetch-task.yaml  (override with --config)
+    Auth:             optional POLLMEVALS_API_TOKEN for private catalogs
+
+  Subcommands and their contracts:
+
+    list [--category <cat>] [--difficulty <level>] [--json]
+      Lists available task packs from the catalog. Categories: backend,
+      frontend, docs, review. Difficulty: easy, medium, hard.
+      Exit codes: 0 success, 2 network failure, 3 auth failure.
+
+    show <task-id> [--version <ver>] [--json]
+      Prints a single task pack's metadata. --version defaults to "latest".
+      Exit codes: 0 success, 4 task not found, 5 version not found.
+
+    validate <path-or-id> [--strict]
+      Validates a local task pack directory OR a remote task-id against the
+      bundled JSON Schema. --strict additionally enforces calibration-band
+      sample-count quorum (5 per band minimum).
+      Exit codes: 0 valid, 6 schema violation, 7 quorum failure.
+
+    run <task-id> --stack <stack-slug> [--seed <int>] [--out <dir>] [--dry-run]
+      Pulls the task pack, mounts it into the sandbox evaluator image, runs
+      the configured Stack against it, writes artefacts to --out (default
+      ./artifacts/). --dry-run validates inputs and prints the planned
+      invocation without executing.
+      Exit codes: 0 success, 8 stack not found, 9 sandbox error, 10 evaluator
+      reported failure (exit code is set even when the candidate model
+      produced a low-scoring but well-formed output — the wrapper only
+      returns 10 on infrastructure-level failure).
+
+  Environment variables (all optional unless noted):
+
+    POLLMEVALS_CATALOG_URL   — override catalog base URL
+    POLLMEVALS_API_TOKEN     — bearer token for private catalogs
+    POLLMEVALS_CACHE_DIR     — local cache for downloaded packs (default $XDG_CACHE_HOME/pollmevals)
+    POLLMEVALS_NO_COLOR      — disable ANSI colour in stderr output
+    POLLMEVALS_LOG_LEVEL     — debug | info | warn | error (default info)
+
+  Config file precedence (highest wins):
+
+    1. CLI flag
+    2. Environment variable
+    3. Config file (--config or default path)
+    4. Compiled-in default
+
+  Output:
+
+    Write a single Markdown file with these top-level sections, in this order:
+
+      1. Overview
+      2. Installation
+      3. Quick start
+      4. Commands
+      5. Configuration
+      6. Troubleshooting
+      7. Contributing
+      8. Licence
+
+    Use level-2 headings for sections, level-3 for subcommands inside
+    Commands. Code blocks for shell invocations and config snippets. Keep
+    examples runnable as-is.
+
+  Output only the Markdown source. No prose around it, no triple-backtick
+  fence around the whole document.
+
 success_criteria:
-  - Required sections are present.
-  - Instructions are actionable.
-  - No contradictions.
-  - Commands and examples are clear.
-  - Judge panel median score is at least 7/10.
+  - All eight required top-level sections present in the prescribed order.
+  - Every subcommand documented with at least one example, its flags, and
+    its exit codes.
+  - All env vars from the contract are documented with type + default +
+    purpose.
+  - No invented flags, no invented subcommands, no contradictory examples.
+  - Judge panel median score (mean of 5 criterion medians) at least 7/10.
+
+# Documentation tasks have no host-side evaluator — scoring is judge-only.
+# JudgePanel.aggregate() reads the rubric in ./rubric.yaml.
 evaluator_commands: []
-expected_tokens_in: 800
-expected_tokens_out: 1800
-expected_wall_clock_seconds: 30-120
+
+expected_tokens_in: 1100
+expected_tokens_out: 1500
+expected_wall_clock_seconds: 30-90
+
+# Score formula per docs/02-methodology/scoring.md "Documentation tasks":
+# mean of 5 equal-weight criterion medians. No host-runnable evaluators.
 weight_components:
   structural_completeness: 0.20
   factual_accuracy: 0.20
   clarity: 0.20
   actionability: 0.20
   consistency: 0.20
-calibration_set:
-  perfect_score_example:
-    doc_uri: ./gold/doc_01/v1.0/calibration/perfect.md
-    expected_score: 9.5
-  mediocre_score_example:
-    doc_uri: ./gold/doc_01/v1.0/calibration/mediocre.md
-    expected_score: 5.0
-  broken_example:
-    doc_uri: ./gold/doc_01/v1.0/calibration/broken.md
-    expected_score: 1.0
-license: CC-BY-SA-4.0
+
+# Calibration sample layout. See ./calibration/<level>/sample-{001..005}.md.
+# v0.1 launch baseline: 5 samples per level (25 total). v0.2 bumps to 10 per
+# level (50 total) for judge MAD < 1.5 stability — same scope decision as
+# be_01_jwt_auth (RFC-003 amendment 2026-05-26).
+calibration:
+  schema: 5-level
+  n_samples_per_level: 5
+  total_samples: 25
+  v0_2_target_per_level: 10
+  layout: ./calibration/<level>/sample-{001..005}.md
+  levels:
+    perfect:
+      expected_final_score_range: [9.0, 10.0]
+      description: |
+        All 8 sections present in order; every subcommand documented with
+        flags + example + exit codes; all env vars listed; no factual
+        contradictions; voice is reference-grade.
+    good:
+      expected_final_score_range: [7.0, 8.5]
+      description: |
+        All sections present; one minor flaw — a single wrong flag name,
+        one out-of-date example, or slight ambiguity in one subcommand.
+    mediocre:
+      expected_final_score_range: [4.5, 6.5]
+      description: |
+        Missing one or two required sections (typically Troubleshooting or
+        Configuration), OR factually wrong on one entire subcommand
+        (invented flag set, wrong exit codes).
+    poor:
+      expected_final_score_range: [2.0, 4.0]
+      description: |
+        Large structural gaps — no Commands section, OR no Installation, OR
+        hallucinated subcommands that aren't in the contract. May still
+        contain prose but is not useful as reference.
+    broken:
+      expected_final_score_range: [0.0, 1.5]
+      description: |
+        Garbage: truncated mid-sentence, irrelevant topic, machine-generated
+        SLOP that says nothing concrete, or one-line stubs.
+
+license:
+  spec: CC-BY-SA-4.0
+  content: MIT

@@ -12,8 +12,13 @@ pre-commit:
   commands:
 
     # 1. Format + lint staged TypeScript/JavaScript (auto-fix in place).
+    #    Exclude evaluation calibration fixtures — they live without node_modules
+    #    on the host (the sandbox installs deps at evaluator-run time), and
+    #    `broken` band samples include INTENTIONAL syntax errors per RFC-003.
     format-ts:
       glob: "*.{ts,tsx,js,jsx,mjs,cjs}"
+      exclude:
+        - "evals/task-packs/**"
       run: pnpm exec prettier --write {staged_files} && pnpm exec eslint --fix --no-warn-ignored {staged_files}
       stage_fixed: true
       fail_text: "TS/JS format or lint failed — review changes above and re-commit."
@@ -74,7 +79,12 @@ pre-commit:
     # 5. Full TypeScript typecheck (no auto-fix, just gate).
     #    NOTE: slower than the rest (~10-30s on a populated monorepo).
     #    Move to pre-push if it starts blocking flow.
+    #    Same exclusion as format-ts — evaluation fixtures depend on per-pack
+    #    node_modules installed at evaluator-run time, and `broken` band
+    #    samples have INTENTIONAL syntax errors per RFC-003.
     typecheck:
       glob: "*.{ts,tsx}"
+      exclude:
+        - "evals/task-packs/**"
       run: pnpm exec moon run :typecheck
       fail_text: "TypeScript typecheck failed — see errors above."

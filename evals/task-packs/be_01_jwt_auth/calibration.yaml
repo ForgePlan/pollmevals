@@ -1,3 +1,4 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
 task_id: be_01_jwt_auth
 rubric_version: "1.0"
 gold_scores:
@@ -7,4 +8,7 @@ gold_scores:
   poor: 2.5
   broken: 0.5
 mad_threshold: 1.5
-n_samples_per_level: 10
+n_samples_per_level: 5
+# v0.1 launch baseline: 5 per level (25 total). v0.2 target: 10 per level (50).
+# See RFC-003 § "calibration sample count" amendment + EVID for this pack.
+v0_2_target_per_level: 10

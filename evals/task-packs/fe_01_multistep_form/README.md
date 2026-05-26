@@ -1,3 +1,4 @@
+<!-- source: own-authored 2026-05-26 by gogocat (license: MIT) -->
 # FE-01 — Multi-step Form
 
 ## Task type
