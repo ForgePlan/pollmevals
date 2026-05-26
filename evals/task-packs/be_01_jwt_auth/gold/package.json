@@ -1,0 +1,28 @@
+{
+  "name": "be-01-jwt-auth-gold",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Gold pack for be_01_jwt_auth. Pinned via ADR-007 Tier 1 (own-authored, MIT).",
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run --reporter=json",
+    "typecheck": "tsc --noEmit --strict solution.ts",
+    "lint": "eslint --max-warnings=0 solution.ts"
+  },
+  "dependencies": {
+    "cookie-parser": "1.4.7",
+    "express": "4.21.2",
+    "jsonwebtoken": "9.0.2"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "1.4.9",
+    "@types/express": "4.17.23",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/node": "22.10.5",
+    "@types/supertest": "6.0.3",
+    "supertest": "7.1.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

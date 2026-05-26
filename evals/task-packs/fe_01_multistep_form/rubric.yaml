@@ -1,0 +1,193 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
+# Judge rubric for fe_01_multistep_form — used by JudgePanel under PRD-002.
+#
+# Each criterion is scored 0-10 by every judge. Median per criterion is
+# computed in JudgeAggregation; the final pattern_match score is the mean of
+# criterion medians (per docs/02-methodology/scoring.md).
+#
+# Anchors specify the 0 / 5 / 10 reference points. Judges interpolate.
+# Judges receive this rubric + the candidate output; they do NOT see the
+# gold solution, the calibration labels, the hidden tests, or the candidate's
+# model identity (anonymisation pipeline per docs/04-runbook/07-judge-panel.md).
+
+schema_version: pollmevals.rubric.v1
+task_id: fe_01_multistep_form
+rubric_version: "1.0"
+sourcing: own  # ADR-007 Tier 1
+license:
+  spec: CC-BY-SA-4.0
+  code: MIT
+
+# 6 criteria. Sum of weights = 1.0. These weights produce the per-judge
+# total_score that JudgePanel.aggregate() takes the median of (RFC-002 Slice C).
+criteria:
+
+  correctness:
+    weight: 0.30
+    description: |
+      Does the component implement every hard requirement in the prompt?
+      Three linear steps, Next/Back navigation, validation blocks
+      forward progress, submission produces the four UI states
+      (idle / loading / success / error), draft persistence works across
+      remount, public API matches MultiStepFormProps / FormData verbatim.
+    anchors:
+      0: |
+        Single-page form (no steps) OR Next/Back broken OR allows
+        skipping past invalid step OR submission never resolves.
+        Public API does not match the requested shape.
+      5: |
+        Three steps render and basic navigation works, but one
+        requirement is missed (e.g. no draft persistence, or
+        submission swallows errors silently, or Back loses data).
+      10: |
+        Every hard requirement satisfied. Validation gates forward
+        progress, submission cycles through idle → loading →
+        success/error deterministically, data round-trips through
+        sessionStorage, Back never destroys input. Public API matches
+        verbatim.
+
+  accessibility:
+    weight: 0.25
+    description: |
+      Does the markup pass axe-core (0 serious / critical)? Labels are
+      bound via htmlFor / id. Errors are linked via aria-describedby +
+      aria-invalid. Focus moves to the first control of the new step on
+      transition; focus moves to the first error on blocked submission.
+      A polite aria-live region announces step + outcome. Real <button>
+      and semantic landmarks (<form>, <fieldset>, <legend>) — no
+      div-as-button.
+    anchors:
+      0: |
+        No labels (or label-via-placeholder). div-as-button. No
+        aria-live region. axe-core reports multiple serious or critical
+        violations. Keyboard users cannot complete the form.
+      5: |
+        Labels present and axe is mostly clean, but focus management
+        is missing on step change OR no aria-live announcements
+        OR aria-invalid is set but no aria-describedby links the error
+        message.
+      10: |
+        axe-core 0 serious / 0 critical on every step. Labels bound
+        via htmlFor. Errors linked with aria-describedby +
+        aria-invalid="true". Focus deterministic on step change
+        AND on validation failure. Polite live region announces
+        step transitions and submission outcome. Semantic landmarks
+        used throughout.
+
+  type_safety:
+    weight: 0.15
+    description: |
+      Strict mode compliance. No `any`. No `as` casts on user-provided
+      values. Discriminated unions for UI state (idle / loading /
+      success / error). FormData / StepKey types narrowed before use.
+      Event handler signatures match React's typed events.
+    anchors:
+      0: |
+        Liberal `any` use; `as unknown as Whatever` casts on form
+        events; strict mode disabled or many ts-ignore comments.
+        State stored as `Record<string, any>`.
+      5: |
+        Strict mode on, but UI state is a single string (no
+        discrimination on error/success payload); one or two unsafe
+        casts on JSON.parse output from sessionStorage.
+      10: |
+        Zero `any`, zero `as` casts on external input. JSON.parse
+        result narrowed via type guard. Discriminated union for UI
+        state with payloads (error message, success metadata). Public
+        API types match prompt verbatim. No ts-ignore.
+
+  ux_states:
+    weight: 0.15
+    description: |
+      Are the four UI states (idle / loading / error / success)
+      explicit and deterministic? Submit button reflects loading
+      (aria-busy + disabled). Errors are recoverable (form returns
+      to idle with data preserved). Empty / pristine states render
+      without errors. Success state cannot be left without explicit
+      reset.
+    anchors:
+      0: |
+        Only one visible state (form always looks the same). No
+        loading indicator. Errors clear the form on the next render.
+        Submit button can be clicked while a submit is in flight.
+      5: |
+        Loading and success render distinctly, but error state is
+        rendered as a console.error or alert(); the form recovers
+        but without aria-live announcement. Submit button disables
+        but lacks aria-busy.
+      10: |
+        Four distinct UI states with clear visual + a11y affordances.
+        Loading: aria-busy + disabled submit. Success: confirmation
+        panel + announcement. Error: inline message + announcement +
+        form preserved. Idle: clean pristine. State machine is a
+        discriminated union — no impossible state combinations.
+
+  code_clarity:
+    weight: 0.10
+    description: |
+      Reads like production React code. Components are short and
+      single-purpose. Cyclomatic complexity ≤ 6 per function. Variable
+      names communicate intent. No narration comments. Custom hooks
+      extract reusable logic (e.g. useSessionStorage, useStepState).
+    anchors:
+      0: |
+        One 300-line component. Variables named `t`, `x`, `data`.
+        Comments narrate every JSX node. Effects with stale-closure
+        bugs that someone "fixed" by adding eslint-disable.
+      5: |
+        Mostly readable, but one component over 100 lines doing
+        several things. A few names need work (`handleClick`,
+        `process`). One useEffect with dependencies the linter would
+        warn about.
+      10: |
+        Each function ≤ 60 lines, CC ≤ 6, one responsibility. Names
+        map to the domain (advanceStep, hydrateDraft,
+        announcePolitely). Custom hooks isolate side effects. Zero
+        narration comments.
+
+  test_alignment:
+    weight: 0.05
+    description: |
+      Does the code shape suggest testability? Pure helpers (validation
+      functions, sessionStorage adapters) exported where possible.
+      Side effects cleanly separated from rendering. Props allow
+      dependency injection for the submit handler so hidden tests
+      can pass a fake.
+    anchors:
+      0: |
+        Hardcoded fetch() call inside the component. Validation logic
+        inlined in JSX (no testable helper). Untestable in isolation.
+      5: |
+        Submit handler is a prop but validation helpers are private;
+        tests must drive validation through the full UI. State is
+        accessible only via DOM.
+      10: |
+        Pure validation helpers exported. onSubmit is a prop (DI).
+        sessionStorage access wrapped in a hook injectable via prop
+        or context (so hidden tests can stub it). State machine
+        observable through stable testid / role attributes.
+
+# Output JSON shape the judge must produce. JudgePanel.score() expects this
+# exact key set per RFC-002 Slice B.
+output_schema:
+  rubric_scores:
+    correctness: 0..10
+    accessibility: 0..10
+    type_safety: 0..10
+    ux_states: 0..10
+    code_clarity: 0..10
+    test_alignment: 0..10
+  total_score: 0..10  # weighted sum per criteria.weight above
+  reasoning: |
+    Free-text explanation, 200 chars max per criterion. Cited evidence
+    from the candidate output (line numbers OK if line-numbered).
+
+# Anonymisation contract per docs/04-runbook/07-judge-panel.md. The judge
+# never sees these strings (Anti-SLOP Reviewer Agent strips them before
+# the prompt is rendered to the judge).
+anonymisation_strip:
+  - "/\\bas an AI\\b/i"
+  - "/\\bI'm Claude\\b/i"
+  - "/\\bI'm GPT\\b/i"
+  - "/\\bI'm Gemini\\b/i"
+  - "/Anthropic|OpenAI|Google DeepMind/i"

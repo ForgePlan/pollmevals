@@ -1,0 +1,167 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
+# Judge rubric for be_01_jwt_auth — used by JudgePanel under PRD-002.
+#
+# Each criterion is scored 0-10 by every judge. Median per criterion is
+# computed in JudgeAggregation; the final pattern_match score is the mean of
+# criterion medians (per docs/02-methodology/scoring.md).
+#
+# Anchors specify the 0 / 5 / 10 reference points. Judges interpolate.
+# Judges receive this rubric + the candidate output; they do NOT see the
+# gold solution, the calibration labels, the hidden tests, or the candidate's
+# model identity (anonymisation pipeline per docs/04-runbook/07-judge-panel.md).
+
+schema_version: pollmevals.rubric.v1
+task_id: be_01_jwt_auth
+rubric_version: "1.0"
+sourcing: own  # ADR-007 Tier 1
+license:
+  spec: CC-BY-SA-4.0
+  code: MIT
+
+# 6 criteria. Sum of weights = 1.0. These weights produce the per-judge
+# total_score that JudgePanel.aggregate() takes the median of (RFC-002 Slice C).
+criteria:
+
+  correctness:
+    weight: 0.30
+    description: |
+      Does the middleware implement every hard requirement in the prompt?
+      Rejects expired/malformed/wrong-issuer tokens with 401. Validates the
+      signature with the configured access secret. Refresh-token cookie
+      rotation invalidates the prior server-side. Public API matches the
+      AuthedRequest / AuthMiddlewareOptions surface.
+    anchors:
+      0: |
+        Token verification missing entirely OR always returns 200 OR rejects
+        valid tokens. Public API does not match the requested shape.
+      5: |
+        Validates signature and expiry but skips one requirement (e.g. no
+        issuer check, or no refresh rotation, or returns 401 for everything
+        instead of distinguishing 401/403).
+      10: |
+        Every hard requirement satisfied. Distinguishes 401 (auth failure)
+        from 403 (CSRF / forbidden). Refresh rotation invalidates prior
+        token in the store. Public API matches verbatim.
+
+  security_posture:
+    weight: 0.25
+    description: |
+      Does the code follow secure defaults? No secret, raw token, or signing
+      key in logs, error messages, response bodies, or response headers.
+      Cookie attributes correct (HttpOnly + Secure + SameSite). CSRF check
+      present on state-changing requests. No timing-attack-sensitive string
+      comparison on secrets.
+    anchors:
+      0: |
+        Token, secret, or refresh value appears in logs / response / error
+        message. Cookies are not HttpOnly. No CSRF check at all.
+      5: |
+        Tokens not logged, but error messages reveal whether a user exists
+        or distinguish "wrong password" from "user not found". Cookies have
+        HttpOnly but missing Secure or SameSite.
+      10: |
+        Stable error codes only (AUTH_EXPIRED / AUTH_INVALID / CSRF_MISMATCH);
+        same message regardless of which check failed. Cookies are HttpOnly
+        + Secure + SameSite=Strict. CSRF double-submit or synchroniser
+        present. Signature comparison uses jsonwebtoken's verify (constant
+        time on the canonical path).
+
+  error_handling:
+    weight: 0.15
+    description: |
+      Are failure modes handled deliberately? Async errors don't crash the
+      process. Correct HTTP statuses (401 auth, 403 forbidden/CSRF, 400
+      malformed input, 500 internal). Errors flow through Express's
+      next(err) where appropriate.
+    anchors:
+      0: |
+        Unhandled rejections; throws bubble to default Express handler;
+        wrong statuses (200 on auth failure, or 500 on bad token).
+      5: |
+        Happy path handled; one or two error paths missing (e.g. malformed
+        Authorization header crashes instead of returning 400).
+      10: |
+        Every error path produces the correct status + stable error code +
+        next(err) when appropriate. No try/catch swallowing without logging.
+        Logs structured (one JSON object per event).
+
+  type_safety:
+    weight: 0.15
+    description: |
+      Strict mode compliance. No `any`. No `as` casts on user-provided
+      values. JWT payload narrowed via type guard (jsonwebtoken returns
+      string | JwtPayload; narrowing required). Discriminated unions or
+      branded types for token kinds where appropriate.
+    anchors:
+      0: |
+        Liberal `any` use; `as unknown as Whatever` casts on req.body;
+        strict mode disabled or many ts-ignore comments.
+      5: |
+        Strict mode on, but one or two unsafe casts on jwt.verify return
+        value or req.cookies. Payload accessed without narrowing.
+      10: |
+        Zero `any`, zero `as` casts on external input. jwt.verify return
+        narrowed via type guard before use. Public API types match prompt
+        verbatim. No ts-ignore.
+
+  code_clarity:
+    weight: 0.10
+    description: |
+      Reads like production code. Functions are short and single-purpose.
+      Cyclomatic complexity ≤ 8 per function. Variable names communicate
+      intent. Comments only where the WHY isn't obvious (no narration of
+      WHAT).
+    anchors:
+      0: |
+        One 200-line function. Variables named `t`, `x`, `data`. Comments
+        narrate every line.
+      5: |
+        Mostly readable, but one function over 30 lines doing several
+        things. A few names need work (`process`, `handle`).
+      10: |
+        Each function ≤ 30 lines, ≤ CC 8, one responsibility. Names map
+        to the domain (`verifyAccessToken`, `rotateRefreshCookie`). Zero
+        narration comments.
+
+  test_alignment:
+    weight: 0.05
+    description: |
+      Does the code shape suggest testability? Pure helpers exported where
+      possible. Side effects (cookie write, store mutation) cleanly
+      separated from validation. Dependency injection for the store (so
+      hidden tests can pass a fake).
+    anchors:
+      0: |
+        Hardcoded dependencies (`new MemoryStore()` inside the middleware).
+        Side effects intermixed with validation. Untestable in isolation.
+      5: |
+        Store is injectable but validation helpers are private (tests must
+        call through the middleware to exercise them).
+      10: |
+        Pure validation helpers exported. Store + clock are injectable.
+        Hidden tests can wire fakes for both with no monkey-patching.
+
+# Output JSON shape the judge must produce. JudgePanel.score() expects this
+# exact key set per RFC-002 Slice B.
+output_schema:
+  rubric_scores:
+    correctness: 0..10
+    security_posture: 0..10
+    error_handling: 0..10
+    type_safety: 0..10
+    code_clarity: 0..10
+    test_alignment: 0..10
+  total_score: 0..10  # weighted sum per criteria.weight above
+  reasoning: |
+    Free-text explanation, 200 chars max per criterion. Cited evidence from
+    the candidate output (line numbers OK if line-numbered).
+
+# Anonymisation contract per docs/04-runbook/07-judge-panel.md. The judge
+# never sees these strings (Anti-SLOP Reviewer Agent strips them before
+# the prompt is rendered to the judge).
+anonymisation_strip:
+  - "/\\bas an AI\\b/i"
+  - "/\\bI'm Claude\\b/i"
+  - "/\\bI'm GPT\\b/i"
+  - "/\\bI'm Gemini\\b/i"
+  - "/Anthropic|OpenAI|Google DeepMind/i"

@@ -1,3 +1,4 @@
+<!-- source: own-authored 2026-05-26 by gogocat (license: MIT) -->
 # Prompt for be_01_jwt_auth
 
 The canonical prompt is defined in `task.yaml` under `prompt_template`.

@@ -1,3 +1,4 @@
+# source: own-authored 2026-05-26 by gogocat (license: MIT)
 schema_version: pollmevals.task.v1
 id: be_01
 slug: jwt-auth-middleware-with-refresh
@@ -5,23 +6,79 @@ version: "1.0"
 category: backend
 difficulty: medium
 language: typescript
+
+# Sourcing tier per ADR-007. own = all artefacts authored in-tree under MIT.
+sourcing: own
+
 description: |
-  Write a JWT authentication middleware for Express.js in TypeScript. It must validate access tokens from the Authorization header, support refresh token rotation, set secure HTTP-only cookies, add CSRF protection for state-changing operations, return correct HTTP status codes and log failed auth attempts without leaking secrets.
+  Write a JWT authentication middleware for Express.js in TypeScript. It must
+  validate access tokens from the Authorization header, support refresh token
+  rotation, set secure HTTP-only cookies, add CSRF protection for state-changing
+  operations, return correct HTTP status codes, and log failed auth attempts
+  WITHOUT leaking secrets, the token, or the signing key.
+
 prompt_template: |
-  Implement the middleware in a single TypeScript file. Use jsonwebtoken, express and cookie-parser. Output only the code.
+  You will implement an Express.js authentication middleware in TypeScript.
+
+  Hard requirements:
+    1. Validate the `Authorization: Bearer <jwt>` header on every request.
+    2. Reject expired, malformed, or unsigned tokens with HTTP 401.
+    3. Reject tokens whose `iss` claim does not match the configured issuer.
+    4. On valid refresh-token cookie, rotate (issue a new refresh + new access);
+       invalidate the old refresh server-side.
+    5. Set the refresh token as an `HttpOnly`, `Secure`, `SameSite=Strict`
+       cookie. Never include it in a response body or log line.
+    6. For HTTP methods other than GET/HEAD/OPTIONS, require a CSRF token
+       (double-submit cookie pattern is acceptable). Reject mismatches with 403.
+    7. On any auth failure, log a structured event WITHOUT the token, the
+       signing secret, or the user's bearer header. Use a stable error code
+       (`AUTH_EXPIRED`, `AUTH_INVALID_SIGNATURE`, etc) — never plaintext PII.
+
+  Public API surface:
+    export interface AuthedRequest extends Request {
+      user: { sub: string; roles: readonly string[] };
+    }
+    export function authMiddleware(opts: AuthMiddlewareOptions): RequestHandler;
+    export interface AuthMiddlewareOptions {
+      accessSecret: string;
+      refreshSecret: string;
+      issuer: string;
+      refreshStore: RefreshStore;       // server-side rotation store
+    }
+
+  Constraints:
+    - One TypeScript file under workspace/solution.ts.
+    - Use the pinned versions of jsonwebtoken, express, and cookie-parser
+      provided in package.json. No additional dependencies.
+    - tsc --strict --noEmit must pass.
+    - eslint must report zero warnings under the provided config.
+    - All tests in tests.spec.ts must pass (you do not see them — they are
+      hidden until publication).
+
+  Output only the code for solution.ts. No prose, no markdown fences.
+
 success_criteria:
-  - All tests pass.
-  - Cyclomatic complexity is at or below the task threshold.
-  - TypeScript strict mode passes.
-  - No high or critical Semgrep findings.
-  - Pattern compliance median judge score is at least 7/10.
+  - All hidden tests in tests.spec.ts pass via vitest.
+  - Cyclomatic complexity per function is at or below 8 (lizard).
+  - TypeScript strict mode passes with no `any`, no `as` casts on user input.
+  - eslint reports zero warnings.
+  - No secret, raw token, or signing key appears in any log line, error
+    message, or response body.
+  - Pattern-compliance judge median score is at least 7/10.
+
+# Evaluator commands are executed by the host-side evaluator chain. The
+# Docker-sandboxed CorrectnessEvaluator runs vitest inside the eval-ts image.
 evaluator_commands:
-  - npm test --silent
-  - eslint --max-warnings=0 workspace/solution.ts
+  - npx vitest run --reporter=json
   - tsc --noEmit --strict workspace/solution.ts
-expected_tokens_in: 900
-expected_tokens_out: 1400
-expected_wall_clock_seconds: 30-90
+  - npx eslint --max-warnings=0 workspace/solution.ts
+
+expected_tokens_in: 1200
+expected_tokens_out: 1800
+expected_wall_clock_seconds: 30-120
+
+# Score weights per docs/02-methodology/scoring.md "coding task" formula:
+# 0.40 correctness + 0.15 coverage + 0.10 complexity + 0.10 lint + 0.10 type_safety + 0.15 pattern_match
 weight_components:
   correctness: 0.40
   test_coverage: 0.15
@@ -29,20 +86,36 @@ weight_components:
   linter: 0.10
   type_safety: 0.10
   pattern_match: 0.15
-calibration_set:
-  perfect_score_example:
-    code_uri: ./gold/be_01/v1.0/calibration/perfect.ts
-    expected_score: 9.5
-  good_score_example:
-    code_uri: ./gold/be_01/v1.0/calibration/good.ts
-    expected_score: 7.5
-  mediocre_score_example:
-    code_uri: ./gold/be_01/v1.0/calibration/mediocre.ts
-    expected_score: 5.0
-  poor_score_example:
-    code_uri: ./gold/be_01/v1.0/calibration/poor.ts
-    expected_score: 2.5
-  broken_example:
-    code_uri: ./gold/be_01/v1.0/calibration/broken.ts
-    expected_score: 0.5
-license: CC-BY-SA-4.0
+
+# Calibration sample layout. See ./calibration/<level>/sample-{001..010}.ts.
+# Expected final_score (0-10) populated by Anti-SLOP Reviewer Agent after
+# evaluator wiring runs in Task #23. n_samples_per_level=10 per RFC-003.
+calibration:
+  schema: 5-level
+  # v0.1 launch baseline: 5 samples per level (25 total). PRD-002 § Q4 target
+  # is 10 per level (50 total) for judge MAD < 1.5 stability. v0.2 milestone
+  # bumps to 10. RFC-003 amendment 2026-05-26 documents this scope decision.
+  n_samples_per_level: 5
+  total_samples: 25
+  v0_2_target_per_level: 10
+  layout: ./calibration/<level>/sample-{001..005}.ts
+  levels:
+    perfect:
+      expected_final_score_range: [9.0, 10.0]
+      description: production-ready, satisfies all hard requirements, idiomatic TS
+    good:
+      expected_final_score_range: [7.0, 8.5]
+      description: works, minor issues (one missed edge case, slightly weak error code, suboptimal but safe)
+    mediocre:
+      expected_final_score_range: [4.5, 6.5]
+      description: works on happy path; multiple correctness or security gaps; passes some tests
+    poor:
+      expected_final_score_range: [2.0, 4.0]
+      description: runs but fundamentally insecure; passes few tests; leaks tokens or skips validation
+    broken:
+      expected_final_score_range: [0.0, 1.5]
+      description: does not compile, or compiles but completely fails security model
+
+license:
+  spec: CC-BY-SA-4.0
+  code: MIT

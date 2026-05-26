@@ -1,3 +1,4 @@
+<!-- source: own-authored 2026-05-26 by gogocat (license: MIT) -->
 # BE-01 — JWT Auth Middleware
 
 ## Task type
