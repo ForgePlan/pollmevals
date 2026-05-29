@@ -14,6 +14,9 @@
 .forgeplan/.anomalies-journal.jsonl.tmp
 # === end forgeplan section ===
 
+# === Claude Code agent worktrees (ephemeral, per-agent scratch) ===
+.claude/worktrees/
+
 # === macOS ===
 .DS_Store
 
