@@ -11,7 +11,7 @@ links:
   relation: refines
 - target: SPEC-001
   relation: informs
-status: draft
+status: active
 title: Atomic binary requirements[] — task schema, evaluator contract, and migration of be_01/fe_01/doc_01
 ---
 
@@ -387,4 +387,10 @@ What the downstream `tester` agent should target (hooks, not cases). The first t
 - `docs/02-methodology/task-lifecycle.md`, `docs/adr/0002-run-immutability.md` — task-version bump policy.
 - `AfterQuery/App-Bench` (Hugging Face) — external reference benchmark; **citation only; no content imported** (license unspecified).
 - Metrics in this RFC (score-distribution shift, α/MAD impact, calibration baselines) are **TBD** — they belong in an EVID artifact from the first post-migration calibration session, not invented here.
+
+
+
+
+
+
 

@@ -13,7 +13,7 @@ links:
   relation: informs
 - target: PRD-002
   relation: informs
-status: draft
+status: active
 title: Atomic binary requirements[] feed scoring components, not replace them
 ---
 
@@ -205,5 +205,8 @@ No fixed `valid_until` date — the decision is event-triggered, not time-trigge
 - `packages/contracts/schemas/` + `apps/eval-core-py/src/contracts/` — where `requirements[]` and `requirement_results[]` land.
 - FPF/ADI cycle (H1-H4) — decision source of record (supplied by orchestrator; `forgeplan_reason RFC-003` corroborates the direction).
 - Metrics in this ADR (score-distribution shift, α/MAD impact) are **TBD** — they belong in an EVID artifact produced by the first post-migration calibration session, not invented here.
+
+
+
 
 
