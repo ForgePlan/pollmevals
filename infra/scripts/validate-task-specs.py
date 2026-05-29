@@ -11,7 +11,7 @@ does not exist in the repository (orphan import, GitHub issue #1). Rewritten
 in this commit to use pure stdlib + pyyaml + jsonschema, removing the phantom
 dependency entirely.
 
-RFC-004 (Slice 2) extended this script with requirements[] validation rules:
+RFC-004 (Slice 1) extended this script with requirements[] validation rules:
   MUST rules (hard errors — block the pack):
     1. Unique requirement ids.
     2. maps_to ∈ allowed component set for the task category.
@@ -63,7 +63,7 @@ from typing import Final
 # Dependency guard — give an actionable error before any other import fails.
 # ---------------------------------------------------------------------------
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 except ImportError:  # pragma: no cover
     print(
         "ERROR: pyyaml is not installed.\n"
@@ -75,7 +75,7 @@ except ImportError:  # pragma: no cover
     sys.exit(1)
 
 try:
-    from jsonschema import ValidationError, validate  # type: ignore[import-untyped]
+    from jsonschema import ValidationError, validate
 except ImportError:  # pragma: no cover
     print(
         "ERROR: jsonschema is not installed.\n"
@@ -125,9 +125,7 @@ _JUDGE_ONLY_CRITERIA: Final[frozenset[str]] = frozenset(
 # and is NOT included in the allowed set; security requirements map to
 # "correctness" until the proposal is formally adopted.
 _AUTO_ALLOWED: Final[dict[str, frozenset[str]]] = {
-    "backend": frozenset(
-        {"correctness", "test_coverage", "complexity", "linter", "type_safety"}
-    ),
+    "backend": frozenset({"correctness", "test_coverage", "complexity", "linter", "type_safety"}),
     "frontend": frozenset(
         {"correctness", "accessibility", "test_coverage", "type_safety", "ux_states"}
     ),
@@ -179,7 +177,8 @@ def _parse_test_requirement_tags(test_file: Path) -> set[str]:
     """
     try:
         content = test_file.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        print(f"WARNING: could not read test file {test_file}: {exc}", file=sys.stderr)
         return set()
     matches = _REQUIREMENT_TAG_RE.findall(content)
     return {f"R{n}" for n in matches}
@@ -190,6 +189,142 @@ def _parse_test_requirement_tags(test_file: Path) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
+def _check_unique_ids(reqs: list[dict[str, object]], rel: str) -> list[str]:
+    """MUST-1 — requirement ids must be unique within a task."""
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for req in reqs:
+        rid = str(req.get("id", ""))
+        if rid in seen:
+            duplicates.append(rid)
+        seen.add(rid)
+    if duplicates:
+        return [f"  ✗ {rel}: [MUST-1] duplicate requirement ids: {sorted(set(duplicates))}"]
+    return []
+
+
+def _check_maps_to(reqs: list[dict[str, object]], category: str, rel: str) -> list[str]:
+    """MUST-2 / MUST-3 — auto requirements map to an allowed deterministic component.
+
+    One message per offending requirement: MUST-3 is the specific judge-only case,
+    MUST-2 the generic out-of-allowed-set case.
+    """
+    auto_allowed = _AUTO_ALLOWED.get(category, frozenset())
+    errors: list[str] = []
+    for req in reqs:
+        if req.get("check_type") != "auto":
+            continue
+        maps_to = str(req.get("maps_to", ""))
+        if maps_to in _JUDGE_ONLY_CRITERIA:
+            errors.append(
+                f"  ✗ {rel}: [MUST-3] requirement {req.get('id')!r}: "
+                f"check_type='auto' cannot map to judge-only criterion {maps_to!r}. "
+                f"Change check_type to 'judge' or change maps_to to a deterministic component."
+            )
+        elif maps_to not in auto_allowed:
+            errors.append(
+                f"  ✗ {rel}: [MUST-2] requirement {req.get('id')!r}: "
+                f"maps_to={maps_to!r} is not in the allowed auto set for "
+                f"category {category!r}: {sorted(auto_allowed)}"
+            )
+    return errors
+
+
+def _check_prompt_refs(reqs: list[dict[str, object]], prompt_template: str, rel: str) -> list[str]:
+    """MUST-4 — every prompt_ref resolves to a numbered item in prompt_template.
+
+    A declared prompt_ref against a template with NO numbered items is an error
+    (guards the empty-set silent-pass defect), not a silent pass.
+    """
+    numbered_items = _parse_prompt_numbered_items(prompt_template)
+    errors: list[str] = []
+    for req in reqs:
+        prompt_ref = req.get("prompt_ref")
+        if not isinstance(prompt_ref, int):
+            continue
+        if not numbered_items:
+            errors.append(
+                f"  ✗ {rel}: [MUST-4] requirement {req.get('id')!r}: "
+                f"prompt_ref={prompt_ref} declared but prompt_template has no numbered "
+                f"items (expected a 'N. ...' list to reference)."
+            )
+        elif prompt_ref not in numbered_items:
+            errors.append(
+                f"  ✗ {rel}: [MUST-4] requirement {req.get('id')!r}: "
+                f"prompt_ref={prompt_ref} does not match any numbered item in prompt_template "
+                f"(found items: {sorted(numbered_items)})"
+            )
+    return errors
+
+
+def _check_weight_sum(weight_components: dict[str, object], rel: str) -> list[str]:
+    """MUST-5 — Σ weight_components == 1.0 (tolerance ±1e-6)."""
+    if not weight_components:
+        return []
+    weight_values = [v for v in weight_components.values() if isinstance(v, (int, float))]
+    if not weight_values:
+        return []
+    weight_sum = sum(weight_values)
+    if abs(weight_sum - 1.0) > _WEIGHT_SUM_TOLERANCE:
+        return [
+            f"  ✗ {rel}: [MUST-5] Σ weight_components = {weight_sum:.8f} "
+            f"(expected 1.0 ± {_WEIGHT_SUM_TOLERANCE}). "
+            f"Weights: {dict(weight_components)}"
+        ]
+    return []
+
+
+def _check_should_warnings(
+    reqs: list[dict[str, object]], task_pack_dir: Path, rel: str
+) -> list[str]:
+    """SHOULD-6 (atomic-item count) + SHOULD-7 (auto-req ↔ test-tag 1:1 coverage)."""
+    warnings: list[str] = []
+
+    total_reqs = len(reqs)
+    if total_reqs < _MIN_REQUIREMENTS_WARN:
+        warnings.append(
+            f"  ⚠ {rel}: [SHOULD-6] only {total_reqs} requirement items "
+            f"(target ≥ {_MIN_REQUIREMENTS_WARN}). "
+            f"Consider adding more atomic items for better auditing."
+        )
+
+    auto_ids = {str(r.get("id", "")) for r in reqs if r.get("check_type") == "auto"}
+    if not auto_ids:
+        return warnings
+
+    test_files = list(task_pack_dir.glob("gold/tests.spec.*"))
+    test_files.extend(task_pack_dir.glob("gold/tests_*.py"))
+    test_files.extend(task_pack_dir.glob("gold/test_*.py"))
+    if not test_files:
+        return warnings
+
+    tagged_ids: set[str] = set()
+    for tf in test_files:
+        tagged_ids.update(_parse_test_requirement_tags(tf))
+
+    if not tagged_ids:
+        warnings.append(
+            f"  ⚠ {rel}: [SHOULD-7] {len(auto_ids)} auto requirements defined "
+            f"but no [Rn] tags found in {[str(tf.name) for tf in test_files]}. "
+            f"Tag each test title with its requirement id."
+        )
+        return warnings
+
+    untagged = auto_ids - tagged_ids
+    unmatched = tagged_ids - auto_ids
+    if untagged:
+        warnings.append(
+            f"  ⚠ {rel}: [SHOULD-7] auto requirements with no matching "
+            f"test tag [Rn]: {sorted(untagged)}"
+        )
+    if unmatched:
+        warnings.append(
+            f"  ⚠ {rel}: [SHOULD-7] test tags [Rn] with no matching "
+            f"auto requirement: {sorted(unmatched)}"
+        )
+    return warnings
+
+
 def _validate_requirements(
     data: dict[str, object],
     task_pack_dir: Path,
@@ -197,149 +332,33 @@ def _validate_requirements(
 ) -> tuple[bool, list[str]]:
     """Validate the RFC-004 requirements[] rules for a single task.
 
-    Parameters
-    ----------
-    data:
-        The parsed YAML dict for the task.
-    task_pack_dir:
-        Directory of the task pack (used for SHOULD coverage check).
-    rel:
-        Relative path string used in error messages.
-
-    Returns
-    -------
-    tuple[bool, list[str]]
-        (is_valid, list_of_messages) where each message is a pre-formatted
-        error or warning string ready to print.  is_valid is False if any
-        MUST rule was violated; warnings do not affect the bool.
+    Returns ``(is_valid, messages)``. ``is_valid`` is False if any MUST rule was
+    violated; SHOULD warnings are included in ``messages`` but do not affect it.
+    A task with no ``requirements`` field (old pack) skips every rule.
     """
     requirements = data.get("requirements")
     if requirements is None:
-        # No requirements field — old pack, all rules silently skip.
         return True, []
-
     if not isinstance(requirements, list):
         return False, [f"  ✗ {rel}: requirements must be a list"]
 
-    messages: list[str] = []
-    is_valid = True
-
-    # Cast to typed list (schema already validated item shapes).
-    reqs: list[dict[str, object]] = [
-        r for r in requirements if isinstance(r, dict)
-    ]
-
+    # Schema already validated item shapes; keep only dict items defensively.
+    reqs: list[dict[str, object]] = [r for r in requirements if isinstance(r, dict)]
     category = str(data.get("category", "")).lower()
-    weight_components = data.get("weight_components", {})
-    if not isinstance(weight_components, dict):
-        weight_components = {}
+    weight_components_raw = data.get("weight_components", {})
+    weight_components: dict[str, object] = (
+        weight_components_raw if isinstance(weight_components_raw, dict) else {}
+    )
     prompt_template = str(data.get("prompt_template", ""))
 
-    # MUST 1 — unique requirement ids.
-    ids: list[str] = [str(r.get("id", "")) for r in reqs]
-    seen_ids: set[str] = set()
-    duplicate_ids: list[str] = []
-    for rid in ids:
-        if rid in seen_ids:
-            duplicate_ids.append(rid)
-        seen_ids.add(rid)
-    if duplicate_ids:
-        is_valid = False
-        messages.append(
-            f"  ✗ {rel}: [MUST-1] duplicate requirement ids: {sorted(set(duplicate_ids))}"
-        )
+    errors: list[str] = []
+    errors += _check_unique_ids(reqs, rel)
+    errors += _check_maps_to(reqs, category, rel)
+    errors += _check_prompt_refs(reqs, prompt_template, rel)
+    errors += _check_weight_sum(weight_components, rel)
+    warnings = _check_should_warnings(reqs, task_pack_dir, rel)
 
-    # MUST 2 — maps_to ∈ allowed set for the category (auto requirements only).
-    auto_allowed = _AUTO_ALLOWED.get(category, frozenset())
-    for req in reqs:
-        if req.get("check_type") == "auto":
-            maps_to = str(req.get("maps_to", ""))
-            if maps_to not in auto_allowed:
-                is_valid = False
-                messages.append(
-                    f"  ✗ {rel}: [MUST-2] requirement {req.get('id')!r}: "
-                    f"maps_to={maps_to!r} is not in the allowed auto set for "
-                    f"category {category!r}: {sorted(auto_allowed)}"
-                )
-
-    # MUST 3 — auto requirements must NOT map to judge-only criteria.
-    for req in reqs:
-        if req.get("check_type") == "auto":
-            maps_to = str(req.get("maps_to", ""))
-            if maps_to in _JUDGE_ONLY_CRITERIA:
-                is_valid = False
-                messages.append(
-                    f"  ✗ {rel}: [MUST-3] requirement {req.get('id')!r}: "
-                    f"check_type='auto' cannot map to judge-only criterion {maps_to!r}. "
-                    f"Change check_type to 'judge' or change maps_to to a deterministic component."
-                )
-
-    # MUST 4 — prompt_ref must resolve to a real numbered item in prompt_template.
-    numbered_items = _parse_prompt_numbered_items(prompt_template)
-    for req in reqs:
-        prompt_ref = req.get("prompt_ref")
-        if isinstance(prompt_ref, int) and numbered_items and prompt_ref not in numbered_items:
-            is_valid = False
-            messages.append(
-                f"  ✗ {rel}: [MUST-4] requirement {req.get('id')!r}: "
-                f"prompt_ref={prompt_ref} does not match any numbered item in prompt_template "
-                f"(found items: {sorted(numbered_items)})"
-            )
-
-    # MUST 5 — Σ weight_components == 1.0 (tolerance ±1e-6).
-    if weight_components:
-        weight_values = [v for v in weight_components.values() if isinstance(v, (int, float))]
-        if weight_values:
-            weight_sum = sum(weight_values)
-            if abs(weight_sum - 1.0) > _WEIGHT_SUM_TOLERANCE:
-                is_valid = False
-                messages.append(
-                    f"  ✗ {rel}: [MUST-5] Σ weight_components = {weight_sum:.8f} "
-                    f"(expected 1.0 ± {_WEIGHT_SUM_TOLERANCE}). "
-                    f"Weights: {dict(weight_components)}"
-                )
-
-    # SHOULD 6 — ≥ 20 requirements (warn, do not block).
-    total_reqs = len(reqs)
-    if total_reqs < _MIN_REQUIREMENTS_WARN:
-        messages.append(
-            f"  ⚠ {rel}: [SHOULD-6] only {total_reqs} requirement items "
-            f"(target ≥ {_MIN_REQUIREMENTS_WARN}). "
-            f"Consider adding more atomic items for better auditing."
-        )
-
-    # SHOULD 7 — 1:1 coverage between auto requirements and tagged hidden tests.
-    auto_ids = {str(r.get("id", "")) for r in reqs if r.get("check_type") == "auto"}
-    if auto_ids:
-        test_files = list(task_pack_dir.glob("gold/tests.spec.*"))
-        test_files.extend(task_pack_dir.glob("gold/tests_*.py"))
-        test_files.extend(task_pack_dir.glob("gold/test_*.py"))
-        if test_files:
-            tagged_ids: set[str] = set()
-            for tf in test_files:
-                tagged_ids.update(_parse_test_requirement_tags(tf))
-
-            if tagged_ids:
-                untagged = auto_ids - tagged_ids
-                unmatched = tagged_ids - auto_ids
-                if untagged:
-                    messages.append(
-                        f"  ⚠ {rel}: [SHOULD-7] auto requirements with no matching "
-                        f"test tag [Rn]: {sorted(untagged)}"
-                    )
-                if unmatched:
-                    messages.append(
-                        f"  ⚠ {rel}: [SHOULD-7] test tags [Rn] with no matching "
-                        f"auto requirement: {sorted(unmatched)}"
-                    )
-            elif len(auto_ids) > 0:
-                messages.append(
-                    f"  ⚠ {rel}: [SHOULD-7] {len(auto_ids)} auto requirements defined "
-                    f"but no [Rn] tags found in {[str(tf.name) for tf in test_files]}. "
-                    f"Tag each test title with its requirement id."
-                )
-
-    return is_valid, messages
+    return len(errors) == 0, errors + warnings
 
 
 # ---------------------------------------------------------------------------
