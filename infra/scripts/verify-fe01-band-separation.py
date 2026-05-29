@@ -49,6 +49,15 @@ CALIBRATION = REPO_ROOT / "evals/task-packs/fe_01_multistep_form/calibration"
 ARTIFACTS = REPO_ROOT / "artifacts/local/step3-eval-verify/fe_01"
 TASK_ID = "fe_01_multistep_form"
 
+# Source node_modules tree for the mounted workspace. Defaults to the gold
+# pack's node_modules (host platform). Override with FE01_NODE_MODULES to point
+# at a Linux-built tree when running on a non-Linux host: the sandbox image is
+# linux/musl, so macOS-built native deps (rollup/esbuild) fail with
+# MODULE_NOT_FOUND inside the container. Build a Linux tree with e.g.
+#   docker run --rm -v "$PWD/build:/work" node:22.18-alpine \
+#     sh -c "cd /work && npm install"  # against the pack's package.json+lock
+NODE_MODULES_SRC = pathlib.Path(os.environ.get("FE01_NODE_MODULES", str(GOLD / "node_modules")))
+
 BANDS = ["perfect", "good", "mediocre", "poor", "broken"]
 
 # Primary gates from task spec comments:
@@ -82,7 +91,7 @@ def _copy_node_modules_shared(tmp_root: pathlib.Path) -> pathlib.Path:
     if not shared.exists():
         try:
             shutil.copytree(
-                GOLD / "node_modules",
+                NODE_MODULES_SRC,
                 shared,
                 symlinks=True,
                 copy_function=os.link,
