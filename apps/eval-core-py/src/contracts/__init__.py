@@ -3,6 +3,7 @@
 Public API — import from here, not from sub-modules:
 
     from contracts import Manifest, RunStatus, EvalRow, ArtifactRef, ...
+    from contracts import TaskRequirement, RequirementResult  # RFC-004
 """
 
 from .aggregates import CountsByStatus, RunAggregates
@@ -18,6 +19,7 @@ from .manifest import (
     RunType,
 )
 from .pins import ModelPin, PricingSnapshot, StackPin, TaskPin
+from .task import RequirementResult, TaskRequirement
 
 __all__ = [
     "METHODOLOGY_VERSION_V0_1_0",
@@ -38,9 +40,11 @@ __all__ = [
     "PricingSnapshot",
     "ProbeResult",
     "Region",
+    "RequirementResult",
     "RunAggregates",
     "RunStatus",
     "RunType",
     "StackPin",
     "TaskPin",
+    "TaskRequirement",
 ]
