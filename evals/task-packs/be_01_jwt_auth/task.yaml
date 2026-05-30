@@ -2,7 +2,7 @@
 schema_version: pollmevals.task.v1
 id: be_01
 slug: jwt-auth-middleware-with-refresh
-version: "1.0"
+version: "1.1"
 category: backend
 difficulty: medium
 language: typescript
@@ -119,3 +119,155 @@ calibration:
 license:
   spec: CC-BY-SA-4.0
   code: MIT
+
+# RFC-004 Slice 2 — atomic binary requirements[] (task version 1.0 → 1.1).
+# 27 items derived from the 7 prose hard-requirements + security bullets.
+# Security items (R18, R19, R21, R22, R24, R25) map to correctness per the
+# RFC-004 §Default-if-stalled fallback: "security" is NOT in _AUTO_ALLOWED
+# for backend until the security-component proposal is formally adopted.
+requirements:
+  # --- correctness: bearer validation & error codes ---
+  - id: "R1"
+    text: "Authorization Bearer header is validated on a request"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R2"
+    text: "Missing Authorization header returns 401 + AUTH_MISSING"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R3"
+    text: "Expired token returns 401 + AUTH_EXPIRED"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 2
+  - id: "R4"
+    text: "Tampered or invalid-signature token returns 401 + AUTH_INVALID_SIGNATURE"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 2
+  - id: "R5"
+    text: "Wrong-issuer token returns 401 + AUTH_INVALID_ISSUER"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 3
+  # --- correctness: extractBearer helper ---
+  - id: "R6"
+    text: "extractBearer returns the token for a well-formed Bearer header"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R7"
+    text: "extractBearer returns null for undefined"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R8"
+    text: "extractBearer returns null for a header with missing scheme"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R9"
+    text: "extractBearer returns null for a header with wrong scheme"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R10"
+    text: "extractBearer returns null for an empty Bearer value"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  # --- correctness: isStateChanging helper ---
+  - id: "R11"
+    text: "isStateChanging returns false for safe methods GET, HEAD, OPTIONS"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 6
+  - id: "R12"
+    text: "isStateChanging returns true for unsafe methods POST, PUT, PATCH, DELETE"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 6
+  # --- type_safety: narrowAccessClaims helper ---
+  - id: "R13"
+    text: "narrowAccessClaims narrows a well-shaped payload"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 1
+  - id: "R14"
+    text: "narrowAccessClaims rejects payload with non-string sub"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 1
+  - id: "R15"
+    text: "narrowAccessClaims rejects payload with non-array roles"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 1
+  - id: "R16"
+    text: "narrowAccessClaims rejects payload with non-string role element"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 1
+  - id: "R17"
+    text: "narrowAccessClaims rejects a string payload (jwt sometimes returns a string)"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 1
+  # --- security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal) ---
+  - id: "R18"
+    text: "POST without matching CSRF token returns 403 + CSRF_MISMATCH"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 6
+  - id: "R19"
+    text: "POST with matching CSRF token is accepted (returns 200)"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 6
+  # --- correctness: refresh rotation ---
+  - id: "R20"
+    text: "Active refresh cookie rotates and invalidates the old jti"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 4
+  # --- security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal) ---
+  - id: "R21"
+    text: "Refresh cookie is HttpOnly"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 5
+  - id: "R22"
+    text: "Refresh cookie is SameSite=Strict"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 5
+  # --- correctness: revoked refresh ---
+  - id: "R23"
+    text: "Revoked refresh cookie returns 401 + AUTH_REFRESH_REVOKED"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 4
+  # --- security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal) ---
+  - id: "R24"
+    text: "Bearer token is never echoed in the error response body on failure"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 7
+  - id: "R25"
+    text: "Access or refresh secret is never written to stderr on internal error"
+    check_type: auto
+    maps_to: correctness  # security req — maps_to correctness pending the security-component decision (RFC-004 §Security-component proposal)
+    prompt_ref: 7
+  # --- judge-only: design quality (recorded, not wired in v0.2) ---
+  - id: "R26"
+    text: "Uses dependency injection for the refresh store (testability)"
+    check_type: judge
+    maps_to: test_alignment
+    prompt_ref: 4
+  - id: "R27"
+    text: "Functions are short, single-purpose, cyclomatic complexity ≤ 8, and have intent-revealing names"
+    check_type: judge
+    maps_to: code_clarity
+    prompt_ref: 7

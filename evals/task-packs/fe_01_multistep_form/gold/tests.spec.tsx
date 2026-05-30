@@ -54,17 +54,17 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("validateField", () => {
-  it("requires a non-empty value", () => {
+  it("[R22] requires a non-empty value", () => {
     expect(validateField("name", "")).toMatch(/required/i);
     expect(validateField("name", "   ")).toMatch(/required/i);
   });
   it("accepts a well-formed email", () => {
     expect(validateField("email", "user@example.com")).toBeNull();
   });
-  it("rejects a malformed email", () => {
+  it("[R23] rejects a malformed email", () => {
     expect(validateField("email", "not-an-email")).toMatch(/email/i);
   });
-  it("rejects a non-digit zip", () => {
+  it("[R24] rejects a non-digit zip", () => {
     expect(validateField("zip", "abcde")).toMatch(/postal/i);
   });
   it("accepts a 5-digit zip", () => {
@@ -85,22 +85,22 @@ describe("fieldsForStep", () => {
 });
 
 describe("isStepValid", () => {
-  it("accepts a fully valid step", () => {
+  it("[R6] accepts a fully valid step", () => {
     expect(isStepValid("personal", VALID)).toBe(true);
   });
-  it("rejects when one field is invalid", () => {
+  it("[R7] rejects when one field is invalid", () => {
     expect(isStepValid("personal", { ...VALID, email: "bad" })).toBe(false);
   });
 });
 
 describe("hydrateDraft", () => {
-  it("returns empty for null", () => {
+  it("[R25] returns empty for null", () => {
     expect(hydrateDraft(null)).toEqual({});
   });
-  it("returns empty for malformed JSON", () => {
+  it("[R26] returns empty for malformed JSON", () => {
     expect(hydrateDraft("{not-json")).toEqual({});
   });
-  it("ignores non-string fields", () => {
+  it("[R27] ignores non-string fields", () => {
     expect(hydrateDraft(JSON.stringify({ name: "ok", email: 42 }))).toEqual({ name: "ok" });
   });
 });
@@ -110,7 +110,7 @@ describe("hydrateDraft", () => {
 // ---------------------------------------------------------------------------
 
 describe("MultiStepForm (happy path)", () => {
-  it("walks through all three steps and submits", async () => {
+  it("[R1][R2][R5] walks through all three steps and submits", async () => {
     const onSubmit = vi.fn(async () => undefined);
     render(<MultiStepForm onSubmit={onSubmit} />);
 
@@ -133,7 +133,7 @@ describe("MultiStepForm (happy path)", () => {
 // ---------------------------------------------------------------------------
 
 describe("MultiStepForm (validation)", () => {
-  it("blocks Next on empty email and renders an error linked via aria-describedby", () => {
+  it("[R4][R8][R11] blocks Next on empty email and renders an error linked via aria-describedby", () => {
     render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -146,7 +146,7 @@ describe("MultiStepForm (validation)", () => {
     expect(screen.queryByLabelText(/street/i)).not.toBeInTheDocument();
   });
 
-  it("renders error on blur with a bad email", () => {
+  it("[R10] renders error on blur with a bad email", () => {
     render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     const email = screen.getByLabelText(/email/i);
     fireEvent.change(email, { target: { value: "not-an-email" } });
@@ -160,13 +160,13 @@ describe("MultiStepForm (validation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("MultiStepForm (keyboard)", () => {
-  it("uses real button elements (focusable + Enter activates)", () => {
+  it("[R9] uses real button elements (focusable + Enter activates)", () => {
     render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     const next = screen.getByRole("button", { name: /next/i });
     expect(next.tagName).toBe("BUTTON");
   });
 
-  it("focuses the first input on step change", async () => {
+  it("[R18] focuses the first input on step change", async () => {
     render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     fillStep1();
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -181,14 +181,14 @@ describe("MultiStepForm (keyboard)", () => {
 // ---------------------------------------------------------------------------
 
 describe("MultiStepForm (axe)", () => {
-  it("has 0 serious / critical violations on step 1", async () => {
+  it("[R12] has 0 serious / critical violations on step 1", async () => {
     const { container } = render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     const results = await axe.run(container);
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious).toEqual([]);
   });
 
-  it("has 0 serious / critical violations on the review step", async () => {
+  it("[R13] has 0 serious / critical violations on the review step", async () => {
     const { container } = render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     fillStep1();
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -209,7 +209,7 @@ describe("MultiStepForm (sessionStorage)", () => {
     window.sessionStorage.clear();
   });
 
-  it("persists draft on input and rehydrates on remount", async () => {
+  it("[R14][R15] persists draft on input and rehydrates on remount", async () => {
     const { unmount } = render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     fillStep1();
     await waitFor(() => {
@@ -223,7 +223,7 @@ describe("MultiStepForm (sessionStorage)", () => {
     expect((screen.getByLabelText(/email/i) as HTMLInputElement).value).toBe(VALID.email);
   });
 
-  it("clears the draft after a successful submit", async () => {
+  it("[R17] clears the draft after a successful submit", async () => {
     render(<MultiStepForm onSubmit={vi.fn(async () => undefined)} />);
     fillStep1();
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -241,7 +241,7 @@ describe("MultiStepForm (sessionStorage)", () => {
 // ---------------------------------------------------------------------------
 
 describe("MultiStepForm (ui states)", () => {
-  it("announces submission failure via role=alert and preserves data", async () => {
+  it("[R20][R21] announces submission failure via role=alert and preserves data", async () => {
     const onSubmit = vi.fn(async () => {
       throw new Error("network down");
     });
