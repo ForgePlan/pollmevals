@@ -64,48 +64,48 @@ function signAccess(claims: Record<string, unknown>, secret = ACCESS_SECRET): st
 // ---------------------------------------------------------------------------
 
 describe("extractBearer", () => {
-  it("returns the token for a well-formed Bearer header", () => {
+  it("[R6] returns the token for a well-formed Bearer header", () => {
     expect(extractBearer("Bearer abc.def.ghi")).toBe("abc.def.ghi");
   });
-  it("returns null for undefined", () => {
+  it("[R7] returns null for undefined", () => {
     expect(extractBearer(undefined)).toBeNull();
   });
-  it("returns null for missing scheme", () => {
+  it("[R8] returns null for missing scheme", () => {
     expect(extractBearer("abc.def.ghi")).toBeNull();
   });
-  it("returns null for wrong scheme", () => {
+  it("[R9] returns null for wrong scheme", () => {
     expect(extractBearer("Basic abc")).toBeNull();
   });
-  it("returns null for empty Bearer value", () => {
+  it("[R10] returns null for empty Bearer value", () => {
     expect(extractBearer("Bearer ")).toBeNull();
   });
 });
 
 describe("isStateChanging", () => {
-  it.each(["GET", "HEAD", "OPTIONS"])("returns false for safe method %s", (m) => {
+  it.each(["GET", "HEAD", "OPTIONS"])("[R11] returns false for safe method %s", (m) => {
     expect(isStateChanging(m)).toBe(false);
   });
-  it.each(["POST", "PUT", "PATCH", "DELETE"])("returns true for unsafe method %s", (m) => {
+  it.each(["POST", "PUT", "PATCH", "DELETE"])("[R12] returns true for unsafe method %s", (m) => {
     expect(isStateChanging(m)).toBe(true);
   });
 });
 
 describe("narrowAccessClaims", () => {
-  it("narrows a well-shaped payload", () => {
+  it("[R13] narrows a well-shaped payload", () => {
     expect(
       narrowAccessClaims({ sub: "u1", iss: "x", roles: ["a", "b"], exp: 1, iat: 0 }),
     ).toEqual({ sub: "u1", iss: "x", roles: ["a", "b"], exp: 1 });
   });
-  it("rejects payload with non-string sub", () => {
+  it("[R14] rejects payload with non-string sub", () => {
     expect(narrowAccessClaims({ sub: 1, iss: "x", roles: ["a"], exp: 1 })).toBeNull();
   });
-  it("rejects payload with non-array roles", () => {
+  it("[R15] rejects payload with non-array roles", () => {
     expect(narrowAccessClaims({ sub: "u", iss: "x", roles: "a", exp: 1 })).toBeNull();
   });
-  it("rejects payload with non-string role element", () => {
+  it("[R16] rejects payload with non-string role element", () => {
     expect(narrowAccessClaims({ sub: "u", iss: "x", roles: ["a", 2], exp: 1 })).toBeNull();
   });
-  it("rejects a string payload (jwt sometimes returns a string)", () => {
+  it("[R17] rejects a string payload (jwt sometimes returns a string)", () => {
     expect(narrowAccessClaims("not-an-object")).toBeNull();
   });
 });
@@ -128,20 +128,20 @@ describe("authMiddleware (happy path)", () => {
     });
   });
 
-  it("passes a valid Bearer token", async () => {
+  it("[R1] passes a valid Bearer token", async () => {
     const token = signAccess({ sub: "alice" });
     const res = await request(app).get("/protected").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.user).toEqual({ sub: "alice", roles: ["user"] });
   });
 
-  it("returns 401 + AUTH_MISSING when Authorization header absent", async () => {
+  it("[R2] returns 401 + AUTH_MISSING when Authorization header absent", async () => {
     const res = await request(app).get("/protected");
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("AUTH_MISSING");
   });
 
-  it("returns 401 + AUTH_EXPIRED for an expired token", async () => {
+  it("[R3] returns 401 + AUTH_EXPIRED for an expired token", async () => {
     const token = jwt.sign(
       { sub: "alice", iss: ISSUER, roles: ["user"], exp: Math.floor(Date.now() / 1000) - 60 },
       ACCESS_SECRET,
@@ -152,14 +152,14 @@ describe("authMiddleware (happy path)", () => {
     expect(res.body.error).toBe("AUTH_EXPIRED");
   });
 
-  it("returns 401 + AUTH_INVALID_SIGNATURE for a tampered token", async () => {
+  it("[R4] returns 401 + AUTH_INVALID_SIGNATURE for a tampered token", async () => {
     const token = signAccess({ sub: "alice" }) + "tampered";
     const res = await request(app).get("/protected").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("AUTH_INVALID_SIGNATURE");
   });
 
-  it("returns 401 + AUTH_INVALID_ISSUER for a wrong-iss token", async () => {
+  it("[R5] returns 401 + AUTH_INVALID_ISSUER for a wrong-iss token", async () => {
     const token = jwt.sign({ sub: "alice", iss: "evil", roles: ["user"] }, ACCESS_SECRET, {
       algorithm: "HS256",
     });
@@ -185,7 +185,7 @@ describe("authMiddleware (CSRF)", () => {
     });
   });
 
-  it("rejects POST without matching csrf_token / X-CSRF-Token", async () => {
+  it("[R18] rejects POST without matching csrf_token / X-CSRF-Token", async () => {
     const token = signAccess({ sub: "alice" });
     const res = await request(app)
       .post("/state")
@@ -196,7 +196,7 @@ describe("authMiddleware (CSRF)", () => {
     expect(res.body.error).toBe("CSRF_MISMATCH");
   });
 
-  it("accepts POST with matching csrf_token / X-CSRF-Token", async () => {
+  it("[R19] accepts POST with matching csrf_token / X-CSRF-Token", async () => {
     const token = signAccess({ sub: "alice" });
     const csrf = "secure-csrf-value-1234567890ab";
     const res = await request(app)
@@ -213,7 +213,10 @@ describe("authMiddleware (CSRF)", () => {
 // ---------------------------------------------------------------------------
 
 describe("authMiddleware (refresh rotation)", () => {
-  it("rotates an active refresh cookie and invalidates the old jti", async () => {
+  // Shared setup so each refresh-cookie requirement (R20 rotation/jti, R21
+  // HttpOnly, R22 SameSite=Strict) is asserted in its own 1:1-tagged test
+  // (RFC-004 Invariant C4: test_id ↔ requirement_id is 1:1).
+  async function rotateActiveRefresh() {
     const store = makeStore();
     const oldJti = "jti-original";
     store.active.add(oldJti);
@@ -228,22 +231,36 @@ describe("authMiddleware (refresh rotation)", () => {
       issuer: ISSUER,
       refreshStore: store,
     });
-
     const res = await request(app)
       .get("/protected")
       .set("Authorization", `Bearer ${access}`)
       .set("Cookie", `refresh_token=${refresh}`);
+    return { res, store, oldJti };
+  }
+
+  it("[R20] rotates an active refresh cookie and invalidates the old jti", async () => {
+    const { res, store, oldJti } = await rotateActiveRefresh();
     expect(res.status).toBe(200);
     expect(store.active.has(oldJti)).toBe(false);
     expect(store.active.size).toBe(1);
-    // New cookie present, HttpOnly + Secure + SameSite=Strict
+    // New refresh cookie issued on rotation.
     const setCookie = res.headers["set-cookie"] as string[] | undefined;
     expect(setCookie?.some((c) => c.includes("refresh_token="))).toBe(true);
+  });
+
+  it("[R21] sets the rotated refresh cookie HttpOnly", async () => {
+    const { res } = await rotateActiveRefresh();
+    const setCookie = res.headers["set-cookie"] as string[] | undefined;
     expect(setCookie?.some((c) => /httponly/i.test(c))).toBe(true);
+  });
+
+  it("[R22] sets the rotated refresh cookie SameSite=Strict", async () => {
+    const { res } = await rotateActiveRefresh();
+    const setCookie = res.headers["set-cookie"] as string[] | undefined;
     expect(setCookie?.some((c) => /samesite=strict/i.test(c))).toBe(true);
   });
 
-  it("rejects a revoked refresh cookie", async () => {
+  it("[R23] rejects a revoked refresh cookie", async () => {
     const store = makeStore();
     // No active jti registered.
     const refresh = jwt.sign({ sub: "alice", jti: "revoked-jti", iss: ISSUER }, REFRESH_SECRET, {
@@ -273,7 +290,7 @@ describe("authMiddleware (refresh rotation)", () => {
 // ---------------------------------------------------------------------------
 
 describe("authMiddleware (secret hygiene)", () => {
-  it("never echoes the bearer token in the error body on failure", async () => {
+  it("[R24] never echoes the bearer token in the error body on failure", async () => {
     const token = "FORBIDDEN-SECRET-VALUE-MUST-NOT-LEAK";
     const app = makeApp({
       accessSecret: ACCESS_SECRET,
@@ -286,7 +303,7 @@ describe("authMiddleware (secret hygiene)", () => {
     expect(JSON.stringify(res.body)).not.toContain(token);
   });
 
-  it("never writes the access secret to stderr on internal error", async () => {
+  it("[R25] never writes the access secret to stderr on internal error", async () => {
     const writes: string[] = [];
     const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
       writes.push(String(chunk));

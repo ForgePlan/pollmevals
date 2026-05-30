@@ -2,7 +2,7 @@
 schema_version: pollmevals.task.v1
 id: fe_01
 slug: accessible-multistep-form-persisted-draft
-version: "1.0"
+version: "1.1"
 category: frontend
 difficulty: medium
 language: typescript-react
@@ -135,3 +135,157 @@ calibration:
 license:
   spec: CC-BY-SA-4.0
   code: MIT
+
+# RFC-004 Slice 2 — atomic binary requirements[] (task version 1.0 → 1.1).
+# 27 items decomposed from the 7 hard requirements.
+# 23 auto (correctness/accessibility/ux_states/type_safety) + 4 judge (pattern_match).
+# Judge items (R3, R16, R17, R18) cover requirements with no standalone executable
+# check in the current test suite (Back navigation, aria-live step announcement,
+# aria-busy assertion, disabled-during-submit assertion); they are recorded-only
+# in v0.2 per RFC-004 §H4 deferral.
+requirements:
+  # --- correctness: 3-step linear navigation ---
+  - id: "R1"
+    text: "The form renders three linear steps (personal info, address, review+submit)"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R2"
+    text: "Next button advances the form to the next step"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R3"
+    text: "Back button returns the form to the previous step without losing entered data"
+    check_type: judge
+    maps_to: pattern_match
+    prompt_ref: 1
+  - id: "R4"
+    text: "The user cannot advance past an invalid step (Next is blocked while the current step has errors)"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R5"
+    text: "Submit calls onSubmit with the complete FormData (name, email, street, city, zip)"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  # --- correctness: step validity ---
+  - id: "R6"
+    text: "isStepValid returns true for a fully valid step"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  - id: "R7"
+    text: "isStepValid returns false when one field is invalid"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 1
+  # --- accessibility: labels + semantic markup ---
+  - id: "R8"
+    text: "Each input has a visible label accessible by its label text (htmlFor/id bound)"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 2
+  - id: "R9"
+    text: "Navigation controls use real <button> elements (not div-as-button)"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 2
+  # --- accessibility: validation + aria attributes ---
+  - id: "R10"
+    text: "A failing input has aria-invalid='true' set while invalid"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 3
+  - id: "R11"
+    text: "A failing input's error message is linked via aria-describedby"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 3
+  # --- accessibility: axe-core clean ---
+  - id: "R12"
+    text: "axe-core reports 0 serious or critical violations on step 1"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 2
+  - id: "R13"
+    text: "axe-core reports 0 serious or critical violations on the review step"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 2
+  # --- correctness: sessionStorage draft persistence ---
+  - id: "R14"
+    text: "Draft state persists to sessionStorage under the key 'fe01:multistep-form:draft' on every field change"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 4
+  - id: "R15"
+    text: "Draft is hydrated from sessionStorage on component remount"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 4
+  - id: "R16"
+    text: "A polite aria-live region announces step transitions ('Step N of 3, ...')"
+    check_type: judge
+    maps_to: pattern_match
+    prompt_ref: 6
+  - id: "R17"
+    text: "Draft is cleared from sessionStorage after a successful submit"
+    check_type: auto
+    maps_to: correctness
+    prompt_ref: 4
+  # --- accessibility: focus management ---
+  - id: "R18"
+    text: "Focus moves to the first focusable control of the new step when Next is clicked"
+    check_type: auto
+    maps_to: accessibility
+    prompt_ref: 5
+  # --- ux_states: submit button loading affordance ---
+  - id: "R19"
+    text: "Submit button is shown as loading (aria-busy='true' and disabled) while submit is in flight"
+    check_type: judge
+    maps_to: pattern_match
+    prompt_ref: 7
+  # --- ux_states: error recovery ---
+  - id: "R20"
+    text: "Submission failure is announced via role=alert"
+    check_type: auto
+    maps_to: ux_states
+    prompt_ref: 7
+  - id: "R21"
+    text: "Form data is preserved in sessionStorage after submission failure (not cleared on error)"
+    check_type: auto
+    maps_to: ux_states
+    prompt_ref: 7
+  # --- type_safety: pure helper exports ---
+  - id: "R22"
+    text: "validateField rejects empty or whitespace-only values"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 3
+  - id: "R23"
+    text: "validateField rejects malformed email addresses"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 3
+  - id: "R24"
+    text: "validateField rejects non-digit zip codes"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 3
+  - id: "R25"
+    text: "hydrateDraft returns an empty object for null input"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 4
+  - id: "R26"
+    text: "hydrateDraft returns an empty object for malformed JSON"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 4
+  - id: "R27"
+    text: "hydrateDraft ignores non-string fields from the serialised draft"
+    check_type: auto
+    maps_to: type_safety
+    prompt_ref: 4

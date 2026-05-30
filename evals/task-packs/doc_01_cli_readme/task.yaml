@@ -2,7 +2,7 @@
 schema_version: pollmevals.task.v1
 id: doc_01
 slug: readme-for-pollmevals-fetch-task-cli
-version: "1.0"
+version: "1.1"
 category: docs
 difficulty: easy
 language: markdown
@@ -172,3 +172,91 @@ calibration:
 license:
   spec: CC-BY-SA-4.0
   content: MIT
+
+# RFC-004 Slice 2 — atomic binary requirements[] (task version 1.0 → 1.1).
+# doc_01 has evaluator_commands: [] so ALL requirements are check_type: judge
+# (no host-side executable checks). Every item maps to one of the 5 rubric
+# criteria and traces back to a numbered output section in the prompt.
+# The <20-item SHOULD-6 warning is expected and acceptable for a judge-only pack
+# (per RFC-004 §doc_01 migration guidance).
+requirements:
+  # --- structural_completeness: the 8 required sections ---
+  - id: "R1"
+    text: "Overview section is present as a level-2 heading"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 1
+  - id: "R2"
+    text: "Installation section is present as a level-2 heading"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 2
+  - id: "R3"
+    text: "Quick start section is present as a level-2 heading"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 3
+  - id: "R4"
+    text: "Commands section is present and contains a level-3 subsection for each of the four subcommands (list, show, validate, run)"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 4
+  - id: "R5"
+    text: "Configuration section is present as a level-2 heading"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 5
+  - id: "R6"
+    text: "Troubleshooting section is present as a level-2 heading"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 6
+  - id: "R7"
+    text: "Contributing and Licence sections are present in order"
+    check_type: judge
+    maps_to: structural_completeness
+    prompt_ref: 7
+  # --- factual_accuracy: flags, exit codes, env vars match the contract ---
+  - id: "R8"
+    text: "Each subcommand's flags match the contract exactly (no invented flags, no omitted flags)"
+    check_type: judge
+    maps_to: factual_accuracy
+    prompt_ref: 4
+  - id: "R9"
+    text: "All exit codes for all subcommands match the contract values"
+    check_type: judge
+    maps_to: factual_accuracy
+    prompt_ref: 4
+  - id: "R10"
+    text: "All five environment variables are documented with correct names and defaults"
+    check_type: judge
+    maps_to: factual_accuracy
+    prompt_ref: 5
+  # --- clarity: prose and formatting ---
+  - id: "R11"
+    text: "Each subcommand entry contains at least one runnable shell example"
+    check_type: judge
+    maps_to: clarity
+    prompt_ref: 4
+  - id: "R12"
+    text: "Quick start section is copy-pasteable (no unexpanded variables or placeholder tokens)"
+    check_type: judge
+    maps_to: actionability
+    prompt_ref: 3
+  # --- actionability: troubleshooting ---
+  - id: "R13"
+    text: "Troubleshooting section covers at least two distinct failure modes with concrete fixes"
+    check_type: judge
+    maps_to: actionability
+    prompt_ref: 6
+  # --- consistency: naming and formatting uniformity ---
+  - id: "R14"
+    text: "Tool name is spelled consistently as 'pollmevals fetch-task' or 'pollmevals-fetch-task' throughout"
+    check_type: judge
+    maps_to: consistency
+    prompt_ref: 1
+  - id: "R15"
+    text: "Code blocks use consistent language hints and formatting conventions across all sections"
+    check_type: judge
+    maps_to: consistency
+    prompt_ref: 4
