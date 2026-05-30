@@ -105,6 +105,31 @@ Must include:
 - location matching policy;
 - precision/recall scoring.
 
+## Prompt authoring — closed-loop constraint (mandatory)
+
+Every `prompt_template` **must** instruct the model to operate in closed-loop mode:
+
+> The model must not ask follow-up or clarifying questions. It must choose all
+> technical and architectural details itself, using only the information provided
+> in the prompt. Anything not explicitly specified is the model's choice to make.
+
+This constraint is non-negotiable. POLLMEVALS measures the **stack** (model +
+scaffolding), not the operator. An evaluation that stalls waiting for
+clarification produces no output, scores zero, and wastes a judge-panel call.
+
+**Implementation** — include a line such as the following near the end of every
+`prompt_template`, before any output-format instruction:
+
+```
+Do not ask clarifying questions. If any detail is unspecified, choose
+the most idiomatic approach and proceed. Output only the requested artifact.
+```
+
+The three existing reference tasks (`be_01`, `fe_01`, `doc_01`) satisfy this
+constraint via the closing line "Output only the code for solution.ts. No prose,
+no markdown fences." — an equivalent closed-loop instruction. New tasks must
+include an explicit equivalent.
+
 ## Versioning rule
 
 Changing prompt, tests, evaluator, scoring weights or gold solution creates a new task version.

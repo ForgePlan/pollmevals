@@ -17,6 +17,40 @@
     "success_criteria": { "type": "array", "items": { "type": "string" } },
     "evaluator_commands": { "type": "array", "items": { "type": "string" } },
     "weight_components": { "type": "object" },
-    "calibration_set": { "type": "object" }
+    "calibration_set": { "type": "object" },
+    "requirements": {
+      "type": "array",
+      "description": "Atomic binary requirements for this task (RFC-004). Optional — task packs without this field remain valid.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "check_type", "maps_to", "prompt_ref"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^R[0-9]+$",
+            "description": "Unique requirement id within the task, e.g. 'R7'."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One atomic, binary assertion phrased so it is unambiguously true or false."
+          },
+          "check_type": {
+            "enum": ["auto", "judge"],
+            "description": "'auto' = executable check that feeds a deterministic component score; 'judge' = recorded for traceability only in v0.2."
+          },
+          "maps_to": {
+            "type": "string",
+            "description": "For auto: a weight_components key (e.g. 'correctness'). For judge: a rubric criterion name."
+          },
+          "prompt_ref": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based index of the numbered item in prompt_template this requirement traces to."
+          }
+        }
+      }
+    }
   }
 }
