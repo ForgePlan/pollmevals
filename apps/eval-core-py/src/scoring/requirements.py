@@ -84,5 +84,5 @@ def component_score(
         if result_by_id.get(req.id) is not None and result_by_id[req.id].passed is True
     )
 
-    # Score = 10 × |P_c| / |A_c|.  |A_c| >= 1 guaranteed by the guard above.
+    # Score = 10 * |P_c| / |A_c|.  |A_c| >= 1 guaranteed by the guard above.
     return 10.0 * passed_count / len(auto_reqs)

@@ -18,7 +18,6 @@ import pytest
 from src.contracts.task import RequirementResult, TaskRequirement
 from src.scoring import component_score
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -207,9 +206,7 @@ class TestComponentScoreReturnType:
 @pytest.mark.parametrize("n_passed,n_total", [(0, 1), (1, 1), (3, 7), (10, 10)])
 def test_score_in_valid_range(n_passed: int, n_total: int) -> None:
     reqs = [_req(f"R{i}", "auto") for i in range(1, n_total + 1)]
-    results = [
-        _result(f"R{i}", "auto", i <= n_passed) for i in range(1, n_total + 1)
-    ]
+    results = [_result(f"R{i}", "auto", i <= n_passed) for i in range(1, n_total + 1)]
     score = component_score("correctness", reqs, results)
     assert score is not None
     assert 0.0 <= score <= 10.0

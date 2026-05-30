@@ -212,9 +212,7 @@ class TestRequirementResult:
 
 @pytest.fixture(scope="module")
 def task_schema() -> dict:  # type: ignore[type-arg]
-    assert _TASK_SCHEMA_PATH.exists(), (
-        f"task.schema.json not found at {_TASK_SCHEMA_PATH}"
-    )
+    assert _TASK_SCHEMA_PATH.exists(), f"task.schema.json not found at {_TASK_SCHEMA_PATH}"
     with open(_TASK_SCHEMA_PATH) as f:
         return json.load(f)  # type: ignore[no-any-return]
 

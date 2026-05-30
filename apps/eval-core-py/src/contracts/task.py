@@ -21,7 +21,7 @@ class TaskRequirement(BaseModel):
     """One atomic binary requirement in a task's requirements[] list (RFC-004).
 
     check_type "auto"  — executable check whose pass/fail feeds the deterministic
-                         component score: 10 × (passed auto-reqs) / (total auto-reqs)
+                         component score: 10 * (passed auto-reqs) / (total auto-reqs)
                          for the component named in maps_to.
     check_type "judge" — recorded in evaluator_json for traceability only (v0.2);
                          never wired to a score in v0.2.
@@ -35,9 +35,7 @@ class TaskRequirement(BaseModel):
     )
     text: str = Field(
         min_length=1,
-        description=(
-            "One atomic, binary assertion phrased so it is unambiguously true or false."
-        ),
+        description=("One atomic, binary assertion phrased so it is unambiguously true or false."),
     )
     check_type: Literal["auto", "judge"]
     maps_to: str = Field(
