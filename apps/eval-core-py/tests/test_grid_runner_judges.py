@@ -120,6 +120,18 @@ def _degraded_aggregation(judgments: list[Judgment]) -> JudgeAggregation:
     )
 
 
+def _low_alpha_aggregation(judgments: list[Judgment]) -> JudgeAggregation:
+    """G5: a non-DEGRADED aggregation whose alpha CI lower-bound is below 0.70."""
+    return JudgeAggregation(
+        median_per_criterion={"overall": 8.0},
+        alpha_point=0.55,
+        alpha_ci_lower=0.50,
+        alpha_ci_upper=0.65,
+        judge_status="OK",
+        n_judges_used=len(judgments),
+    )
+
+
 class FakeJudgePanel:
     """Duck-typed stand-in for JudgePanel. Each test programs its behavior."""
 
@@ -419,3 +431,63 @@ async def test_degraded_over_20pct_triggers_breach(tmp_path: Path) -> None:
     assert isinstance(grid_result, GridRunResult)
     assert len(grid_result.results) == 10
     assert grid_result.judge_panel_breach is True
+
+
+# ---------------------------------------------------------------------------
+# 9. G5 — alpha publication gate (ADR-005)
+# ---------------------------------------------------------------------------
+
+
+class _LowAlphaPanel:
+    """Fake panel whose aggregate() yields a non-DEGRADED alpha CI lower < 0.70."""
+
+    async def score(self, er: EvalResult, task_id: str) -> list[Judgment]:
+        del er, task_id
+        return [
+            _make_judgment(judge_order=0),
+            _make_judgment(judge_order=1),
+            _make_judgment(judge_order=2),
+        ]
+
+    def aggregate(self, judgments: list[Judgment]) -> JudgeAggregation:
+        return _low_alpha_aggregation(judgments)
+
+
+@pytest.mark.asyncio
+async def test_low_alpha_triggers_alpha_gate_breach(tmp_path: Path) -> None:
+    # A non-DEGRADED eval with alpha_ci_lower=0.50 < 0.70 must trip the gate.
+    runner = _make_runner(tmp_path, judge_panel=cast(FakeJudgePanel, _LowAlphaPanel()))
+    spec = _make_simple_spec(n_tasks=3)
+
+    grid_result = await runner.run(spec)
+
+    assert isinstance(grid_result, GridRunResult)
+    assert grid_result.alpha_gate_breach is True
+
+
+@pytest.mark.asyncio
+async def test_healthy_alpha_no_gate_breach(tmp_path: Path) -> None:
+    # alpha_ci_lower=0.75 >= 0.70 → no breach. Empty degraded set → always full
+    # (3 judges) → _full_aggregation with alpha_ci_lower=0.75.
+    runner = _make_runner(
+        tmp_path, judge_panel=cast(FakeJudgePanel, _DegradedSometimes(degraded_for_tasks=set()))
+    )
+    spec = _make_simple_spec(n_tasks=3)
+
+    grid_result = await runner.run(spec)
+
+    assert isinstance(grid_result, GridRunResult)
+    assert grid_result.alpha_gate_breach is False
+
+
+@pytest.mark.asyncio
+async def test_degraded_alpha_skipped_by_gate(tmp_path: Path) -> None:
+    # All-DEGRADED evals have alpha=None → the alpha gate skips them (not a breach).
+    fake_panel = _DegradedSometimes(degraded_for_tasks={"task-0", "task-1", "task-2"})
+    runner = _make_runner(tmp_path, judge_panel=cast(FakeJudgePanel, fake_panel))
+    spec = _make_simple_spec(n_tasks=3)
+
+    grid_result = await runner.run(spec)
+
+    assert isinstance(grid_result, GridRunResult)
+    assert grid_result.alpha_gate_breach is False

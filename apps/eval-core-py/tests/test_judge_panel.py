@@ -14,6 +14,7 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 import pathlib
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -101,11 +102,38 @@ def _make_fake_eval_result(
     )
 
 
-def _make_fake_score(value: str, explanation: str = "test explanation") -> MagicMock:
-    """Build a mock Inspect AI Score object."""
+def _make_doc01_rubric_json(score_per_criterion: float = 8.0) -> str:
+    """Return a valid doc_01_cli_readme rubric JSON string.
+
+    Produces a 5-criterion JSON matching the doc_01 rubric criteria.
+    ``score_per_criterion`` defaults to 8.0 to ensure parse-back produces
+    non-trivial scores (not 0.0 or 10.0 — easier to detect mis-parsing).
+    """
+    rubric_scores = {
+        "structural_completeness": score_per_criterion,
+        "factual_accuracy": score_per_criterion,
+        "clarity": score_per_criterion,
+        "actionability": score_per_criterion,
+        "consistency": score_per_criterion,
+    }
+    return json.dumps(
+        {
+            "rubric_scores": rubric_scores,
+            "total_score": score_per_criterion,
+            "reasoning": "test explanation",
+        }
+    )
+
+
+def _make_fake_score(value: str, explanation: str | None = None) -> MagicMock:
+    """Build a mock Inspect AI Score object.
+
+    Default ``explanation`` is a valid 5-criterion doc_01 rubric JSON string
+    so that score() parse-back works without further wiring.
+    """
     score = MagicMock()
     score.value = value
-    score.explanation = explanation
+    score.explanation = explanation if explanation is not None else _make_doc01_rubric_json()
     return score
 
 
@@ -314,7 +342,7 @@ class TestJudgePanelInit:
 
     # Default api_key_env resolves to empty string when env var not set
     def test_api_key_empty_when_env_not_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("OPENROUTER_API_KEY_JUDGE", raising=False)
+        monkeypatch.delenv("LITELLM_MASTER_KEY", raising=False)
         panel = JudgePanel(
             judge_models=["openrouter/openai/gpt-5-mini"],
             candidate_model_id="openrouter/anthropic/claude-haiku",
@@ -564,17 +592,26 @@ class TestJudgePanelAggregateSliceC:
 class TestJudgePanelScoreSliceB:
     """Tests for JudgePanel.score() — RFC-002 Slice B.
 
-    All tests mock _run_judge_task, _read_raw_output, and _make_judge_models
-    so no real LLM calls and no OPENAI_API_KEY are required.
+    All tests mock _run_judge_task, _read_raw_output, _make_judge_models,
+    and _load_rubric_criteria so no real LLM calls, no OPENAI_API_KEY, and
+    no file-system rubric.yaml access are required.
 
     Verifies:
       - correct scorer list construction (one per judge)
       - max_tokens cap passes through to get_model config at init time
       - 2 judges → 2 Judgment objects with distinct judge_model_id
-      - score "C" → rubric_scores["overall"] = 10.0 (1.0 * 10)
-      - score "I" → rubric_scores["overall"] = 0.0
+      - rubric JSON parsed → per-criterion dict emitted in Judgment
       - judge_order is set per shuffled position
     """
+
+    # Canonical doc_01 rubric criteria used for mocking _load_rubric_criteria.
+    _DOC01_CRITERIA: ClassVar[dict[str, dict[str, object]]] = {
+        "structural_completeness": {"weight": 0.20, "description": "structure", "anchors": {}},
+        "factual_accuracy": {"weight": 0.20, "description": "accuracy", "anchors": {}},
+        "clarity": {"weight": 0.20, "description": "clarity", "anchors": {}},
+        "actionability": {"weight": 0.20, "description": "actionability", "anchors": {}},
+        "consistency": {"weight": 0.20, "description": "consistency", "anchors": {}},
+    }
 
     @pytest.fixture(autouse=True)
     def mock_make_judge_models(self) -> object:
@@ -583,7 +620,7 @@ class TestJudgePanelScoreSliceB:
         _make_judge_models is lazily called inside score() to build scorer
         objects. We replace it with a method that returns dummy MagicMock
         objects of the right length — the scorer list is only used to build
-        model_graded_qa instances, which themselves are mocked out via
+        rubric scorer instances, which themselves are mocked out via
         _run_judge_task.
         """
 
@@ -591,6 +628,18 @@ class TestJudgePanelScoreSliceB:
             return [MagicMock(name=f"mock_model_{i}") for i in range(len(self_panel._judge_models))]
 
         with patch.object(JudgePanel, "_make_judge_models", _fake_make_judge_models):
+            yield
+
+    @pytest.fixture(autouse=True)
+    def mock_load_rubric_criteria(self) -> object:
+        """Prevent file-system rubric.yaml access in score() tests.
+
+        Returns the doc_01 5-criterion rubric so tests don't need the repo
+        CWD to contain evals/task-packs/.
+        """
+        import src.orchestrator.judge_panel as _jp
+
+        with patch.object(_jp, "_load_rubric_criteria", return_value=self._DOC01_CRITERIA):
             yield
 
     @pytest.fixture
@@ -622,8 +671,8 @@ class TestJudgePanelScoreSliceB:
         eval_result = _make_fake_eval_result()
         fake_log = _make_fake_eval_log(
             {
-                "model_graded_qa": _make_fake_score("C", "Judge 1 says correct"),
-                "model_graded_qa_1": _make_fake_score("C", "Judge 2 says correct"),
+                "judge_0": _make_fake_score("C"),
+                "judge_1": _make_fake_score("C"),
             }
         )
 
@@ -640,12 +689,13 @@ class TestJudgePanelScoreSliceB:
 
     @pytest.mark.asyncio
     async def test_score_c_maps_to_10(self, two_judge_panel: JudgePanel) -> None:
-        """Score value 'C' → rubric_scores['overall'] = 10.0, total_score = 10.0."""
+        """Rubric JSON with all criteria = 10.0 → 5-key dict and total_score = 10.0."""
         eval_result = _make_fake_eval_result()
+        all_10_json = _make_doc01_rubric_json(score_per_criterion=10.0)
         fake_log = _make_fake_eval_log(
             {
-                "model_graded_qa": _make_fake_score("C", "Correct"),
-                "model_graded_qa_1": _make_fake_score("C", "Also correct"),
+                "judge_0": _make_fake_score("C", all_10_json),
+                "judge_1": _make_fake_score("C", all_10_json),
             }
         )
 
@@ -656,18 +706,21 @@ class TestJudgePanelScoreSliceB:
         ):
             judgments = await two_judge_panel.score(eval_result, "be_01_jwt_auth")  # type: ignore[arg-type]
 
+        doc01_criteria = set(self._DOC01_CRITERIA.keys())
         for j in judgments:
-            assert j.rubric_scores["overall"] == 10.0
+            assert set(j.rubric_scores.keys()) == doc01_criteria
+            assert all(v == 10.0 for v in j.rubric_scores.values())
             assert j.total_score == 10.0
 
     @pytest.mark.asyncio
     async def test_score_i_maps_to_0(self, two_judge_panel: JudgePanel) -> None:
-        """Score value 'I' → rubric_scores['overall'] = 0.0, total_score = 0.0."""
+        """Rubric JSON with all criteria = 0.0 → 5-key dict and total_score = 0.0."""
         eval_result = _make_fake_eval_result()
+        all_0_json = _make_doc01_rubric_json(score_per_criterion=0.0)
         fake_log = _make_fake_eval_log(
             {
-                "model_graded_qa": _make_fake_score("I", "Incorrect"),
-                "model_graded_qa_1": _make_fake_score("I", "Also incorrect"),
+                "judge_0": _make_fake_score("I", all_0_json),
+                "judge_1": _make_fake_score("I", all_0_json),
             }
         )
 
@@ -678,8 +731,10 @@ class TestJudgePanelScoreSliceB:
         ):
             judgments = await two_judge_panel.score(eval_result, "be_01_jwt_auth")  # type: ignore[arg-type]
 
+        doc01_criteria = set(self._DOC01_CRITERIA.keys())
         for j in judgments:
-            assert j.rubric_scores["overall"] == 0.0
+            assert set(j.rubric_scores.keys()) == doc01_criteria
+            assert all(v == 0.0 for v in j.rubric_scores.values())
             assert j.total_score == 0.0
 
     @pytest.mark.asyncio
@@ -688,8 +743,8 @@ class TestJudgePanelScoreSliceB:
         eval_result = _make_fake_eval_result()
         fake_log = _make_fake_eval_log(
             {
-                "model_graded_qa": _make_fake_score("C"),
-                "model_graded_qa_1": _make_fake_score("I"),
+                "judge_0": _make_fake_score("C"),
+                "judge_1": _make_fake_score("I"),
             }
         )
 

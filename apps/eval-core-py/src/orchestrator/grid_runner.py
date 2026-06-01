@@ -139,6 +139,13 @@ class GridRunResult:
     # the run when this trips (manifest still written with status="degraded").
     judge_panel_breach: bool = False
 
+    # G5 (ADR-005 alpha publication gate): set True when any non-DEGRADED eval
+    # has a computed Krippendorff alpha CI lower-bound < 0.70 (inter-judge
+    # agreement below the publication threshold). Surfaced as a flag like
+    # judge_panel_breach -- the leaderboard/manifest consumer decides; the run
+    # is not hard-blocked.
+    alpha_gate_breach: bool = False
+
     def succeeded(self) -> list[EvalResult]:
         """Return only EvalResult entries with status == SCORED."""
         out: list[EvalResult] = []
@@ -510,18 +517,42 @@ class GridRunner:
             judge_panel_breach = degraded_ratio > 0.20
             if judge_panel_breach:
                 logger.warning(
-                    "Judge panel breach: %d/%d evals (%.1f%%) ended DEGRADED — "
+                    "Judge panel breach: %d/%d evals (%.1f%%) ended DEGRADED -- "
                     "exceeds 20%% threshold; orchestrator should refuse publication.",
                     n_degraded,
                     len(attempted),
                     degraded_ratio * 100,
                 )
 
+        # G5: ADR-005 alpha publication gate. Flag when any eval with a real,
+        # non-DEGRADED Krippendorff alpha has CI lower-bound < 0.70 (inter-judge
+        # agreement below the publication threshold). DEGRADED / None-alpha evals
+        # are skipped -- their alpha is intentionally absent, not a breach.
+        alpha_gate_breach = False
+        if self._judge_panel is not None and attempted:
+            for r in attempted:
+                if not isinstance(r, EvalResult) or r.eval_row is None:
+                    continue
+                agg = r.eval_row.judge_aggregate
+                if (
+                    agg is not None
+                    and agg.judge_status != "DEGRADED"
+                    and agg.alpha_ci_lower is not None
+                    and agg.alpha_ci_lower < 0.70
+                ):
+                    alpha_gate_breach = True
+                    logger.warning(
+                        "Alpha gate breach: eval has Krippendorff alpha CI lower-bound "
+                        "%.3f < 0.70 -- inter-judge agreement below publication threshold.",
+                        agg.alpha_ci_lower,
+                    )
+
         return GridRunResult(
             results=attempted,
             total_cost_usd=self._running_total,
             budget_breach=budget_breach,
             judge_panel_breach=judge_panel_breach,
+            alpha_gate_breach=alpha_gate_breach,
         )
 
 
