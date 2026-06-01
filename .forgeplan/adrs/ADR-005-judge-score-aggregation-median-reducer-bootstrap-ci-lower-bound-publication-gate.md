@@ -11,7 +11,7 @@ links:
   relation: informs
 - target: RFC-002
   relation: informs
-status: draft
+status: active
 title: judge score aggregation — median reducer + bootstrap CI lower-bound publication gate
 ---
 
@@ -200,6 +200,9 @@ Both decisions integrate cleanly with PRD-002's broader contract: median feeds F
 - `docs/04-runbook/08-scoring-contract.md` — α + bootstrap CI spec details for run manifest
 - Zheng et al. 2023 (arxiv 2306.05685) — position bias and reducer interaction in LLM-as-judge panels
 - PRD-002 H3 — predicts CI width ≥ 0.12 at smoke-scale (135 judgments); empirical check is Phase 3 Week 3
+
+
+
 
 
 
