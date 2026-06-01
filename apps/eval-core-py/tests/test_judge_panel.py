@@ -342,7 +342,7 @@ class TestJudgePanelInit:
 
     # Default api_key_env resolves to empty string when env var not set
     def test_api_key_empty_when_env_not_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("OPENROUTER_API_KEY_JUDGE", raising=False)
+        monkeypatch.delenv("LITELLM_MASTER_KEY", raising=False)
         panel = JudgePanel(
             judge_models=["openrouter/openai/gpt-5-mini"],
             candidate_model_id="openrouter/anthropic/claude-haiku",

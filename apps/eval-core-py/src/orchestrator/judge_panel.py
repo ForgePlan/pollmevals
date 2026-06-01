@@ -87,10 +87,16 @@ _FAMILY_ALIASES: dict[str, str] = {
 # OpenRouter when key budget is low — Claude Sonnet native max is 65k).
 _DEFAULT_JUDGE_MAX_TOKENS = 512
 
-# Rubric-path token cap — slightly higher than the binary path (512) to
-# accommodate per-criterion JSON output.  Sub-choice A: separate constant so
-# the two paths are independently tunable.
-_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 768
+# Rubric-path token cap.  Set to 2048 so STRONG / reasoning judges (e.g.
+# gpt-5-mini) have room for reasoning tokens PLUS the full per-criterion JSON —
+# at 768 a reasoning judge exhausted the budget and returned an empty completion
+# (RFC-002 live run).  The upper bound is the OpenRouter HTTP-402 hazard
+# (EVID-023): OpenRouter pre-reserves max_tokens * completion_price, so this only
+# stays safe on a FUNDED account — the live run's 402 at 1536 was a depleted key
+# (monthly budget exhausted), NOT the cap being inherently too high.  If a
+# reasoning judge still truncates at 2048, cap reasoning via reasoning_effort
+# rather than raising further.  Separate from the binary path (512).
+_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 2048
 
 # G3: calibration sample file extensions per task language. be_01 uses .ts,
 # fe_01 .tsx, doc_01 .md. The calibration loader must glob all of these or
@@ -412,8 +418,16 @@ def _parse_rubric_scores(explanation: str, judge_id: str) -> dict[str, float]:
     the judge's JSON identically.
     """
     rubric_scores: dict[str, float]
+    # Judges sometimes wrap the JSON in markdown fences or surrounding prose
+    # (RFC-002 live run: gpt-5-mini). Extract the outermost {...} object before
+    # parsing; a truncated object (no closing brace) still falls through to the
+    # fallback below.
+    stripped = explanation.strip()
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    candidate = stripped[start : end + 1] if start != -1 and end > start else stripped
     try:
-        parsed = json.loads(explanation)
+        parsed = json.loads(candidate)
         raw_rubric = parsed.get("rubric_scores", {})
         rubric_scores = {
             str(k): max(0.0, min(10.0, float(v)))
@@ -630,7 +644,7 @@ class JudgePanel:
         rubric_version: str,
         *,
         base_url: str = "http://localhost:4000",
-        api_key_env: str = "OPENROUTER_API_KEY_JUDGE",
+        api_key_env: str = "LITELLM_MASTER_KEY",
         judge_max_tokens: int = _DEFAULT_JUDGE_MAX_TOKENS,
     ) -> None:
         if not judge_models:
@@ -1419,10 +1433,16 @@ class JudgePanel:
         from inspect_ai.model import get_model
 
         if self._judge_model_objects is None:
+            # Pass base_url + api_key explicitly so the OpenAI client is built
+            # without relying on OPENAI_* env vars being set at this point
+            # (RFC-002 live run: get_model runs before _run_judge_task wires env).
+            api_key = self.api_key or None
             self._judge_model_objects = [
                 get_model(
                     self._proxy_alias_for(jm),
                     config=self._judge_config,
+                    base_url=self._base_url,
+                    api_key=api_key,
                 )
                 for jm in self._judge_models
             ]
@@ -1497,8 +1517,14 @@ class JudgePanel:
             os.environ["OPENAI_API_KEY"] = api_key
 
             # eval_async is a native coroutine in inspect_ai — await directly.
+            # Pass a (pre-resolved) judge model as the top-level model: eval_async
+            # requires one to initialise even though the forwarding solver
+            # overwrites state.output and never calls it (RFC-002 live run). The
+            # real judge calls come from the per-judge scorers.
+            judge_models = self._make_judge_models()
             result = await _inspect_eval_async(
                 judge_task,
+                model=judge_models[0],
                 log_dir="/tmp/pollmevals_judge_logs",
                 log_level="warning",
             )
