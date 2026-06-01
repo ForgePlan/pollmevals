@@ -27,6 +27,9 @@ import logging
 import os
 import pathlib
 import random
+import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
@@ -41,6 +44,7 @@ from src.contracts import (
     Judgment,
     ProbeResult,
 )
+from src.orchestrator.cost import PricingTuple, compute_cost
 
 if TYPE_CHECKING:
     from inspect_ai import Task as InspectTask
@@ -92,6 +96,40 @@ _DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 768
 # fe_01 .tsx, doc_01 .md. The calibration loader must glob all of these or
 # code packs are silently skipped.
 _CALIBRATION_SAMPLE_EXTS: tuple[str, ...] = (".md", ".ts", ".tsx", ".py", ".txt")
+
+# Identification-probe token cap (G2 / Slice D): the judge answers with a single
+# family word, so a tight cap keeps the SC-4 anonymisation probe cheap.
+_DEFAULT_JUDGE_MAX_TOKENS_PROBE = 32
+
+# G6: default judge pricing for cost attribution.  Judge cost is computed from
+# the real per-call token counts (captured in Score.metadata at generate time)
+# times this rate.  Judges are a mix of vendor families; we use a
+# Claude-Sonnet-class $3 / $15 per-Mtoken rate as a conservative blended default
+# (slightly over-estimates -> budget-safe).  snapshot_at = Unix epoch is a
+# sentinel meaning "estimate, not a fetched OpenRouter snapshot"; wiring real
+# per-judge pricing from the proxy is a follow-up (does not touch this contract).
+_DEFAULT_JUDGE_PRICING = PricingTuple(
+    model_id="_judge_default",
+    input_per_mtoken_usd=Decimal("3.0"),
+    output_per_mtoken_usd=Decimal("15.0"),
+    snapshot_at=datetime(1970, 1, 1, tzinfo=UTC),
+)
+
+
+@dataclass
+class _JudgeTokenStats:
+    """Minimal stats shim satisfying ``cost.EvalStatsLike`` for judge cost (G6).
+
+    ``compute_cost`` only reads ``input_tokens`` / ``output_tokens``; this
+    two-field record adapts the per-judge counts (read back from Score.metadata)
+    to that protocol without importing inspect_ai's ModelUsage at runtime.
+
+    Not ``frozen``: ``EvalStatsLike`` declares its members as settable, so a
+    frozen (read-only) dataclass would fail the Protocol's structural check.
+    """
+
+    input_tokens: int
+    output_tokens: int
 
 
 # ---------------------------------------------------------------------------
@@ -314,6 +352,131 @@ def _load_rubric_criteria(task_id: str) -> dict[str, dict[str, object]]:
     return {str(k): cast_dict(v) for k, v in criteria_raw.items()}
 
 
+def _build_rubric_prompt(
+    rubric_criteria: dict[str, dict[str, object]],
+    candidate_output: str,
+) -> str:
+    """Build the per-criterion rubric scoring prompt presented to a judge.
+
+    Shared by the production scorer (``_make_rubric_scorer``) and the
+    calibration path (``_score_calibration_sample``) so both present IDENTICAL
+    instructions — calibration measures the same scoring behaviour used in
+    production, with no second prompt that could silently drift.
+    """
+    criteria_lines: list[str] = []
+    for cname, cdict in rubric_criteria.items():
+        weight = cdict.get("weight", 1.0)
+        description = str(cdict.get("description", "")).strip()
+        anchors_raw = cdict.get("anchors", {})
+        # Anchor keys may be ints (YAML `0:`) or strings (`"0":`) — normalise to str.
+        anchors: dict[str, object] = (
+            {str(k): v for k, v in anchors_raw.items()} if isinstance(anchors_raw, dict) else {}
+        )
+        anchor_0 = str(anchors.get("0", "score 0")).strip()
+        anchor_5 = str(anchors.get("5", "score 5")).strip()
+        anchor_10 = str(anchors.get("10", "score 10")).strip()
+        criteria_lines.append(
+            f"Criterion: {cname} (weight={weight})\n"
+            f"  Description: {description}\n"
+            f"  Anchor 0:  {anchor_0}\n"
+            f"  Anchor 5:  {anchor_5}\n"
+            f"  Anchor 10: {anchor_10}"
+        )
+
+    criteria_block = "\n\n".join(criteria_lines)
+    criterion_keys_json = json.dumps(list(rubric_criteria.keys()))
+
+    return (
+        "You are an expert code and documentation evaluator.\n\n"
+        "Score the following candidate output against each rubric criterion "
+        "on a scale from 0 to 10 (floats allowed, e.g. 7.5).\n\n"
+        f"## Rubric criteria\n\n{criteria_block}\n\n"
+        "## Candidate output\n\n"
+        f"{candidate_output}\n\n"
+        "## Instructions\n\n"
+        "Respond with ONLY valid JSON (no markdown, no code fences), "
+        "exactly in this shape:\n"
+        '{"rubric_scores": {' + ", ".join(f'"{k}": <float_0_10>' for k in rubric_criteria) + "}, "
+        '"total_score": <float_0_10>, '
+        '"reasoning": "<brief explanation>"}\n\n'
+        f"Criterion keys MUST be exactly: {criterion_keys_json}"
+    )
+
+
+def _parse_rubric_scores(explanation: str, judge_id: str) -> dict[str, float]:
+    """Parse per-criterion scores from a judge's JSON explanation.
+
+    Returns ``{criterion: clamped_0_10_float}``; on any parse failure logs a
+    warning and falls back to ``{"overall": 0.0}`` (degenerate but non-crashing).
+    Shared by ``score()`` and ``_score_calibration_sample`` so both interpret
+    the judge's JSON identically.
+    """
+    rubric_scores: dict[str, float]
+    try:
+        parsed = json.loads(explanation)
+        raw_rubric = parsed.get("rubric_scores", {})
+        rubric_scores = {
+            str(k): max(0.0, min(10.0, float(v)))
+            for k, v in raw_rubric.items()
+            if isinstance(v, (int, float))
+        }
+        if not rubric_scores:
+            raise ValueError("rubric_scores dict is empty or has no numeric values")
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        logger.warning(
+            "JudgePanel: failed to parse rubric JSON for judge %s (exc=%s); "
+            "falling back to {'overall': 0.0}",
+            judge_id,
+            exc,
+        )
+        rubric_scores = {"overall": 0.0}
+    return rubric_scores
+
+
+def _read_judge_usage_meta(score_obj: object) -> tuple[int, int, int]:
+    """Extract ``(tokens_in, tokens_out, latency_ms)`` from a Score's metadata.
+
+    The rubric scorer stashes token counts + wall-clock latency in
+    ``Score.metadata`` (G6).  Defensive on purpose: returns zeros when metadata
+    is absent or not a real dict — unit tests feed MagicMock Score objects whose
+    ``.metadata`` attribute is itself a MagicMock, and we must NOT treat that as
+    usage data.
+    """
+    meta = getattr(score_obj, "metadata", None)
+    if not isinstance(meta, dict):
+        return 0, 0, 0
+
+    def _as_int(value: object) -> int:
+        if isinstance(value, (int, float)):
+            return max(0, int(value))
+        return 0
+
+    return (
+        _as_int(meta.get("tokens_in")),
+        _as_int(meta.get("tokens_out")),
+        _as_int(meta.get("latency_ms")),
+    )
+
+
+def _extract_family_guess(completion: str, probe_families: frozenset[str]) -> str:
+    """Map a judge's free-text identification answer to a probe family.
+
+    Prefers an exact first-word match, then falls back to a substring scan;
+    returns ``"unknown"`` when no probe family appears (judge hedged, refused,
+    or named a family outside the SC-4 list).
+    """
+    text = completion.lower().strip()
+    if not text:
+        return "unknown"
+    first_word = text.split()[0].strip(".,!?\"'`:;")
+    if first_word in probe_families:
+        return first_word
+    for family in sorted(probe_families):
+        if family in text:
+            return family
+    return "unknown"
+
+
 def _make_rubric_scorer(
     judge_model_obj: InspectModel,
     rubric_criteria: dict[str, dict[str, object]],
@@ -347,30 +510,6 @@ def _make_rubric_scorer(
     from inspect_ai.model import GenerateConfig as _GenerateConfig
     from inspect_ai.scorer import Score, scorer
 
-    # Build the rubric block shown to the judge — one entry per criterion.
-    criteria_lines: list[str] = []
-    for cname, cdict in rubric_criteria.items():
-        weight = cdict.get("weight", 1.0)
-        description = str(cdict.get("description", "")).strip()
-        anchors_raw = cdict.get("anchors", {})
-        # Anchor keys may be ints (YAML `0:`) or strings (`"0":`) — normalise to str.
-        anchors: dict[str, object] = (
-            {str(k): v for k, v in anchors_raw.items()} if isinstance(anchors_raw, dict) else {}
-        )
-        anchor_0 = str(anchors.get("0", "score 0")).strip()
-        anchor_5 = str(anchors.get("5", "score 5")).strip()
-        anchor_10 = str(anchors.get("10", "score 10")).strip()
-        criteria_lines.append(
-            f"Criterion: {cname} (weight={weight})\n"
-            f"  Description: {description}\n"
-            f"  Anchor 0:  {anchor_0}\n"
-            f"  Anchor 5:  {anchor_5}\n"
-            f"  Anchor 10: {anchor_10}"
-        )
-
-    criteria_block = "\n\n".join(criteria_lines)
-    criterion_keys_json = json.dumps(list(rubric_criteria.keys()))
-
     @scorer(metrics=[], name=f"judge_{idx}")
     def _rubric_scorer_factory(
         model: InspectModel = judge_model_obj,
@@ -378,32 +517,28 @@ def _make_rubric_scorer(
         async def _score(state: TaskState, generate: Generate) -> Score:
             candidate_output = state.output.completion if state.output else ""
 
-            prompt = (
-                "You are an expert code and documentation evaluator.\n\n"
-                "Score the following candidate output against each rubric criterion "
-                "on a scale from 0 to 10 (floats allowed, e.g. 7.5).\n\n"
-                f"## Rubric criteria\n\n{criteria_block}\n\n"
-                "## Candidate output\n\n"
-                f"{candidate_output}\n\n"
-                "## Instructions\n\n"
-                "Respond with ONLY valid JSON (no markdown, no code fences), "
-                "exactly in this shape:\n"
-                '{"rubric_scores": {'
-                + ", ".join(f'"{k}": <float_0_10>' for k in rubric_criteria)
-                + "}, "
-                '"total_score": <float_0_10>, '
-                '"reasoning": "<brief explanation>"}\n\n'
-                f"Criterion keys MUST be exactly: {criterion_keys_json}"
-            )
+            prompt = _build_rubric_prompt(rubric_criteria, candidate_output)
 
-            # Generate using the judge model — max_tokens already capped via
-            # GenerateConfig at construction time (_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC).
+            # Generate using the judge model — max_tokens capped via
+            # GenerateConfig (_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC) per EVID-023.
+            # G6: time the call and capture token usage so score() can populate
+            # per-judge latency / tokens / cost on each Judgment (the
+            # cost-includes-judge-calls tenet).  Stashed in Score.metadata,
+            # which score() reads back via _read_judge_usage_meta().
+            t0 = time.perf_counter()
             response = await model.generate(
                 input=prompt,
                 config=_GenerateConfig(max_tokens=_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC),
             )
+            latency_ms = int((time.perf_counter() - t0) * 1000)
             completion = response.completion if response else ""
-            return Score(value=0.0, explanation=completion)
+            usage = response.usage if response else None
+            metadata: dict[str, object] = {
+                "tokens_in": int(usage.input_tokens) if usage is not None else 0,
+                "tokens_out": int(usage.output_tokens) if usage is not None else 0,
+                "latency_ms": latency_ms,
+            }
+            return Score(value=0.0, explanation=completion, metadata=metadata)
 
         # Inspect AI consumes the async callable as the scorer implementation;
         # the runtime `@scorer` decorator handles registry wiring.
@@ -688,31 +823,21 @@ class JudgePanel:
                 # Skip this judge rather than crash; caller handles missing judgments.
                 continue
 
-            # G1: parse per-criterion JSON from Score.explanation (Sub-choice B).
-            # The rubric scorer stores its JSON payload in explanation; the
-            # Score.value field carries a placeholder 0.0 (not used for scoring).
+            # G1: parse per-criterion JSON from Score.explanation (Sub-choice B)
+            # via the shared parser (also used by the calibration path).
             raw_explanation = str(score_obj.explanation or "")
-            rubric_scores: dict[str, float]
-            try:
-                parsed = json.loads(raw_explanation)
-                raw_rubric = parsed.get("rubric_scores", {})
-                rubric_scores = {
-                    str(k): max(0.0, min(10.0, float(v)))
-                    for k, v in raw_rubric.items()
-                    if isinstance(v, (int, float))
-                }
-                if not rubric_scores:
-                    raise ValueError("rubric_scores dict is empty or has no numeric values")
-            except (json.JSONDecodeError, ValueError, TypeError) as exc:
-                logger.warning(
-                    "JudgePanel.score(): failed to parse rubric JSON for judge %s "
-                    "(exc=%s); falling back to {'overall': 0.0}",
-                    judge_id,
-                    exc,
-                )
-                rubric_scores = {"overall": 0.0}
+            rubric_scores = _parse_rubric_scores(raw_explanation, judge_id)
 
             total_score = _compute_total_score(rubric_scores, rubric_criteria)
+
+            # G6: per-judge cost accounting.  The rubric scorer stashed token
+            # counts + wall-clock latency in Score.metadata; read them back and
+            # price the call so GridRunner's running total includes judge calls.
+            tokens_in, tokens_out, latency_ms = _read_judge_usage_meta(score_obj)
+            cost_usd = compute_cost(
+                _JudgeTokenStats(input_tokens=tokens_in, output_tokens=tokens_out),
+                _DEFAULT_JUDGE_PRICING,
+            )
 
             judgments.append(
                 Judgment(
@@ -722,10 +847,10 @@ class JudgePanel:
                     rubric_scores=rubric_scores,
                     total_score=total_score,
                     raw_explanation=raw_explanation,
-                    latency_ms=0,  # TODO Slice E — read from log.stats
-                    tokens_in=0,  # TODO Slice E
-                    tokens_out=0,  # TODO Slice E
-                    cost_usd=Decimal("0"),  # TODO Slice E (litellm.cost_per_token)
+                    latency_ms=latency_ms,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_usd=cost_usd,
                 )
             )
 
@@ -1157,6 +1282,55 @@ class JudgePanel:
     # Slice D — internal calibration + probe scoring helpers
     # ------------------------------------------------------------------
 
+    async def _generate_one_judge(
+        self,
+        judge_id: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        """Generate one completion from a single judge model; return its text.
+
+        Wires the LiteLLM proxy env (``OPENAI_BASE_URL`` / ``OPENAI_API_KEY``)
+        the same way ``_run_judge_task`` does, because ``model.generate()`` here
+        runs OUTSIDE an Inspect AI ``eval_async`` context.  Used by the
+        calibration and identification helpers (Slice D), which score one
+        ``(judge, sample)`` pair at a time rather than a full panel.
+
+        Args:
+            judge_id: judge model ID (must be in ``self._judge_models``).
+            prompt: fully-built prompt string.
+            max_tokens: generation cap (EVID-023: always cap to avoid HTTP 402).
+
+        Returns:
+            The judge's completion text ("" if the model returned nothing).
+        """
+        models = self._make_judge_models()
+        try:
+            idx = self._judge_models.index(judge_id)
+        except ValueError as exc:
+            raise ValueError(f"judge_id {judge_id!r} not in panel {self._judge_models}") from exc
+        model = models[idx]
+
+        old_base_url = os.environ.get("OPENAI_BASE_URL")
+        old_api_key = os.environ.get("OPENAI_API_KEY")
+        try:
+            os.environ["OPENAI_BASE_URL"] = self._base_url
+            os.environ["OPENAI_API_KEY"] = self.api_key or "none"
+            response = await model.generate(
+                input=prompt,
+                config=GenerateConfig(max_tokens=max_tokens),
+            )
+            return response.completion if response else ""
+        finally:
+            if old_base_url is None:
+                os.environ.pop("OPENAI_BASE_URL", None)
+            else:
+                os.environ["OPENAI_BASE_URL"] = old_base_url
+            if old_api_key is None:
+                os.environ.pop("OPENAI_API_KEY", None)
+            else:
+                os.environ["OPENAI_API_KEY"] = old_api_key
+
     async def _score_calibration_sample(
         self,
         judge_id: str,
@@ -1165,30 +1339,31 @@ class JudgePanel:
     ) -> float:
         """Score one calibration sample with one judge, returning a 0-10 score.
 
-        In production this will invoke the judge via Inspect AI (same path as
-        score()). In tests this method is mocked via patch.object so no real
-        LLM calls are made.
+        Reuses the SAME rubric prompt + parser as the production ``score()``
+        path (``_build_rubric_prompt`` -> ``_generate_one_judge`` ->
+        ``_parse_rubric_scores`` -> ``_compute_total_score``) so calibration
+        measures the judge exactly as production scoring does — no second,
+        drifting code path.
 
-        The score is extracted the same way as in score(): "C" → 10.0,
-        "I" → 0.0, numeric → scaled. For rubric-based scoring in later slices
-        the return will be the weighted-median total; for Slice D this
-        single-number return is sufficient for MAD computation.
+        In unit tests this method is replaced wholesale via ``patch.object`` so
+        no real LLM calls are made; the real body runs only against the live
+        LiteLLM proxy (validated by the RFC-002 live calibration run).
 
         Args:
-            judge_id: judge model ID (must be in self._judge_models).
-            sample_content: markdown text of the calibration sample.
-            task_id: task identifier (for prompt context).
+            judge_id: judge model ID (must be in ``self._judge_models``).
+            sample_content: text of the calibration sample.
+            task_id: task identifier (selects the rubric for the prompt).
 
         Returns:
-            float in [0.0, 10.0].
+            float in [0.0, 10.0] — the judge's weighted rubric total.
         """
-        # Placeholder — in integration tests this is mocked.
-        # A future slice will wire this to the same Inspect AI eval_async path
-        # used by score(), sharing the forwarding-solver pattern.
-        raise NotImplementedError(
-            "_score_calibration_sample must be mocked in tests or implemented "
-            "in Slice E integration with the Inspect AI eval path."
+        rubric_criteria = _load_rubric_criteria(task_id)
+        prompt = _build_rubric_prompt(rubric_criteria, sample_content)
+        completion = await self._generate_one_judge(
+            judge_id, prompt, _DEFAULT_JUDGE_MAX_TOKENS_RUBRIC
         )
+        rubric_scores = _parse_rubric_scores(completion, judge_id)
+        return _compute_total_score(rubric_scores, rubric_criteria)
 
     async def _score_identification_sample(
         self,
@@ -1197,26 +1372,35 @@ class JudgePanel:
         probe_families: frozenset[str],
         task_id: str,
     ) -> str:
-        """Prompt one judge to identify which model family produced sample_content.
+        """Prompt one judge to identify which model family produced a sample.
 
-        Returns the judge's single-word guess normalised to lowercase.
-        If the guess is not in probe_families, returns "unknown".
+        Returns the judge's single-word guess normalised to lowercase, or
+        ``"unknown"`` if the answer is not one of ``probe_families`` (judge
+        hedged, refused, or named a family outside the SC-4 list).
 
-        In tests this method is mocked via patch.object — no real LLM calls.
+        In unit tests this method is replaced wholesale via ``patch.object`` —
+        no real LLM calls.  The real body runs only against the live proxy.
 
         Args:
             judge_id: judge model ID.
             sample_content: anonymised model output text.
-            probe_families: set of valid one-word family guesses.
-            task_id: task identifier for logging.
+            probe_families: set of valid one-word family guesses (SC-4 list).
+            task_id: task identifier (kept for the mock seam; not in the prompt).
 
         Returns:
-            str: one of the probe_families or "unknown".
+            str: one of ``probe_families`` or ``"unknown"``.
         """
-        raise NotImplementedError(
-            "_score_identification_sample must be mocked in tests or implemented "
-            "in Slice E integration with the Inspect AI eval path."
+        _ = task_id  # part of the patch.object seam; intentionally unused here
+        families_csv = ", ".join(sorted(probe_families))
+        prompt = (
+            "Below is a single model output. Which of these model families "
+            "most likely produced it? Respond with EXACTLY one word from this "
+            f"list: {families_csv}.\n\nOutput:\n{sample_content}"
         )
+        completion = await self._generate_one_judge(
+            judge_id, prompt, _DEFAULT_JUDGE_MAX_TOKENS_PROBE
+        )
+        return _extract_family_guess(completion, probe_families)
 
     # ------------------------------------------------------------------
     # Internal helpers

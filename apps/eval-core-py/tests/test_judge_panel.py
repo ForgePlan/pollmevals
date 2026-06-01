@@ -125,9 +125,7 @@ def _make_doc01_rubric_json(score_per_criterion: float = 8.0) -> str:
     )
 
 
-def _make_fake_score(
-    value: str, explanation: str | None = None
-) -> MagicMock:
+def _make_fake_score(value: str, explanation: str | None = None) -> MagicMock:
     """Build a mock Inspect AI Score object.
 
     Default ``explanation`` is a valid 5-criterion doc_01 rubric JSON string
