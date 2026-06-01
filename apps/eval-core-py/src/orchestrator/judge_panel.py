@@ -22,12 +22,13 @@ Concurrency is OUTSIDE this module — same discipline as eval_caller.py:13-14.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import pathlib
 import random
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import yaml
@@ -45,7 +46,8 @@ if TYPE_CHECKING:
     from inspect_ai import Task as InspectTask
     from inspect_ai.log import EvalLog
     from inspect_ai.model import Model as InspectModel
-    from inspect_ai.solver import Solver
+    from inspect_ai.scorer import Scorer
+    from inspect_ai.solver import Generate, Solver, TaskState
 
     from src.orchestrator.eval_caller import EvalResult
 
@@ -80,6 +82,11 @@ _FAMILY_ALIASES: dict[str, str] = {
 # Default judge max_tokens cap per EVID-023 finding (prevents HTTP 402 on
 # OpenRouter when key budget is low — Claude Sonnet native max is 65k).
 _DEFAULT_JUDGE_MAX_TOKENS = 512
+
+# Rubric-path token cap — slightly higher than the binary path (512) to
+# accommodate per-criterion JSON output.  Sub-choice A: separate constant so
+# the two paths are independently tunable.
+_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 768
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +269,191 @@ def _normalise_model_family(model_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Rubric helpers (G1 — per-criterion scoring)
+# ---------------------------------------------------------------------------
+
+
+def _load_rubric_criteria(task_id: str) -> dict[str, dict[str, object]]:
+    """Load rubric criteria from evals/task-packs/<task_id>/rubric.yaml.
+
+    Returns a dict keyed by criterion name.  Each value is the raw criterion
+    dict from YAML (contains at minimum ``weight``, ``description``,
+    ``anchors``).  Never hardcodes criteria — dynamic per task.
+
+    Path convention mirrors ``run_calibration()`` (:~674):
+        ``pathlib.Path.cwd() / "evals" / "task-packs" / task_id / "rubric.yaml"``
+
+    Args:
+        task_id: eval task slug (e.g. ``"doc_01_cli_readme"``).
+
+    Returns:
+        dict[criterion_name, criterion_dict] — order preserved from YAML.
+
+    Raises:
+        FileNotFoundError: if ``rubric.yaml`` is missing for the task.
+        ValueError: if the YAML is missing the ``criteria`` key.
+    """
+    repo_root = pathlib.Path.cwd()
+    rubric_path = repo_root / "evals" / "task-packs" / task_id / "rubric.yaml"
+
+    if not rubric_path.exists():
+        raise FileNotFoundError(f"rubric.yaml not found for task {task_id!r}: {rubric_path}")
+
+    raw = yaml.safe_load(rubric_path.read_text(encoding="utf-8"))
+    raw_dict = cast_dict(raw)
+    criteria_raw = raw_dict.get("criteria")
+    if not isinstance(criteria_raw, dict):
+        raise ValueError(
+            f"rubric.yaml for task {task_id!r} is missing the 'criteria' key or it is not a mapping"
+        )
+    return {str(k): cast_dict(v) for k, v in criteria_raw.items()}
+
+
+def _make_rubric_scorer(
+    judge_model_obj: InspectModel,
+    rubric_criteria: dict[str, dict[str, object]],
+    idx: int,
+) -> Scorer:
+    """Build a custom Inspect AI scorer for per-criterion rubric scoring.
+
+    The scorer presents all rubric criteria (name, weight, description,
+    0/5/10 anchors) to the judge and asks for a JSON response:
+        {"rubric_scores": {criterion: float_0_10, ...},
+         "total_score": float,
+         "reasoning": "..."}
+
+    The JSON payload is stored in ``Score.explanation`` (Sub-choice B — the
+    confirmed-present string field on the Score model).
+
+    Named via ``scorer(name=f"judge_{idx}")`` (Sub-choice C) so the key in
+    ``sample.scores`` is deterministic (``"judge_0"``, ``"judge_1"``, …)
+    rather than relying on Inspect AI's auto-suffix pattern.
+
+    Args:
+        judge_model_obj: Inspect AI model object (with max_tokens already
+            capped via GenerateConfig).
+        rubric_criteria: loaded criteria dict from ``_load_rubric_criteria``.
+        idx: 0-based position in the shuffled judge list — used as the scorer
+            name suffix.
+
+    Returns:
+        A ``Scorer`` object ready to be placed in ``Task(scorer=[...])``.
+    """
+    from inspect_ai.model import GenerateConfig as _GenerateConfig
+    from inspect_ai.scorer import Score, scorer
+
+    # Build the rubric block shown to the judge — one entry per criterion.
+    criteria_lines: list[str] = []
+    for cname, cdict in rubric_criteria.items():
+        weight = cdict.get("weight", 1.0)
+        description = str(cdict.get("description", "")).strip()
+        anchors_raw = cdict.get("anchors", {})
+        # Anchor keys may be ints (YAML `0:`) or strings (`"0":`) — normalise to str.
+        anchors: dict[str, object] = (
+            {str(k): v for k, v in anchors_raw.items()} if isinstance(anchors_raw, dict) else {}
+        )
+        anchor_0 = str(anchors.get("0", "score 0")).strip()
+        anchor_5 = str(anchors.get("5", "score 5")).strip()
+        anchor_10 = str(anchors.get("10", "score 10")).strip()
+        criteria_lines.append(
+            f"Criterion: {cname} (weight={weight})\n"
+            f"  Description: {description}\n"
+            f"  Anchor 0:  {anchor_0}\n"
+            f"  Anchor 5:  {anchor_5}\n"
+            f"  Anchor 10: {anchor_10}"
+        )
+
+    criteria_block = "\n\n".join(criteria_lines)
+    criterion_keys_json = json.dumps(list(rubric_criteria.keys()))
+
+    @scorer(metrics=[], name=f"judge_{idx}")
+    def _rubric_scorer_factory(
+        model: InspectModel = judge_model_obj,
+    ) -> Scorer:
+        async def _score(state: TaskState, generate: Generate) -> Score:
+            candidate_output = state.output.completion if state.output else ""
+
+            prompt = (
+                "You are an expert code and documentation evaluator.\n\n"
+                "Score the following candidate output against each rubric criterion "
+                "on a scale from 0 to 10 (floats allowed, e.g. 7.5).\n\n"
+                f"## Rubric criteria\n\n{criteria_block}\n\n"
+                "## Candidate output\n\n"
+                f"{candidate_output}\n\n"
+                "## Instructions\n\n"
+                "Respond with ONLY valid JSON (no markdown, no code fences), "
+                "exactly in this shape:\n"
+                '{"rubric_scores": {'
+                + ", ".join(f'"{k}": <float_0_10>' for k in rubric_criteria)
+                + "}, "
+                '"total_score": <float_0_10>, '
+                '"reasoning": "<brief explanation>"}\n\n'
+                f"Criterion keys MUST be exactly: {criterion_keys_json}"
+            )
+
+            # Generate using the judge model — max_tokens already capped via
+            # GenerateConfig at construction time (_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC).
+            response = await model.generate(
+                input=prompt,
+                config=_GenerateConfig(max_tokens=_DEFAULT_JUDGE_MAX_TOKENS_RUBRIC),
+            )
+            completion = response.completion if response else ""
+            return Score(value=0.0, explanation=completion)
+
+        # Inspect AI consumes the async callable as the scorer implementation;
+        # the runtime `@scorer` decorator handles registry wiring.
+        return cast("Scorer", _score)
+
+    return _rubric_scorer_factory()
+
+
+def _compute_total_score(
+    criterion_scores: dict[str, float],
+    rubric_criteria: dict[str, dict[str, object]],
+) -> float:
+    """Compute the weighted total score (or equal-weight mean) from criterion scores.
+
+    For equal-weight packs (all weights identical or all absent): plain mean.
+    For weighted packs: ``sum(weight_i * score_i)`` normalised to [0, 10].
+
+    Args:
+        criterion_scores: dict mapping criterion name → float score in [0, 10].
+        rubric_criteria: criteria metadata from ``_load_rubric_criteria``.
+
+    Returns:
+        float in [0.0, 10.0], clamped.
+    """
+    if not criterion_scores:
+        return 0.0
+
+    weights: list[float] = []
+    for cname in criterion_scores:
+        cdict = rubric_criteria.get(cname, {})
+        w_raw = cdict.get("weight", None)
+        weights.append(float(str(w_raw)) if w_raw is not None else 1.0)
+
+    # Detect equal-weight: all weights numerically identical.
+    if len(set(weights)) == 1:
+        # Equal-weight: plain mean.
+        total = sum(criterion_scores.values()) / len(criterion_scores)
+    else:
+        # Weighted sum — normalise by total weight to keep [0, 10] range.
+        total_weight = sum(weights)
+        if total_weight == 0.0:
+            total = 0.0
+        else:
+            total = (
+                sum(
+                    w * criterion_scores[cname]
+                    for w, cname in zip(weights, criterion_scores, strict=True)
+                )
+                / total_weight
+            )
+
+    return max(0.0, min(10.0, total))
+
+
+# ---------------------------------------------------------------------------
 # JudgePanel
 # ---------------------------------------------------------------------------
 
@@ -371,13 +563,15 @@ class JudgePanel:
         """
         from inspect_ai import Task
         from inspect_ai.dataset import Sample
-        from inspect_ai.scorer import model_graded_qa
         from inspect_ai.solver import solver as _solver
 
         # ── 1. Read raw candidate output from artifact URI ─────────────────
         raw_output_text = self._read_raw_output(eval_result)
 
-        # ── 2. Build forwarding solver — injects pre-computed output so
+        # ── 2. Load rubric criteria for this task (G1: per-criterion scoring)
+        rubric_criteria = _load_rubric_criteria(task_id)
+
+        # ── 3. Build forwarding solver — injects pre-computed output so
         #       judges grade existing text, not a new generation ────────────
         @_solver
         def _forwarding_solver(forced_output: str) -> Solver:
@@ -387,7 +581,6 @@ class JudgePanel:
             the same text that the candidate actually produced.
             """
             from inspect_ai.model import ModelOutput
-            from inspect_ai.solver import Generate, TaskState
 
             async def _solve(state: TaskState, generate: Generate) -> TaskState:
                 state.output = ModelOutput.from_content(
@@ -399,12 +592,14 @@ class JudgePanel:
 
             return _solve
 
-        # ── 3. Randomise judge order (H2 position-bias mitigation) ──────────
+        # ── 4. Randomise judge order (H2 position-bias mitigation) ──────────
         judge_ids_shuffled = list(self._judge_models)
         random.shuffle(judge_ids_shuffled)
 
-        # ── 4. Build per-judge scorers with explicit max_tokens cap ──────────
-        #       EVID-023 finding #3: without this cap, HTTP 402 on OpenRouter.
+        # ── 5. Build per-judge rubric scorers (G1 — replaces model_graded_qa)
+        #       EVID-023 finding: list-of-scorers path works; multi_scorer broken.
+        #       Each scorer uses explicit name "judge_{idx}" (Sub-choice C) so
+        #       sample.scores keys are deterministic.
         judge_model_objs = self._make_judge_models()
         # Rebuild in shuffled order (judge_model_objs preserves init order,
         # so we need to re-map after shuffling).
@@ -413,26 +608,26 @@ class JudgePanel:
             judge_model_objs[original_order.index(jid)] for jid in judge_ids_shuffled
         ]
 
-        scorers = [model_graded_qa(model=jm) for jm in judge_models_in_shuffled_order]
+        scorers = [
+            _make_rubric_scorer(jm, rubric_criteria, idx)
+            for idx, jm in enumerate(judge_models_in_shuffled_order)
+        ]
 
-        # ── 5. Build a minimal Task for judging ──────────────────────────────
-        #       input = task description (so judges understand context)
-        #       target = empty (model_graded_qa grades completion vs input)
+        # ── 6. Build a minimal Task for judging ──────────────────────────────
         #       The forwarding solver injects raw_output_text into state.output.
+        #       The rubric scorers then read state.output.completion.
         sample_input = (
             f"[POLLMEVALS judge task] task={task_id} "
             f"model={eval_result.request.model_id} "
             f"stack={eval_result.request.stack_id} "
-            f"seed={eval_result.request.seed}\n\n"
-            f"Evaluate the following model output for task '{task_id}':\n\n"
-            f"{raw_output_text}"
+            f"seed={eval_result.request.seed}"
         )
 
         judge_task = Task(
             dataset=[
                 Sample(
                     input=sample_input,
-                    target="",  # judges grade via model_graded_qa template
+                    target="",
                     metadata={"forced_output": raw_output_text},
                 )
             ],
@@ -440,14 +635,15 @@ class JudgePanel:
             scorer=scorers,
         )
 
-        # ── 6. Run judges via Inspect AI eval_async ───────────────────────────
+        # ── 7. Run judges via Inspect AI eval_async ───────────────────────────
         #       We set OPENAI_BASE_URL + OPENAI_API_KEY so Inspect AI routes
         #       through the LiteLLM proxy (same pattern as spike script line 183).
         logs = await self._run_judge_task(judge_task)
 
-        # ── 7. Parse per-judge Score from EvalLog.samples[0].scores ──────────
-        #       Keys are auto-assigned: 'model_graded_qa', 'model_graded_qa_1', …
-        #       Per EVID-023: dict with N entries, one per scorer in the list.
+        # ── 8. Parse per-judge Score from EvalLog.samples[0].scores ──────────
+        #       Keys are now "judge_0", "judge_1", … (explicit names, Sub-choice C).
+        #       Fallback to positional access if naming pattern shifted (EVID-023
+        #       positional fallback retained for safety).
         if not logs:
             raise RuntimeError("JudgePanel.score(): Inspect AI eval_async returned no logs")
         # Import EvalLog for isinstance narrowing so mypy knows .samples exists.
@@ -468,13 +664,12 @@ class JudgePanel:
 
         judgments: list[Judgment] = []
         for idx, judge_id in enumerate(judge_ids_shuffled):
-            # Scorer names: first scorer = 'model_graded_qa', subsequent = 'model_graded_qa_1', etc.
-            # Inspect AI uses the auto-suffix pattern confirmed in EVID-023.
-            scorer_key = "model_graded_qa" if idx == 0 else f"model_graded_qa_{idx}"
+            # Primary key: "judge_{idx}" (explicit name via scorer(name=...)).
+            scorer_key = f"judge_{idx}"
             score_obj = scores_dict.get(scorer_key)
 
             if score_obj is None:
-                # Fallback: try positional access if naming pattern shifted.
+                # Fallback: positional access if naming pattern shifted.
                 score_obj_list = list(scores_dict.values())
                 score_obj = score_obj_list[idx] if idx < len(score_obj_list) else None
 
@@ -488,28 +683,40 @@ class JudgePanel:
                 # Skip this judge rather than crash; caller handles missing judgments.
                 continue
 
-            # model_graded_qa returns 'C' (correct) or 'I' (incorrect) for QA-style.
-            # Slice C+ will use multi-criterion rubric scores. For Slice B:
-            # "C" -> 1.0 (correct), "I" -> 0.0 (incorrect), scaled to 0-10.
-            raw_value = score_obj.value
-            if isinstance(raw_value, (int, float)):
-                numeric_01 = max(0.0, min(1.0, float(raw_value)))
-            elif isinstance(raw_value, str):
-                numeric_01 = 1.0 if raw_value.upper() == "C" else 0.0
-            else:
-                numeric_01 = 0.0
+            # G1: parse per-criterion JSON from Score.explanation (Sub-choice B).
+            # The rubric scorer stores its JSON payload in explanation; the
+            # Score.value field carries a placeholder 0.0 (not used for scoring).
+            raw_explanation = str(score_obj.explanation or "")
+            rubric_scores: dict[str, float]
+            try:
+                parsed = json.loads(raw_explanation)
+                raw_rubric = parsed.get("rubric_scores", {})
+                rubric_scores = {
+                    str(k): max(0.0, min(10.0, float(v)))
+                    for k, v in raw_rubric.items()
+                    if isinstance(v, (int, float))
+                }
+                if not rubric_scores:
+                    raise ValueError("rubric_scores dict is empty or has no numeric values")
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                logger.warning(
+                    "JudgePanel.score(): failed to parse rubric JSON for judge %s "
+                    "(exc=%s); falling back to {'overall': 0.0}",
+                    judge_id,
+                    exc,
+                )
+                rubric_scores = {"overall": 0.0}
 
-            # Scale 0-1 -> 0-10 for Judgment.total_score (validated ge=0, le=10).
-            total_score_10 = numeric_01 * 10.0
+            total_score = _compute_total_score(rubric_scores, rubric_criteria)
 
             judgments.append(
                 Judgment(
                     judge_model_id=judge_id,
                     judge_order=idx,
                     rubric_version=self._rubric_version,
-                    rubric_scores={"overall": total_score_10},
-                    total_score=total_score_10,
-                    raw_explanation=str(score_obj.explanation or ""),
+                    rubric_scores=rubric_scores,
+                    total_score=total_score,
+                    raw_explanation=raw_explanation,
                     latency_ms=0,  # TODO Slice E — read from log.stats
                     tokens_in=0,  # TODO Slice E
                     tokens_out=0,  # TODO Slice E
@@ -582,6 +789,26 @@ class JudgePanel:
             [[j.rubric_scores.get(crit, np.nan) for crit in criteria] for j in judgments],
             dtype=float,
         )
+
+        # G1: Criterion-collapse detection.
+        # Judges that return near-identical scores across all criteria produce a
+        # degenerate row where std < 0.5 on the 0-10 scale; Krippendorff alpha is
+        # unreachable regardless of inter-judge agreement on the single flat value.
+        # Warning only (not error) -- the aggregation continues with the matrix.
+        for judgment in judgments:
+            row_scores = [
+                judgment.rubric_scores[crit] for crit in criteria if crit in judgment.rubric_scores
+            ]
+            if len(row_scores) > 1:
+                row_std = float(np.std(row_scores))
+                if row_std < 0.5:
+                    logger.warning(
+                        "aggregate(): criterion collapse detected -- judge %s "
+                        "has near-identical criterion scores (std=%.3f < 0.5); "
+                        "Krippendorff alpha will remain degenerate for this panel.",
+                        judgment.judge_model_id,
+                        row_std,
+                    )
 
         # ── Point estimate (ordinal level per ADR-005) ─────────────────────────
         alpha_point = float(
