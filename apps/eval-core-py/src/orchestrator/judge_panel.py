@@ -88,6 +88,11 @@ _DEFAULT_JUDGE_MAX_TOKENS = 512
 # the two paths are independently tunable.
 _DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 768
 
+# G3: calibration sample file extensions per task language. be_01 uses .ts,
+# fe_01 .tsx, doc_01 .md. The calibration loader must glob all of these or
+# code packs are silently skipped.
+_CALIBRATION_SAMPLE_EXTS: tuple[str, ...] = (".md", ".ts", ".tsx", ".py", ".txt")
+
 
 # ---------------------------------------------------------------------------
 # Module-level helpers (Slice D)
@@ -919,8 +924,14 @@ class JudgePanel:
             level_dir = calib_root / "calibration" / level
             if not level_dir.is_dir():
                 continue
-            for md_file in sorted(level_dir.glob("*.md")):
-                samples.append((level, md_file, md_file.read_text(encoding="utf-8")))
+            # G3: calibration samples are language-specific (be_01 .ts, fe_01
+            # .tsx, doc_01 .md) -- glob all sample extensions, not just .md, or
+            # be_01/fe_01 samples are silently skipped and only doc_01 calibrates.
+            sample_files = sorted(
+                f for ext in _CALIBRATION_SAMPLE_EXTS for f in level_dir.glob(f"*{ext}")
+            )
+            for sample_file in sample_files:
+                samples.append((level, sample_file, sample_file.read_text(encoding="utf-8")))
 
         # ── 3. Compute calibration_hash (SHA-256 of YAML + all sample bodies) ─
         hasher = hashlib.sha256()
