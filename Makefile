@@ -12,7 +12,8 @@ endif
         validate-tasks validate-stacks reproduce \
         smoke-run smoke-dry resume postmortem \
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
-        openrouter-smoke env-check
+        openrouter-smoke env-check \
+        harness-image-aider sandbox-net-up
 
 demo-run:
 	python -m pollmevals_eval_core.demo_run --tasks evals/tasks --output artifacts
@@ -108,6 +109,23 @@ stack-down:
 
 stack-status:
 	@docker ps --filter 'name=pollmevals-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+# ---------------------------------------------------------------------------
+# Harness sandbox images (RFC-006 Half A — candidate-side agent CLIs)
+# ---------------------------------------------------------------------------
+
+# Build the aider harness image (RFC-006 Phase 2). No spend — pulls base + pip.
+harness-image-aider:
+	docker build -t pollmevals-harness-aider:0.1.0 infra/docker/harness-aider/
+
+# Attach the proxy to the internal sandbox bastion net (RFC-006 decision A) on
+# an ALREADY-running stack, without a full `stack-up` recreate. Idempotent.
+sandbox-net-up:
+	@docker network inspect pollmevals-sandbox >/dev/null 2>&1 \
+	  || docker network create --internal pollmevals-sandbox
+	@docker network connect pollmevals-sandbox pollmevals-litellm-proxy 2>/dev/null \
+	  && echo "✅ proxy attached to pollmevals-sandbox" \
+	  || echo "ℹ️  proxy already on pollmevals-sandbox (or not running — 'make stack-up')"
 
 # ---------------------------------------------------------------------------
 # Observability stack (LGTM + OTEL collector) — per NOTE-003
