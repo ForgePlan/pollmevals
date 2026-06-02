@@ -16,7 +16,7 @@ import asyncio
 import dataclasses
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -217,8 +217,14 @@ class GridRunner:
         max_concurrent: int = MAX_CONCURRENT_EVALS,
         judge_panel: JudgePanel | None = None,
         judge_cost_estimate_per_eval: Decimal = Decimal("0.15"),
+        caller_for_stack: Callable[[str], EvalCaller] | None = None,
     ) -> None:
         self._caller = caller
+        # RFC-006 Phase 4b: dispatch-by-stack. When set, GridRunner picks the
+        # caller per stack_id (raw-llm → InspectEvalCaller, CLI stacks →
+        # StackExecutorCaller); falls back to the single ``caller`` otherwise so
+        # every pre-existing construction is unchanged.
+        self._caller_for_stack = caller_for_stack
         self._journal_writer = journal_writer
         self._budget_gate = budget_gate
         self._pricing_snapshot = pricing_snapshot
@@ -289,8 +295,13 @@ class GridRunner:
 
             with tracer.start_as_current_span("eval.run_single", attributes=span_attrs) as span:
                 start_ns = time.monotonic_ns()
+                caller = (
+                    self._caller_for_stack(request.stack_id)
+                    if self._caller_for_stack is not None
+                    else self._caller
+                )
                 try:
-                    result = await self._caller.call(request)
+                    result = await caller.call(request)
                 except Exception as exc:
                     span.record_exception(exc)
                     span.set_status(StatusCode.ERROR, str(exc))
