@@ -1,0 +1,52 @@
+# source: nebius/SWE-rebench-V2 instance box-project__box-644 (code license: MIT, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_009
+slug: swe-rebench-box-644
+version: '1.0'
+category: bugfix
+difficulty: easy
+language: php
+sourcing: hybrid
+license:
+  code: MIT
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: box-project__box-644
+  repo: box-project/box
+  base_commit: a41f20979a19741f9de8b436ad46b6daa71e53e5
+  image_name: docker.io/swerebenchv2/box-project-box:644-a41f209
+  test_cmd: bin/phpunit --verbose --colors=never --testdox
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: easy
+  pr_categories:
+  - core_feat
+description: "Docker support with PHP 8\nAs latest version 3.16.0, Box is supposed to support both PHP\
+  \ 7.x and 8.x\r\n\r\nBut when you look inside [DockerFileGenerator](https://github.com/box-project/box/blob/3.16.0/src/DockerFileGenerator.php#L43-L49)\
+  \ no images are defined for PHP 8.0 and 8.1\r\n\r\nIs it just forgotten ? `8.0-cli-alpine` and `8.1-cli-alpine`\
+  \ images are available on DockerHub"
+prompt_template: "# Bug fix: box-project/box\n\nYou are fixing a real bug in the open-source repository\
+  \ `box-project/box` at commit `a41f20979a19741f9de8b436ad46b6daa71e53e5`.\n\n## Issue\n\nDocker support\
+  \ with PHP 8\nAs latest version 3.16.0, Box is supposed to support both PHP 7.x and 8.x\r\n\r\nBut when\
+  \ you look inside [DockerFileGenerator](https://github.com/box-project/box/blob/3.16.0/src/DockerFileGenerator.php#L43-L49)\
+  \ no images are defined for PHP 8.0 and 8.1\r\n\r\nIs it just forgotten ? `8.0-cli-alpine` and `8.1-cli-alpine`\
+  \ images are available on DockerHub\n\n## Task\n\nModify the php source so the reported problem is resolved.\
+  \ Produce a patch against the repository at the given base commit that makes the failing tests pass\
+  \ without breaking the existing passing tests.\n\nConstraints:\n  - Change only what the fix requires;\
+  \ keep the diff minimal and focused.\n  - Do not edit the test files — they are the hidden acceptance\
+  \ criteria.\n  - Preserve the existing public API unless the issue explicitly requires a change.\n\n\
+  Output a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

@@ -1,0 +1,61 @@
+# source: BigCodeBench task #BigCodeBench/4 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0004
+slug: bcb-0004-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/4"
+  entry_point: task_func
+  libs: ["collections", "itertools"]
+  retrieved: 2026-06-03
+
+description: |
+  Count the occurrence of each integer in the values of the input dictionary, where each value is a list of integers, and return a dictionary with these counts. The resulting dictionary's keys are the integers, and the values are their respective counts across all lists in the input dictionary.
+  The function should output with:
+      dict: A dictionary where each key is an integer from any of the input lists, and the value is the count of
+      how often that integer appears in all the lists combined.
+  You should write self-contained code starting with:
+  ```
+  from collections import Counter
+  import itertools
+  def task_func(d):
+  ```
+
+prompt_template: |
+  Count the occurrence of each integer in the values of the input dictionary, where each value is a list of integers, and return a dictionary with these counts. The resulting dictionary's keys are the integers, and the values are their respective counts across all lists in the input dictionary.
+  The function should output with:
+      dict: A dictionary where each key is an integer from any of the input lists, and the value is the count of
+      how often that integer appears in all the lists combined.
+  You should write self-contained code starting with:
+  ```
+  from collections import Counter
+  import itertools
+  def task_func(d):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

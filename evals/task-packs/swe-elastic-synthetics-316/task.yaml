@@ -1,0 +1,54 @@
+# source: nebius/SWE-rebench-V2 instance elastic__synthetics-316 (code license: MIT, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_001
+slug: swe-rebench-synthetics-316
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: typescript
+sourcing: hybrid
+license:
+  code: MIT
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: elastic__synthetics-316
+  repo: elastic/synthetics
+  base_commit: f52f0bf3d18ca418d1eec4afd1370751fdd914ce
+  image_name: docker.io/swerebenchv2/elastic-synthetics:316-f52f0bf
+  test_cmd: npm run test:unit -- --verbose --no-color
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - minor_bug
+description: "propagate errors from `beforeAll` and `afterAll` hooks\n+ Now error in the `beforeAll` and\
+  \ `afterAll` hooks would be captured and reported as error, but they will not be associated with the\
+  \ reporters in the correct way. \r\n+ Without associating these errors, the Uptime UI will have no information\
+  \ about what happened during the context of a single execution. \r\n\r\nWe have to figure out a way\
+  \ to solve this problem."
+prompt_template: "# Bug fix: elastic/synthetics\n\nYou are fixing a real bug in the open-source repository\
+  \ `elastic/synthetics` at commit `f52f0bf3d18ca418d1eec4afd1370751fdd914ce`.\n\n## Issue\n\npropagate\
+  \ errors from `beforeAll` and `afterAll` hooks\n+ Now error in the `beforeAll` and `afterAll` hooks\
+  \ would be captured and reported as error, but they will not be associated with the reporters in the\
+  \ correct way. \r\n+ Without associating these errors, the Uptime UI will have no information about\
+  \ what happened during the context of a single execution. \r\n\r\nWe have to figure out a way to solve\
+  \ this problem.\n\n## Task\n\nModify the typescript source so the reported problem is resolved. Produce\
+  \ a patch against the repository at the given base commit that makes the failing tests pass without\
+  \ breaking the existing passing tests.\n\nConstraints:\n  - Change only what the fix requires; keep\
+  \ the diff minimal and focused.\n  - Do not edit the test files — they are the hidden acceptance criteria.\n\
+  \  - Preserve the existing public API unless the issue explicitly requires a change.\n\nOutput a unified\
+  \ diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

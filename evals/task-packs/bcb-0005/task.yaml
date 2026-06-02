@@ -1,0 +1,61 @@
+# source: BigCodeBench task #BigCodeBench/5 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0005
+slug: bcb-0005-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/5"
+  entry_point: task_func
+  libs: ["math", "random"]
+  retrieved: 2026-06-03
+
+description: |
+  Create a dictionary where keys are letters from a predefined list LETTERS and values are lists of random integers. Then, calculates the population standard deviation for each list of integers and returns a dictionary of these values. The random integers for each key are generated within the range 0 to 100, and each list contains between 1 to 10 integers.
+  The function should output with:
+      dict: A dictionary where each key corresponds to a letter from the input list and each value is the
+      population standard deviation of a list of random integers associated with that key.
+  You should write self-contained code starting with:
+  ```
+  import random
+  import math
+  def task_func(LETTERS=[chr(i) for i in range(97, 123)]):
+  ```
+
+prompt_template: |
+  Create a dictionary where keys are letters from a predefined list LETTERS and values are lists of random integers. Then, calculates the population standard deviation for each list of integers and returns a dictionary of these values. The random integers for each key are generated within the range 0 to 100, and each list contains between 1 to 10 integers.
+  The function should output with:
+      dict: A dictionary where each key corresponds to a letter from the input list and each value is the
+      population standard deviation of a list of random integers associated with that key.
+  You should write self-contained code starting with:
+  ```
+  import random
+  import math
+  def task_func(LETTERS=[chr(i) for i in range(97, 123)]):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

@@ -1,0 +1,49 @@
+# source: nebius/SWE-rebench-V2 instance crawler-commons__crawler-commons-227 (code license: Apache-2.0, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.rubric.v1
+task_id: swe_004
+rubric_version: '1.0'
+sourcing: hybrid
+language: java
+criteria:
+  correctness:
+    weight: 0.5
+    description: Does the patch make the FAIL_TO_PASS tests pass while keeping all PASS_TO_PASS tests
+      green? Primary signal is the objective test grid (gold/expectations.json), not judge opinion.
+    anchors:
+      0: FAIL_TO_PASS tests still fail, or the patch breaks PASS_TO_PASS tests.
+      5: Resolves the reported issue on the happy path but regresses an edge case or leaves one FAIL_TO_PASS
+        test failing.
+      10: All FAIL_TO_PASS pass and no PASS_TO_PASS regress; the fix matches the intent of the reported
+        issue.
+  minimalism:
+    weight: 0.2
+    description: Is the diff scoped to the fix? No drive-by refactors, no unrelated file churn, no edits
+      to test files.
+    anchors:
+      0: Large unrelated rewrite, or edits the test files to force a pass.
+      5: Mostly focused but includes some incidental, unrelated changes.
+      10: Tight, minimal diff touching only what the fix requires.
+  root_cause:
+    weight: 0.2
+    description: Does the change address the underlying cause rather than masking the symptom (e.g. swallowing
+      an error or special-casing the test input)?
+    anchors:
+      0: Hard-codes the expected test output or suppresses the symptom.
+      5: Plausible fix but narrow; may not generalise beyond the test case.
+      10: Addresses the root cause; the fix generalises to the whole bug class.
+  code_clarity:
+    weight: 0.1
+    description: Does the patch read like idiomatic, maintainable code for this language and repository?
+      Clear names, no dead code, consistent style.
+    anchors:
+      0: Obfuscated or inconsistent with the surrounding code.
+      5: Acceptable but with minor style or naming issues.
+      10: Idiomatic and consistent with the repository's conventions.
+output_schema:
+  rubric_scores:
+    correctness: 0..10
+    minimalism: 0..10
+    root_cause: 0..10
+    code_clarity: 0..10
+  total_score: 0..10
+  reasoning: Free-text, cite evidence from the candidate diff.

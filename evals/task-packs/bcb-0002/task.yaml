@@ -1,0 +1,59 @@
+# source: BigCodeBench task #BigCodeBench/2 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0002
+slug: bcb-0002-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/2"
+  entry_point: task_func
+  libs: ["statistics", "random"]
+  retrieved: 2026-06-03
+
+description: |
+  Create a dictionary in which keys are random letters and values are lists of random integers. The dictionary is then sorted by the mean of the values in descending order, demonstrating the use of the statistics library.
+  The function should output with:
+      dict: The sorted dictionary with letters as keys and lists of integers as values, sorted by their mean values.
+  You should write self-contained code starting with:
+  ```
+  import random
+  import statistics
+  def task_func(LETTERS):
+  ```
+
+prompt_template: |
+  Create a dictionary in which keys are random letters and values are lists of random integers. The dictionary is then sorted by the mean of the values in descending order, demonstrating the use of the statistics library.
+  The function should output with:
+      dict: The sorted dictionary with letters as keys and lists of integers as values, sorted by their mean values.
+  You should write self-contained code starting with:
+  ```
+  import random
+  import statistics
+  def task_func(LETTERS):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

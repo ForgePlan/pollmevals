@@ -1,0 +1,65 @@
+# source: BigCodeBench task #BigCodeBench/9 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0009
+slug: bcb-0009-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/9"
+  entry_point: task_func
+  libs: ["pandas", "matplotlib", "seaborn"]
+  retrieved: 2026-06-03
+
+description: |
+  Create a Pandas DataFrame from a list of pairs and visualize the data using a bar chart. - The title of the barplot should be set to 'Category vs Value'`.
+  The function should output with:
+      tuple:
+      DataFrame: A pandas DataFrame with columns 'Category' and 'Value'.
+      Axes: A matplotlib Axes displaying a bar chart of categories vs. values.
+  You should write self-contained code starting with:
+  ```
+  import pandas as pd
+  import matplotlib.pyplot as plt
+  import seaborn as sns
+  def task_func(list_of_pairs):
+  ```
+
+prompt_template: |
+  Create a Pandas DataFrame from a list of pairs and visualize the data using a bar chart. - The title of the barplot should be set to 'Category vs Value'`.
+  The function should output with:
+      tuple:
+      DataFrame: A pandas DataFrame with columns 'Category' and 'Value'.
+      Axes: A matplotlib Axes displaying a bar chart of categories vs. values.
+  You should write self-contained code starting with:
+  ```
+  import pandas as pd
+  import matplotlib.pyplot as plt
+  import seaborn as sns
+  def task_func(list_of_pairs):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

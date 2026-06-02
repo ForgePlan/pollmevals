@@ -1,0 +1,68 @@
+# source: nebius/SWE-rebench-V2 instance rust-bitcoin__rust-bitcoin-2255 (code license: CC0-1.0, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_010
+slug: swe-rebench-rust-bitcoin-2255
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: rust
+sourcing: hybrid
+license:
+  code: CC0-1.0
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: rust-bitcoin__rust-bitcoin-2255
+  repo: rust-bitcoin/rust-bitcoin
+  base_commit: db37bd27a105006980e5a4788acc23c6de9225df
+  image_name: docker.io/swerebenchv2/rust-bitcoin-rust-bitcoin:2255-db37bd2
+  test_cmd: cargo test --workspace --all-targets --all-features --verbose
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - minor_bug
+description: "`Script::dust_value` method name disagrees with the documentation\nDust is a value that\
+  \ is not economically spendable and can not be broadcasted. The method is called `dust_value` which\
+  \ suggest it returns a value that is too small (and always returning 0 would be a valid implementation)\
+  \ but the documentation says \"Returns the **minimum value* an output with this script should have in\
+  \ order **to be broadcastable** on today’s Bitcoin network.\" (emphasis mine) which implies it's a non-dust\
+  \ value.\r\n\r\nSince writing a method that always returns 0 is useless I assume the documentation is\
+  \ right but the method is named incorrectly. I was not able to verify the implementation yet."
+prompt_template: "# Bug fix: rust-bitcoin/rust-bitcoin\n\nYou are fixing a real bug in the open-source\
+  \ repository `rust-bitcoin/rust-bitcoin` at commit `db37bd27a105006980e5a4788acc23c6de9225df`.\n\n##\
+  \ Issue\n\n`Script::dust_value` method name disagrees with the documentation\nDust is a value that is\
+  \ not economically spendable and can not be broadcasted. The method is called `dust_value` which suggest\
+  \ it returns a value that is too small (and always returning 0 would be a valid implementation) but\
+  \ the documentation says \"Returns the **minimum value* an output with this script should have in order\
+  \ **to be broadcastable** on today’s Bitcoin network.\" (emphasis mine) which implies it's a non-dust\
+  \ value.\r\n\r\nSince writing a method that always returns 0 is useless I assume the documentation is\
+  \ right but the method is named incorrectly. I was not able to verify the implementation yet.\n\nInterface\
+  \ / API notes:\nMethod: Script.minimal_non_dust(&self)\nLocation: impl Script in bitcoin::blockdata::script::borrowed.rs\n\
+  Inputs: self – a reference to the Script whose dust threshold is being queried.\nOutputs: crate::Amount\
+  \ – the minimum value an output with this script must have to be non‑dust, calculated using the default\
+  \ dust‑relay‑fee (3 sat/vByte).\nDescription: Returns the smallest spendable output value for the script\
+  \ under the default Bitcoin Core dust‑relay‑fee policy.\n\nMethod: Script.minimal_non_dust_custom(&self,\
+  \ dust_relay_fee: FeeRate)\nLocation: impl Script in bitcoin::blockdata::script::borrowed.rs\nInputs:\
+  \ self – a reference to the Script; dust_relay_fee – a FeeRate specifying the dust‑relay‑fee to use\
+  \ for the calculation.\nOutputs: crate::Amount – the minimum non‑dust output value for the script using\
+  \ the supplied fee rate.\nDescription: Computes the minimal non‑dust amount for the script, allowing\
+  \ callers to provide a custom dust‑relay‑fee via a FeeRate.\n\n## Task\n\nModify the rust source so\
+  \ the reported problem is resolved. Produce a patch against the repository at the given base commit\
+  \ that makes the failing tests pass without breaking the existing passing tests.\n\nConstraints:\n \
+  \ - Change only what the fix requires; keep the diff minimal and focused.\n  - Do not edit the test\
+  \ files — they are the hidden acceptance criteria.\n  - Preserve the existing public API unless the\
+  \ issue explicitly requires a change.\n\nOutput a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

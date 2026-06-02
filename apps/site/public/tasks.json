@@ -2,6 +2,116 @@
   "generated_from": "evals/task-packs",
   "tasks": [
     {
+      "id": "bcb_0000",
+      "task_id": "bcb-0000",
+      "slug": "bcb-0000-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Calculates the average of the sums of absolute differences between each pair of consecutive numbers for all permutations of a given list. Each permutation is shuffled before calculating the differences.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0000"
+    },
+    {
+      "id": "bcb_0001",
+      "task_id": "bcb-0001",
+      "slug": "bcb-0001-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Generate a random string of the specified length composed of uppercase and lowercase letters, and then count the occurrence of each character in this string.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0001"
+    },
+    {
+      "id": "bcb_0002",
+      "task_id": "bcb-0002",
+      "slug": "bcb-0002-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Create a dictionary in which keys are random letters and values are lists of random integers. The dictionary is then sorted by the mean of the values in descending order, demonstrating the use of the statistics library.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0002"
+    },
+    {
+      "id": "bcb_0003",
+      "task_id": "bcb-0003",
+      "slug": "bcb-0003-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Create a dictionary where keys are specified letters and values are lists of random integers. Then calculate the mean of these integers for each key and return a dictionary of these means.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0003"
+    },
+    {
+      "id": "bcb_0004",
+      "task_id": "bcb-0004",
+      "slug": "bcb-0004-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Count the occurrence of each integer in the values of the input dictionary, where each value is a list of integers, and return a dictionary with these counts.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0004"
+    },
+    {
+      "id": "bcb_0005",
+      "task_id": "bcb-0005",
+      "slug": "bcb-0005-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Create a dictionary where keys are letters from a predefined list LETTERS and values are lists of random integers. Then, calculates the population standard deviation for each list of integers and returns a dictionary of these values.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0005"
+    },
+    {
+      "id": "bcb_0006",
+      "task_id": "bcb-0006",
+      "slug": "bcb-0006-task-func",
+      "category": "backend",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Find the latest log file in a specified directory that matches a given regex pattern.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0006"
+    },
+    {
+      "id": "bcb_0007",
+      "task_id": "bcb-0007",
+      "slug": "bcb-0007-task-func",
+      "category": "backend",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Find the best-selling product from a given CSV file with sales data. This function parses a CSV file assumed to have a header followed by rows containing two columns: 'product' and 'quantity'.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0007"
+    },
+    {
+      "id": "bcb_0008",
+      "task_id": "bcb-0008",
+      "slug": "bcb-0008-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Convert elements in 'T1' to integers and create a list of random integers where the number of integers is determined by the sum of the integers in `T1`. Random integers are generated between 0 and `RANGE` (default is 100).",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0008"
+    },
+    {
+      "id": "bcb_0009",
+      "task_id": "bcb-0009",
+      "slug": "bcb-0009-task-func",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Create a Pandas DataFrame from a list of pairs and visualize the data using a bar chart. - The title of the barplot should be set to 'Category vs Value'`.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/bcb-0009"
+    },
+    {
       "id": "be_01",
       "task_id": "be_01_jwt_auth",
       "slug": "jwt-auth-middleware-with-refresh",
@@ -104,6 +214,396 @@
         }
       ],
       "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/fe_01_multistep_form"
+    },
+    {
+      "id": "lcb_003",
+      "task_id": "lcb-atcoder-abc387-a",
+      "slug": "happy-new-year-2025",
+      "category": "algo",
+      "difficulty": "easy",
+      "language": "python",
+      "summary": "You are given two positive integers A and B. Output the square of A + B. Input The input is given from Standard Input in the following format: A B Output Print the answer. Constraints - 1 \\leq A,B \\leq 2025 - All input values are integers.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc387-a"
+    },
+    {
+      "id": "lcb_001",
+      "task_id": "lcb-atcoder-abc387-b",
+      "slug": "9x9-sum",
+      "category": "algo",
+      "difficulty": "easy",
+      "language": "python",
+      "summary": "Among the 81 integers that appear in the 9-by-9 multiplication table, find the sum of those that are not X. There is a grid of size 9 by 9.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc387-b"
+    },
+    {
+      "id": "lcb_004",
+      "task_id": "lcb-atcoder-abc387-c",
+      "slug": "snake-numbers",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "A positive integer not less than 10 whose top digit (the most significant digit) in decimal representation is strictly larger than every other digit in that number is called a Snake number.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc387-c"
+    },
+    {
+      "id": "lcb_002",
+      "task_id": "lcb-atcoder-abc387-f",
+      "slug": "count-arrays",
+      "category": "algo",
+      "difficulty": "hard",
+      "language": "python",
+      "summary": "You are given positive integers N, M, and a sequence A = (A_1, A_2, \\dots, A_N) of length N, each element being an integer between 1 and N, inclusive.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc387-f"
+    },
+    {
+      "id": "lcb_009",
+      "task_id": "lcb-atcoder-abc388-a",
+      "slug": "upc",
+      "category": "algo",
+      "difficulty": "easy",
+      "language": "python",
+      "summary": "You are given a string S. Here, the first character of S is an uppercase English letter, and the second and subsequent characters are lowercase English letters.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-a"
+    },
+    {
+      "id": "lcb_006",
+      "task_id": "lcb-atcoder-abc388-b",
+      "slug": "heavy-snake",
+      "category": "algo",
+      "difficulty": "easy",
+      "language": "python",
+      "summary": "There are N snakes. Initially, the thickness of the i-th snake is T_i, and its length is L_i. The weight of a snake is defined as the product of its thickness and length.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-b"
+    },
+    {
+      "id": "lcb_008",
+      "task_id": "lcb-atcoder-abc388-c",
+      "slug": "various-kagamimochi",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "There are N mochi (rice cakes) arranged in ascending order of size. The size of the i-th mochi (1 \\leq i \\leq N) is A_i.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-c"
+    },
+    {
+      "id": "lcb_005",
+      "task_id": "lcb-atcoder-abc388-d",
+      "slug": "coming-of-age-celebration",
+      "category": "algo",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "On a certain planet, there are N aliens, all of whom are minors. The i-th alien currently has A_i stones, and will become an adult exactly i years later.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-d"
+    },
+    {
+      "id": "lcb_010",
+      "task_id": "lcb-atcoder-abc388-f",
+      "slug": "dangerous-sugoroku",
+      "category": "algo",
+      "difficulty": "hard",
+      "language": "python",
+      "summary": "There are N squares arranged in a row, labeled 1, 2, \\ldots, N from left to right. You are given M pairs of integers (L_1, R_1), \\ldots, (L_M, R_M).",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-f"
+    },
+    {
+      "id": "lcb_007",
+      "task_id": "lcb-atcoder-abc388-g",
+      "slug": "simultaneous-kagamimochi-2",
+      "category": "algo",
+      "difficulty": "hard",
+      "language": "python",
+      "summary": "There are N mochi (rice cakes), arranged in ascending order of size. The size of the i-th mochi (1\\leq i\\leq N) is A_i.",
+      "criteria": [],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/lcb-atcoder-abc388-g"
+    },
+    {
+      "id": "swe_007",
+      "task_id": "swe-aio-libs-aiohttp-9047",
+      "slug": "swe-rebench-aiohttp-9047",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "ClientSession.get() doesn't support hostname. ### Describe the bug When using a URI with a hostname for an GET call, an error stating 'Bad value for ai_flags' occurs.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-aio-libs-aiohttp-9047"
+    },
+    {
+      "id": "swe_009",
+      "task_id": "swe-box-project-box-644",
+      "slug": "swe-rebench-box-644",
+      "category": "bugfix",
+      "difficulty": "easy",
+      "language": "php",
+      "summary": "Docker support with PHP 8 As latest version 3.16.0, Box is supposed to support both PHP 7.x and 8.x But when you look inside [DockerFileGenerator](https://github.com/box-project/box/blob/3.16.0/src/DockerFileGenerator.php#L43-L49) no images",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-box-project-box-644"
+    },
+    {
+      "id": "swe_008",
+      "task_id": "swe-bvanelli-actualpy-56",
+      "slug": "swe-rebench-actualpy-56",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "python",
+      "summary": "Operation ActionType.SET_SPLIT_AMOUNT not supported ### Description I've a rule that given a certain payee, it creates a split transaction of 50% each. it seems that the code here is not supporting it.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-bvanelli-actualpy-56"
+    },
+    {
+      "id": "swe_004",
+      "task_id": "swe-crawler-commons-crawler-commons-227",
+      "slug": "swe-rebench-crawler-commons-227",
+      "category": "bugfix",
+      "difficulty": "easy",
+      "language": "java",
+      "summary": "[Sitemaps] Sitemap index: stop URL at closing </loc> (cf. [Nutch mailing list](https://lists.apache.org/thread.html/8ebcffbe2bd8edafb6030e4f28fceee07aee08a1ce06a94755ee8d74@%3Cuser.nutch.apache.org%3E) With #153 the sitemaps SAX parser hand",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-crawler-commons-crawler-commons-227"
+    },
+    {
+      "id": "swe_005",
+      "task_id": "swe-dtolnay-cxx-839",
+      "slug": "swe-rebench-cxx-839",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "rust",
+      "summary": "CxxVector::push_back Adding push_back/pop functionality (and other mutation functionality) to `CxxVector` would be helpful for `CxxVector`s containing types that rust can obtain (e.g. `CxxVector<CxxString>` or `CxxVector<SharedPtr<T>>`).",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-dtolnay-cxx-839"
+    },
+    {
+      "id": "swe_001",
+      "task_id": "swe-elastic-synthetics-316",
+      "slug": "swe-rebench-synthetics-316",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "typescript",
+      "summary": "propagate errors from `beforeAll` and `afterAll` hooks + Now error in the `beforeAll` and `afterAll` hooks would be captured and reported as error, but they will not be associated with the reporters in the correct way.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-elastic-synthetics-316"
+    },
+    {
+      "id": "swe_006",
+      "task_id": "swe-gradleup-shadow-1448",
+      "slug": "swe-rebench-shadow-1448",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "kotlin",
+      "summary": "Trouble compiling against older kotlin versions ### Expected and Results We'd expect at least support for kotlin versions in the Gradle 8 family, but we're seeing ``` Class 'com.github.jengelman.gradle.plugins.shadow.ShadowJavaPlugin' was c",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-gradleup-shadow-1448"
+    },
+    {
+      "id": "swe_010",
+      "task_id": "swe-rust-bitcoin-rust-bitcoin-2255",
+      "slug": "swe-rebench-rust-bitcoin-2255",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "rust",
+      "summary": "`Script::dust_value` method name disagrees with the documentation Dust is a value that is not economically spendable and can not be broadcasted.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-rust-bitcoin-rust-bitcoin-2255"
+    },
+    {
+      "id": "swe_003",
+      "task_id": "swe-webpack-contrib-copy-webpack-plugin-590",
+      "slug": "swe-rebench-copy-webpack-plugin-590",
+      "category": "bugfix",
+      "difficulty": "medium",
+      "language": "javascript",
+      "summary": "[Feature] Add order option Hello, In a project I am developing, I have an issue with copying files with the same name from multiple sources.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-webpack-contrib-copy-webpack-plugin-590"
+    },
+    {
+      "id": "swe_002",
+      "task_id": "swe-wtforms-wtforms-614",
+      "slug": "swe-rebench-wtforms-614",
+      "category": "bugfix",
+      "difficulty": "hard",
+      "language": "python",
+      "summary": "Use HTML 5 widgets The HTML 5 widgets are kept in their own section and not used by default, but this distinction doesn't make sense today. \"HTML 5\" is just \"HTML\" now.",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.5
+        },
+        {
+          "name": "minimalism",
+          "weight": 0.2
+        },
+        {
+          "name": "root_cause",
+          "weight": 0.2
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/swe-wtforms-wtforms-614"
     }
   ]
 }

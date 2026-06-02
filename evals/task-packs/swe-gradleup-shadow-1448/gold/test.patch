@@ -1,0 +1,12 @@
+diff --git a/src/documentTest/kotlin/com/github/jengelman/gradle/plugins/shadow/DocCodeSnippetTest.kt b/src/documentTest/kotlin/com/github/jengelman/gradle/plugins/shadow/DocCodeSnippetTest.kt
+index 1af8dc917..d5e06ffc9 100644
+--- a/src/documentTest/kotlin/com/github/jengelman/gradle/plugins/shadow/DocCodeSnippetTest.kt
++++ b/src/documentTest/kotlin/com/github/jengelman/gradle/plugins/shadow/DocCodeSnippetTest.kt
+@@ -10,7 +10,6 @@ import org.junit.jupiter.api.io.TempDir
+ 
+ class DocCodeSnippetTest {
+ 
+-  @OptIn(ExperimentalStdlibApi::class)
+   @TestFactory
+   fun provideDynamicTests(@TempDir root: Path): List<DynamicTest> {
+     val langExecutables = DslLang.entries.map { executor ->

@@ -24,8 +24,13 @@ pre-commit:
       fail_text: "TS/JS format or lint failed — review changes above and re-commit."
 
     # 2. Format + lint staged Python (auto-fix in place).
+    #    Exclude evaluation fixtures: imported gold/ solutions + test suites are
+    #    kept VERBATIM (ADR-007 invariant "never edited in place"; upstream code
+    #    legitimately trips B006/B008 etc.). Same rationale as format-ts/typecheck.
     format-py:
       glob: "*.py"
+      exclude:
+        - "evals/task-packs/**"
       run: uv run ruff format {staged_files} && uv run ruff check --fix {staged_files}
       stage_fixed: true
       fail_text: "Python format or lint failed — review changes above and re-commit."

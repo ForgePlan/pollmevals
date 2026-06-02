@@ -1,0 +1,121 @@
+# source: nebius/SWE-rebench-V2 instance wtforms__wtforms-614 (code license: BSD-3-Clause, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_002
+slug: swe-rebench-wtforms-614
+version: '1.0'
+category: bugfix
+difficulty: hard
+language: python
+sourcing: hybrid
+license:
+  code: BSD-3-Clause
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: wtforms__wtforms-614
+  repo: wtforms/wtforms
+  base_commit: 848d28d67e45cda7a06c4c8ed2768e6a8cb1c016
+  image_name: docker.io/swerebenchv2/wtforms-wtforms:614-848d28d
+  test_cmd: pytest --no-header -rA --tb=line --color=no -p no:cacheprovider -W ignore::DeprecationWarning
+    tests/test_fields.py tests/test_validators.py tests/test_widgets.py
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - core_feat
+description: "Use HTML 5 widgets\nThe HTML 5 widgets are kept in their own section and not used by default,\
+  \ but this distinction doesn't make sense today. \"HTML 5\" is just \"HTML\" now. No supported browser\
+  \ doesn't understand those input types, and ones that aren't supported fall back to text anyway.\r\n\
+  \r\nI already sort of started this by making the required validators add the `required` flag, and I'm\
+  \ taking it further with #406 for more complex flags. Fields should default to using the more specific\
+  \ widgets where possible."
+prompt_template: "# Bug fix: wtforms/wtforms\n\nYou are fixing a real bug in the open-source repository\
+  \ `wtforms/wtforms` at commit `848d28d67e45cda7a06c4c8ed2768e6a8cb1c016`.\n\n## Issue\n\nUse HTML 5\
+  \ widgets\nThe HTML 5 widgets are kept in their own section and not used by default, but this distinction\
+  \ doesn't make sense today. \"HTML 5\" is just \"HTML\" now. No supported browser doesn't understand\
+  \ those input types, and ones that aren't supported fall back to text anyway.\r\n\r\nI already sort\
+  \ of started this by making the required validators add the `required` flag, and I'm taking it further\
+  \ with #406 for more complex flags. Fields should default to using the more specific widgets where possible.\n\
+  \nInterface / API notes:\nMethod: Flags.__getattr__(self, name)  \nLocation: wtforms/fields/core.py\
+  \ → class Flags  \nInputs: *name* – attribute name requested on a Flags instance.  \nOutputs: Returns\
+  \ the attribute’s value if it exists; otherwise returns **None** (previously returned False).  \nDescription:\
+  \ Provides a unified flags object where missing flags evaluate to None, enabling flag‑based widget rendering.\n\
+  \nMethod: Input.__call__(self, field, **kwargs)  \nLocation: wtforms/widgets/core.py → class Input \
+  \ \nInputs: *field* – a WTForms Field instance; **kwargs – optional HTML attributes passed at render\
+  \ time.  \nOutputs: A Markup string for an `<input …>` element; automatically injects any flag attributes\
+  \ whose names appear in the widget’s *validation_attrs* list and are set on *field.flags*.  \nDescription:\
+  \ Renders HTML5‑compatible input elements, pulling validation‑related attributes (e.g., required, minlength,\
+  \ maxlength, min, max, step) from the field’s flags.\n\nMethod: TextInput.__call__(self, field, **kwargs)\
+  \ *(inherited, uses Input.__call__)*  \nLocation: wtforms/widgets/core.py → class TextInput  \nInputs:\
+  \ Same as Input.__call__.  \nOutputs: `<input type=\"text\" …>` markup with added validation attributes.\
+  \  \nDescription: Text input widget that now supports required, maxlength, minlength, and pattern attributes\
+  \ derived from field flags.\n\nMethod: PasswordInput.__call__(self, field, **kwargs)  \nLocation: wtforms/widgets/core.py\
+  \ → class PasswordInput  \nInputs: Same as Input.__call__.  \nOutputs: `<input type=\"password\" …>`\
+  \ markup with validation attributes.  \nDescription: Password input widget supporting the same validation\
+  \ flags as TextInput.\n\nMethod: TextArea.__call__(self, field, **kwargs)  \nLocation: wtforms/widgets/core.py\
+  \ → class TextArea  \nInputs: *field*; **kwargs.  \nOutputs: `<textarea …>` markup with required, maxlength,\
+  \ minlength attributes taken from flags.  \nDescription: Textarea widget now propagates flag‑based validation\
+  \ attributes.\n\nMethod: Select.__call__(self, field, **kwargs)  \nLocation: wtforms/widgets/core.py\
+  \ → class Select  \nInputs: *field*; **kwargs.  \nOutputs: `<select …>` markup with required attribute\
+  \ from flags.  \nDescription: Select widget now adds a required attribute when the field’s flags indicate\
+  \ it.\n\nMethod: SearchField.__init__(self, label=None, validators=None, **kwargs)  \nLocation: wtforms/fields/core.py\
+  \ → class SearchField (inherits StringField)  \nInputs: *label*, *validators*, additional field kwargs.\
+  \  \nOutputs: Instance of a field rendering `<input type=\"search\">`.  \nDescription: New convenience\
+  \ field for HTML `search` input type, using the SearchInput widget.\n\nMethod: TelField.__init__(self,\
+  \ label=None, validators=None, **kwargs)  \nLocation: wtforms/fields/core.py → class TelField (inherits\
+  \ StringField)  \nInputs: Same as SearchField.  \nOutputs: Instance rendering `<input type=\"tel\">`.\
+  \  \nDescription: New field for telephone inputs.\n\nMethod: URLField.__init__(self, label=None, validators=None,\
+  \ **kwargs)  \nLocation: wtforms/fields/core.py → class URLField (inherits StringField)  \nInputs: Same\
+  \ as SearchField.  \nOutputs: Instance rendering `<input type=\"url\">`.  \nDescription: New field for\
+  \ URL inputs.\n\nMethod: EmailField.__init__(self, label=None, validators=None, **kwargs)  \nLocation:\
+  \ wtforms/fields/core.py → class EmailField (inherits StringField)  \nInputs: Same as SearchField. \
+  \ \nOutputs: Instance rendering `<input type=\"email\">`.  \nDescription: New field for email inputs.\n\
+  \nMethod: DateTimeLocalField.__init__(self, label=None, validators=None, format=\"%Y-%m-%d %H:%M:%S\"\
+  , **kwargs)  \nLocation: wtforms/fields/core.py → class DateTimeLocalField (inherits DateTimeField)\
+  \  \nInputs: *label*, *validators*, *format*, additional kwargs.  \nOutputs: Instance rendering `<input\
+  \ type=\"datetime-local\">`.  \nDescription: New field for HTML5 datetime‑local inputs.\n\nMethod: IntegerRangeField.__init__(self,\
+  \ label=None, validators=None, **kwargs)  \nLocation: wtforms/fields/core.py → class IntegerRangeField\
+  \ (inherits IntegerField)  \nInputs: Same as IntegerField.  \nOutputs: Instance rendering `<input type=\"\
+  range\">`.  \nDescription: New field for numeric range inputs, using the RangeInput widget.\n\nMethod:\
+  \ DecimalRangeField.__init__(self, label=None, validators=None, **kwargs)  \nLocation: wtforms/fields/core.py\
+  \ → class DecimalRangeField (inherits DecimalField)  \nInputs: Same as DecimalField.  \nOutputs: Instance\
+  \ rendering `<input type=\"range\">` with step=\"any\".  \nDescription: New field for decimal range\
+  \ inputs.\n\nMethod: Length.__init__(self, min=-1, max=-1, message=None)  \nLocation: wtforms/validators.py\
+  \ → class Length  \nInputs: *min* (int, default –1), *max* (int, default –1), *message* (optional).\
+  \  \nOutputs: Validator instance with *field_flags* dict containing “minlength” and/or “maxlength” when\
+  \ limits are set.  \nDescription: Length validator now provides flag information for widget rendering.\n\
+  \nMethod: NumberRange.__init__(self, min=None, max=None, message=None)  \nLocation: wtforms/validators.py\
+  \ → class NumberRange  \nInputs: *min* (numeric or None), *max* (numeric or None), *message*.  \nOutputs:\
+  \ Validator instance with *field_flags* dict containing “min” and/or “max”.  \nDescription: NumberRange\
+  \ validator now supplies min/max flags for HTML5 widgets.\n\nMethod: Optional.__init__(self, strip_whitespace=True)\
+  \  \nLocation: wtforms/validators.py → class Optional  \nInputs: *strip_whitespace* (bool).  \nOutputs:\
+  \ Validator instance with *field_flags* = {\"optional\": True}.  \nDescription: Optional validator now\
+  \ sets an explicit “optional” flag for widgets.\n\nMethod: DataRequired.__init__(self, message=None)\
+  \  \nLocation: wtforms/validators.py → class DataRequired  \nInputs: *message* (optional).  \nOutputs:\
+  \ Validator instance with *field_flags* = {\"required\": True}.  \nDescription: DataRequired now provides\
+  \ a required flag for widget rendering.\n\nMethod: InputRequired.__init__(self, message=None)  \nLocation:\
+  \ wtforms/validators.py → class InputRequired  \nInputs: *message* (optional).  \nOutputs: Validator\
+  \ instance with *field_flags* = {\"required\": True}.  \nDescription: InputRequired now provides the\
+  \ required flag similarly to DataRequired.\n\nFunction: html_params(**kwargs) *(unchanged signature,\
+  \ but now used by widgets to include flag attributes)*  \nLocation: wtforms/widgets/core.py → helper\
+  \ function.  \nInputs: Arbitrary HTML attribute key/value pairs.  \nOutputs: Properly escaped attribute\
+  \ string.  \nDescription: Generates the attribute list for widget rendering, now receives additional\
+  \ validation attributes from flags.\n\n## Task\n\nModify the python source so the reported problem is\
+  \ resolved. Produce a patch against the repository at the given base commit that makes the failing tests\
+  \ pass without breaking the existing passing tests.\n\nConstraints:\n  - Change only what the fix requires;\
+  \ keep the diff minimal and focused.\n  - Do not edit the test files — they are the hidden acceptance\
+  \ criteria.\n  - Preserve the existing public API unless the issue explicitly requires a change.\n\n\
+  Output a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

@@ -1,0 +1,159 @@
+# source: nebius/SWE-rebench-V2 instance aio-libs__aiohttp-9047 (code license: custom-check-github, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_007
+slug: swe-rebench-aiohttp-9047
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: python
+sourcing: hybrid
+license:
+  code: custom-check-github
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: aio-libs__aiohttp-9047
+  repo: aio-libs/aiohttp
+  base_commit: aca99bc3c73eb6b2ae1eccd7ef76bbe1df96e3f5
+  image_name: docker.io/swerebenchv2/aio-libs-aiohttp:9047-aca99bc
+  test_cmd: pytest --no-header -rA --tb=line --color=no -p no:cacheprovider -W ignore::DeprecationWarning
+    tests/test_connector.py tests/test_proxy.py tests/test_resolver.py
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - major_bug
+description: "ClientSession.get() doesn't support hostname.\n### Describe the bug\r\n\r\nWhen using a\
+  \ URI with a hostname for an GET call, an error stating 'Bad value for ai_flags' occurs. When replacing\
+  \ the hostname with an IPv4 address, the error no longer occurs. I would like to be able to use the\
+  \ hostname instead because I'm trying to connect to a link local IPv6 device.\r\n\r\nI'm trying to do\
+  \ a GET request from a device that is directly connected to my PC. The backtrace is down below:\r\n\r\
+  \nIt appears that this behavior was introduced around this change: https://github.com/aio-libs/aiohttp/commit/38dd9b8557f35bdfc1376e5833fb8e235c9d49ba\r\
+  \n\r\nI've noticed that removing the AI_NUMERICHOST flag causes the error to go away as well. That may\
+  \ be connected to this commit: https://github.com/aio-libs/aiohttp/commit/c48f2d1c93e6f166f73ad0100d646952031d664f\r\
+  \n\r\nI've ALSO tried reverting to using Python 3.8 with aiohttp 3.10.5 and this error does not occur.\r\
+  \n\r\n### To Reproduce\r\n\r\n1. I was able to reproduce the error with the following script:\r\n```\r\
+  \nimport aiohttp\r\nimport asyncio\r\n\r\nasync def main():\r\n    url=\"http://<hostname>:80/<loc>/<loc>/<loc>/\"\
+  \r\n\r\n    async with aiohttp.ClientSession() as client:\r\n        res = await client.get(url)\r\n\
+  \        print(res)\r\n\r\nasyncio.run(main())\r\n```\r\n\r\nI have removed the actual URI information\
+  \ for obvious reasons. \r\n\r\n### Expected behavior\r\n\r\nI except the GET request to complete successfully.\r\
+  \n\r\n### Logs/tracebacks\r\n```\r\nTraceback (most recent call last):\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 1301, in _create_direct_connection\r\n    hosts = await self._resolve_host(host, port, traces=traces)\r\
+  \n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\", line 911, in\
+  \ _resolve_host\r\n    return await asyncio.shield(resolved_host_task)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 948, in _resolve_host_with_throttle\r\n    addrs = await self._resolver.resolve(host, port, family=self._family)\r\
+  \n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/resolver.py\", line 56, in resolve\r\
+  \n    resolved_host, _port = await self._loop.getnameinfo(\r\n  File \"/usr/lib/python3.10/asyncio/base_events.py\"\
+  , line 867, in getnameinfo\r\n    return await self.run_in_executor(\r\n  File \"/usr/lib/python3.10/concurrent/futures/thread.py\"\
+  , line 58, in run\r\n    result = self.fn(*self.args, **self.kwargs)\r\nsocket.gaierror: [Errno -1]\
+  \ Bad value for ai_flags\r\n\r\nThe above exception was the direct cause of the following exception:\r\
+  \n\r\nTraceback (most recent call last):\r\n  File \"/home/leenathan2/Desktop/aiohttp_test.py\", line\
+  \ 11, in <module>\r\n    asyncio.run(main())\r\n  File \"/usr/lib/python3.10/asyncio/runners.py\", line\
+  \ 44, in run\r\n    return loop.run_until_complete(main)\r\n  File \"/usr/lib/python3.10/asyncio/base_events.py\"\
+  , line 649, in run_until_complete\r\n    return future.result()\r\n  File \"/home/leenathan2/Desktop/aiohttp_test.py\"\
+  , line 8, in main\r\n    res = await client.get(url)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/client.py\"\
+  , line 657, in _request\r\n    conn = await self._connector.connect(\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 564, in connect\r\n    proto = await self._create_connection(req, traces, timeout)\r\n  File\
+  \ \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\", line 975, in _create_connection\r\
+  \n    _, proto = await self._create_direct_connection(req, traces, timeout)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 1307, in _create_direct_connection\r\n    raise ClientConnectorError(req.connection_key, exc)\
+  \ from exc\r\naiohttp.client_exceptions.ClientConnectorError: Cannot connect to host <hostname>:80 ssl:default\
+  \ [Bad value for ai_flags]\r\n```\r\n\r\n\r\n### Python Version\r\n\r\n```console\r\nPython 3.10.12\r\
+  \n```\r\n\r\n\r\n### aiohttp Version\r\n\r\n```console\r\nName: aiohttp\r\nVersion: 3.10.5\r\nSummary:\
+  \ Async http client/server framework (asyncio)\r\nHome-page: https://github.com/aio-libs/aiohttp\r\n\
+  Author: \r\nAuthor-email: \r\nLicense: Apache 2\r\nLocation: /home/leenathan2/.local/lib/python3.10/site-packages\r\
+  \nRequires: aiohappyeyeballs, aiosignal, async-timeout, attrs, frozenlist, multidict, yarl\r\n```\r\n\
+  \r\n\r\n### multidict Version\r\n\r\n```console\r\nName: multidict\r\nVersion: 6.0.5\r\nSummary: multidict\
+  \ implementation\r\nHome-page: https://github.com/aio-libs/multidict\r\nAuthor: Andrew Svetlov\r\nAuthor-email:\
+  \ andrew.svetlov@gmail.com\r\nLicense: Apache 2\r\nLocation: /home/leenathan2/.local/lib/python3.10/site-packages\r\
+  \nRequires: \r\nRequired-by: aiohttp, yarl\r\n```\r\n\r\n\r\n### yarl Version\r\n\r\n```console\r\n\
+  Name: yarl\r\nVersion: 1.9.8\r\nSummary: Yet another URL library\r\nHome-page: https://github.com/aio-libs/yarl\r\
+  \nAuthor: Andrew Svetlov\r\nAuthor-email: andrew.svetlov@gmail.com\r\nLicense: Apache-2.0\r\nLocation:\
+  \ /home/leenathan2/.local/lib/python3.10/site-packages\r\nRequires: idna, multidict\r\nRequired-by:\
+  \ aiohttp\r\n```\r\n\r\n\r\n### OS\r\n\r\nUbuntu Linux 22.04\r\n\r\n### Related component\r\n\r\nClient\r\
+  \n\r\n### Additional context\r\n\r\n_No response_\r\n\r\n### Code of Conduct\r\n\r\n- [X] I agree to\
+  \ follow the aio-libs Code of Conduct"
+prompt_template: "# Bug fix: aio-libs/aiohttp\n\nYou are fixing a real bug in the open-source repository\
+  \ `aio-libs/aiohttp` at commit `aca99bc3c73eb6b2ae1eccd7ef76bbe1df96e3f5`.\n\n## Issue\n\nClientSession.get()\
+  \ doesn't support hostname.\n### Describe the bug\r\n\r\nWhen using a URI with a hostname for an GET\
+  \ call, an error stating 'Bad value for ai_flags' occurs. When replacing the hostname with an IPv4 address,\
+  \ the error no longer occurs. I would like to be able to use the hostname instead because I'm trying\
+  \ to connect to a link local IPv6 device.\r\n\r\nI'm trying to do a GET request from a device that is\
+  \ directly connected to my PC. The backtrace is down below:\r\n\r\nIt appears that this behavior was\
+  \ introduced around this change: https://github.com/aio-libs/aiohttp/commit/38dd9b8557f35bdfc1376e5833fb8e235c9d49ba\r\
+  \n\r\nI've noticed that removing the AI_NUMERICHOST flag causes the error to go away as well. That may\
+  \ be connected to this commit: https://github.com/aio-libs/aiohttp/commit/c48f2d1c93e6f166f73ad0100d646952031d664f\r\
+  \n\r\nI've ALSO tried reverting to using Python 3.8 with aiohttp 3.10.5 and this error does not occur.\r\
+  \n\r\n### To Reproduce\r\n\r\n1. I was able to reproduce the error with the following script:\r\n```\r\
+  \nimport aiohttp\r\nimport asyncio\r\n\r\nasync def main():\r\n    url=\"http://<hostname>:80/<loc>/<loc>/<loc>/\"\
+  \r\n\r\n    async with aiohttp.ClientSession() as client:\r\n        res = await client.get(url)\r\n\
+  \        print(res)\r\n\r\nasyncio.run(main())\r\n```\r\n\r\nI have removed the actual URI information\
+  \ for obvious reasons. \r\n\r\n### Expected behavior\r\n\r\nI except the GET request to complete successfully.\r\
+  \n\r\n### Logs/tracebacks\r\n```\r\nTraceback (most recent call last):\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 1301, in _create_direct_connection\r\n    hosts = await self._resolve_host(host, port, traces=traces)\r\
+  \n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\", line 911, in\
+  \ _resolve_host\r\n    return await asyncio.shield(resolved_host_task)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 948, in _resolve_host_with_throttle\r\n    addrs = await self._resolver.resolve(host, port, family=self._family)\r\
+  \n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/resolver.py\", line 56, in resolve\r\
+  \n    resolved_host, _port = await self._loop.getnameinfo(\r\n  File \"/usr/lib/python3.10/asyncio/base_events.py\"\
+  , line 867, in getnameinfo\r\n    return await self.run_in_executor(\r\n  File \"/usr/lib/python3.10/concurrent/futures/thread.py\"\
+  , line 58, in run\r\n    result = self.fn(*self.args, **self.kwargs)\r\nsocket.gaierror: [Errno -1]\
+  \ Bad value for ai_flags\r\n\r\nThe above exception was the direct cause of the following exception:\r\
+  \n\r\nTraceback (most recent call last):\r\n  File \"/home/leenathan2/Desktop/aiohttp_test.py\", line\
+  \ 11, in <module>\r\n    asyncio.run(main())\r\n  File \"/usr/lib/python3.10/asyncio/runners.py\", line\
+  \ 44, in run\r\n    return loop.run_until_complete(main)\r\n  File \"/usr/lib/python3.10/asyncio/base_events.py\"\
+  , line 649, in run_until_complete\r\n    return future.result()\r\n  File \"/home/leenathan2/Desktop/aiohttp_test.py\"\
+  , line 8, in main\r\n    res = await client.get(url)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/client.py\"\
+  , line 657, in _request\r\n    conn = await self._connector.connect(\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 564, in connect\r\n    proto = await self._create_connection(req, traces, timeout)\r\n  File\
+  \ \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\", line 975, in _create_connection\r\
+  \n    _, proto = await self._create_direct_connection(req, traces, timeout)\r\n  File \"/home/leenathan2/.local/lib/python3.10/site-packages/aiohttp/connector.py\"\
+  , line 1307, in _create_direct_connection\r\n    raise ClientConnectorError(req.connection_key, exc)\
+  \ from exc\r\naiohttp.client_exceptions.ClientConnectorError: Cannot connect to host <hostname>:80 ssl:default\
+  \ [Bad value for ai_flags]\r\n```\r\n\r\n\r\n### Python Version\r\n\r\n```console\r\nPython 3.10.12\r\
+  \n```\r\n\r\n\r\n### aiohttp Version\r\n\r\n```console\r\nName: aiohttp\r\nVersion: 3.10.5\r\nSummary:\
+  \ Async http client/server framework (asyncio)\r\nHome-page: https://github.com/aio-libs/aiohttp\r\n\
+  Author: \r\nAuthor-email: \r\nLicense: Apache 2\r\nLocation: /home/leenathan2/.local/lib/python3.10/site-packages\r\
+  \nRequires: aiohappyeyeballs, aiosignal, async-timeout, attrs, frozenlist, multidict, yarl\r\n```\r\n\
+  \r\n\r\n### multidict Version\r\n\r\n```console\r\nName: multidict\r\nVersion: 6.0.5\r\nSummary: multidict\
+  \ implementation\r\nHome-page: https://github.com/aio-libs/multidict\r\nAuthor: Andrew Svetlov\r\nAuthor-email:\
+  \ andrew.svetlov@gmail.com\r\nLicense: Apache 2\r\nLocation: /home/leenathan2/.local/lib/python3.10/site-packages\r\
+  \nRequires: \r\nRequired-by: aiohttp, yarl\r\n```\r\n\r\n\r\n### yarl Version\r\n\r\n```console\r\n\
+  Name: yarl\r\nVersion: 1.9.8\r\nSummary: Yet another URL library\r\nHome-page: https://github.com/aio-libs/yarl\r\
+  \nAuthor: Andrew Svetlov\r\nAuthor-email: andrew.svetlov@gmail.com\r\nLicense: Apache-2.0\r\nLocation:\
+  \ /home/leenathan2/.local/lib/python3.10/site-packages\r\nRequires: idna, multidict\r\nRequired-by:\
+  \ aiohttp\r\n```\r\n\r\n\r\n### OS\r\n\r\nUbuntu Linux 22.04\r\n\r\n### Related component\r\n\r\nClient\r\
+  \n\r\n### Additional context\r\n\r\n_No response_\r\n\r\n### Code of Conduct\r\n\r\n- [X] I agree to\
+  \ follow the aio-libs Code of Conduct\n\nInterface / API notes:\nMethod: TCPConnector._get_ssl_context(self,\
+  \ req: ClientRequest) -> Optional[ssl.SSLContext>\nLocation: aiohttp/connector.py, class TCPConnector\n\
+  Inputs: \n- **req** – a `ClientRequest` instance. The method inspects `req.is_ssl()` and `req.ssl` to\
+  \ decide which SSL context to return.\nOutputs: \n- Returns an `ssl.SSLContext` object when SSL is required,\
+  \ or `None` when the request is not an SSL request. The returned context is one of the module‑level\
+  \ cached contexts (`_SSL_CONTEXT_VERIFIED` or `_SSL_CONTEXT_UNVERIFIED`) depending on verification requirements.\n\
+  Description: Synchronously selects the appropriate SSL context for a request, replacing the previous\
+  \ async version. Used by the connector when establishing TLS connections.\n\nFunction: _make_ssl_context(verified:\
+  \ bool) -> Optional[ssl.SSLContext>\nLocation: aiohttp/connector.py (module‑level function)\nInputs:\
+  \ \n- **verified** – a boolean flag; `True` creates a default verified SSL context, `False` creates\
+  \ an unverified “insecure” context. If the `ssl` module is unavailable, returns `None`.\nOutputs: \n\
+  - Returns a freshly created `ssl.SSLContext` configured for verification (`True`) or without verification\
+  \ (`False`), or `None` when SSL support is absent.\nDescription: Helper that builds an SSL context in\
+  \ a blocking manner. Tests verify that it safely returns `None` when the `ssl` module is mocked out,\
+  \ ensuring connector code degrades gracefully without SSL support.\n\n## Task\n\nModify the python source\
+  \ so the reported problem is resolved. Produce a patch against the repository at the given base commit\
+  \ that makes the failing tests pass without breaking the existing passing tests.\n\nConstraints:\n \
+  \ - Change only what the fix requires; keep the diff minimal and focused.\n  - Do not edit the test\
+  \ files — they are the hidden acceptance criteria.\n  - Preserve the existing public API unless the\
+  \ issue explicitly requires a change.\n\nOutput a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

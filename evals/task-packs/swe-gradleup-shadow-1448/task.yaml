@@ -1,0 +1,67 @@
+# source: nebius/SWE-rebench-V2 instance gradleup__shadow-1448 (code license: Apache-2.0, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_006
+slug: swe-rebench-shadow-1448
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: kotlin
+sourcing: hybrid
+license:
+  code: Apache-2.0
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: gradleup__shadow-1448
+  repo: GradleUp/shadow
+  base_commit: b829b78e37d1f0befe314f1683abfdb7bb2944f0
+  image_name: docker.io/swerebenchv2/gradleup-shadow:1448-b829b78
+  test_cmd: ./gradlew test --rerun-tasks --no-daemon --console=plain && find . -name 'TEST-*.xml' -path
+    '*/test-results/*' -exec cat {} +
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: easy
+  pr_categories:
+  - regression_bug
+description: "Trouble compiling against older kotlin versions\n### Expected and Results\n\nWe'd expect\
+  \ at least support for kotlin versions in the Gradle 8 family, but we're seeing \n```\nClass 'com.github.jengelman.gradle.plugins.shadow.ShadowJavaPlugin'\
+  \ was compiled with an incompatible version of Kotlin. The actual metadata version is 2.1.0, but the\
+  \ compiler version 1.9.0 can read versions up to 2.0.0.\n```\nwhile compiling against Kotlin 1.9.20\
+  \ and Gradle 8.6\n\n### Related environment and versions\n\n_No response_\n\n### Reproduction steps\n\
+  \n1. Create a gradle plugin\n2. Set the gradle version to 8.14\n3. Set the kotlin gradle plugin version\
+  \ to 1.9.25\n4. Observe issue\n\n```\n`/example/gradle-shadow-old-kotlin/plugin/src/main/kotlin/org/example/GradleShadowOldKotlinPlugin.kt:17:17\
+  \ Class 'kotlin.Unit' was compiled with an incompatible version of Kotlin. The actual metadata version\
+  \ is 2.1.0, but the compiler version 1.9.0 can read versions up to 2.0.0.\nThe class is loaded from\
+  \ /Users/cwalker/.gradle/wrapper/dists/gradle-9.0.0-milestone-8-bin/9sf1y14o9rs7csri8q5psfb7a/gradle-9.0.0-milestone-8/lib/kotlin-stdlib-2.1.21.jar!/kotlin/Unit.class\n\
+  ```\n\n### Anything else?\n\n_No response_"
+prompt_template: "# Bug fix: GradleUp/shadow\n\nYou are fixing a real bug in the open-source repository\
+  \ `GradleUp/shadow` at commit `b829b78e37d1f0befe314f1683abfdb7bb2944f0`.\n\n## Issue\n\nTrouble compiling\
+  \ against older kotlin versions\n### Expected and Results\n\nWe'd expect at least support for kotlin\
+  \ versions in the Gradle 8 family, but we're seeing \n```\nClass 'com.github.jengelman.gradle.plugins.shadow.ShadowJavaPlugin'\
+  \ was compiled with an incompatible version of Kotlin. The actual metadata version is 2.1.0, but the\
+  \ compiler version 1.9.0 can read versions up to 2.0.0.\n```\nwhile compiling against Kotlin 1.9.20\
+  \ and Gradle 8.6\n\n### Related environment and versions\n\n_No response_\n\n### Reproduction steps\n\
+  \n1. Create a gradle plugin\n2. Set the gradle version to 8.14\n3. Set the kotlin gradle plugin version\
+  \ to 1.9.25\n4. Observe issue\n\n```\n`/example/gradle-shadow-old-kotlin/plugin/src/main/kotlin/org/example/GradleShadowOldKotlinPlugin.kt:17:17\
+  \ Class 'kotlin.Unit' was compiled with an incompatible version of Kotlin. The actual metadata version\
+  \ is 2.1.0, but the compiler version 1.9.0 can read versions up to 2.0.0.\nThe class is loaded from\
+  \ /Users/cwalker/.gradle/wrapper/dists/gradle-9.0.0-milestone-8-bin/9sf1y14o9rs7csri8q5psfb7a/gradle-9.0.0-milestone-8/lib/kotlin-stdlib-2.1.21.jar!/kotlin/Unit.class\n\
+  ```\n\n### Anything else?\n\n_No response_\n\n## Task\n\nModify the kotlin source so the reported problem\
+  \ is resolved. Produce a patch against the repository at the given base commit that makes the failing\
+  \ tests pass without breaking the existing passing tests.\n\nConstraints:\n  - Change only what the\
+  \ fix requires; keep the diff minimal and focused.\n  - Do not edit the test files — they are the hidden\
+  \ acceptance criteria.\n  - Preserve the existing public API unless the issue explicitly requires a\
+  \ change.\n\nOutput a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15
