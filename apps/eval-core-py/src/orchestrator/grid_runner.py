@@ -17,7 +17,7 @@ import dataclasses
 import logging
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -72,6 +72,11 @@ class GridSpec:
     tasks: list[str]  # task_ids e.g. "be_01_jwt_auth"
     stacks: list[str]  # stack_ids e.g. "raw-llm"
     seeds: list[int]
+    # Per-task wall-clock budget (seconds). Different tasks need different time —
+    # a quick README vs a full backend middleware. Falls back to iter_requests'
+    # ``timeout_s`` for any task not listed. The executor still caps this by the
+    # stack's own ``limits.max_wall_clock_seconds``.
+    task_timeout_s: dict[str, int] = field(default_factory=dict)
 
     def total_evals(self) -> int:
         """Number of evals the grid will attempt (before budget gating)."""
@@ -107,7 +112,7 @@ class GridSpec:
                             stack_id=stack_id,
                             task_id=task_id,
                             seed=seed,
-                            timeout_s=timeout_s,
+                            timeout_s=self.task_timeout_s.get(task_id, timeout_s),
                             max_retries=max_retries,
                         )
 

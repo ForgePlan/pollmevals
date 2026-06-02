@@ -16,7 +16,11 @@ from src.orchestrator.cost import BudgetGate
 from src.orchestrator.eval_caller import EvalRequest, EvalResult, FakeEvalCaller
 from src.orchestrator.grid_runner import GridRunner, GridSpec
 from src.orchestrator.journal import JournalWriter
-from src.orchestrator.stack_caller import StackExecutorCaller, default_model_alias
+from src.orchestrator.stack_caller import (
+    StackExecutorCaller,
+    default_model_alias,
+    make_task_timeout_provider,
+)
 from src.orchestrator.stack_executor import (
     FakeHarnessLauncher,
     HarnessRunOutcome,
@@ -165,3 +169,26 @@ class TestGridRunnerDispatchByStack:
         )
         await runner.run(spec)
         assert sorted(spy.seen) == ["aider", "raw-llm"]
+
+
+class TestPerTaskTimeout:
+    def test_gridspec_overrides_per_task(self) -> None:
+        spec = GridSpec(
+            run_hash="sha256:" + "a" * 64,
+            models=["m"],
+            tasks=["slow", "fast"],
+            stacks=["raw-llm"],
+            seeds=[1],
+            task_timeout_s={"slow": 1200},
+        )
+        got = {r.task_id: r.timeout_s for r in spec.iter_requests(timeout_s=300)}
+        assert got["slow"] == 1200  # per-task override
+        assert got["fast"] == 300  # falls back to the default
+
+    def test_difficulty_provider_reads_task_yaml(self) -> None:
+        repo = Path(__file__).resolve().parents[3]
+        timeout_of = make_task_timeout_provider(repo)
+        # be_01 is declared difficulty=medium -> 600s
+        assert timeout_of("be_01_jwt_auth") == 600
+        # doc_01 is easy -> 300s
+        assert timeout_of("doc_01_cli_readme") == 300

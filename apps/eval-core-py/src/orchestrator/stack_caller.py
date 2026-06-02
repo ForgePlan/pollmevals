@@ -164,6 +164,25 @@ def make_task_prompt_provider(repo_root: Path) -> Callable[[str], str]:
     return _provider
 
 
+# Per-task wall-clock budget by declared difficulty. Different tasks need
+# different time — a quick README (easy) vs a full backend middleware (medium)
+# vs a multi-file refactor (hard). Tune here, or override per task in GridSpec.
+_DIFFICULTY_TIMEOUT_S: dict[str, int] = {"easy": 300, "medium": 600, "hard": 1200}
+
+
+def make_task_timeout_provider(repo_root: Path) -> Callable[[str], int]:
+    """``task_id -> wall-clock seconds`` from the task's declared difficulty."""
+
+    def _provider(task_id: str) -> int:
+        data = yaml.safe_load(
+            (repo_root / "evals" / "task-packs" / task_id / "task.yaml").read_text(encoding="utf-8")
+        )
+        difficulty = str(data.get("difficulty", "medium")) if isinstance(data, dict) else "medium"
+        return _DIFFICULTY_TIMEOUT_S.get(difficulty, 600)
+
+    return _provider
+
+
 def make_be01_snapshot_provider(repo_root: Path) -> Callable[[str, Path], None]:
     """Seed a be_01 candidate workspace: pinned deps only — NO gold, NO tests.
 

@@ -8,6 +8,7 @@ import { StackParetoChart } from "@/components/StackParetoChart";
 import { ScaffoldingLift } from "@/components/ScaffoldingLift";
 import { PerTaskWinners } from "@/components/PerTaskWinners";
 import { StackTable } from "@/components/StackTable";
+import { TaskCards } from "@/components/TaskCards";
 
 function loadBoard(): Board {
   // Prefer the REAL run data (board.json, emitted by build_real_board.py) when
@@ -136,6 +137,17 @@ export default function Home() {
           whole thesis.
         </p>
         <ScaffoldingLift board={board} />
+      </section>
+
+      <section className="section" id="catalogue">
+        <h2>What we evaluate · the tasks</h2>
+        <p className="section-lede">
+          Every score traces back to a concrete task — a frozen prompt, a gold
+          solution, hidden tests, and a weighted judge rubric. Each card links
+          to the full spec in the repo: see exactly what is asked and how it is
+          scored.
+        </p>
+        <TaskCards />
       </section>
 
       <section className="section" id="tasks">
