@@ -89,6 +89,7 @@ from src.orchestrator.grid_runner import (  # noqa: E402
     GridSpec,
 )
 from src.orchestrator.journal import JournalWriter  # noqa: E402
+from src.orchestrator.judge_panel import JudgePanel  # noqa: E402
 from src.orchestrator.manifest_writer import ManifestPath, ManifestWriter  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,11 @@ _LITELLM_BASE_URL = "http://localhost:4000"
 _ARTIFACTS_ROOT = _REPO_ROOT / "artifacts" / "runs"
 _TASK_SPECS_ROOT = _REPO_ROOT / "evals" / "tasks"
 _STACK_SPECS_ROOT = _REPO_ROOT / "stacks"
+
+# Balanced judge panel for --with-judges (strong, family-diverse: anthropic /
+# openai / google). Validated live in EVID-047/048. The candidate model MUST be
+# a different family (the smoke qwen / meta-llama candidates qualify).
+_JUDGE_MODELS: list[str] = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
 
 # Canonical LiteLLM model_name entries (from infra/litellm-config.yaml).
 _LITELLM_MODEL_NAMES: dict[str, str] = {
@@ -941,6 +947,17 @@ async def async_main(args: argparse.Namespace) -> int:
     seeds = list(range(1, args.seeds + 1))
     budget = Decimal(str(args.budget_usd))
     api_key: str = os.environ.get("LITELLM_MASTER_KEY", "")
+    # getattr default keeps manually-built test Namespaces (no --with-judges) working.
+    with_judges: bool = getattr(args, "with_judges", False)
+
+    if with_judges and len(models) != 1:
+        logger.error(
+            "--with-judges requires exactly ONE candidate model (got %d). The "
+            "GridRunner uses a single judge panel with one candidate_model_id. "
+            "Re-run e.g. --models openrouter/qwen/qwen-2-5-14b --tasks doc_01_cli_readme",
+            len(models),
+        )
+        return 1
 
     # Step 1
     task_check = validate_task_specs(tasks)
@@ -1027,11 +1044,24 @@ async def async_main(args: argparse.Namespace) -> int:
         litellm_base_url=_LITELLM_BASE_URL,
         api_key=api_key,
     )
+    judge_panel: JudgePanel | None = None
+    if with_judges:
+        # One panel for the grid → one candidate_model_id for the self-judging
+        # guard (async_main enforced len(models) == 1 above).
+        judge_panel = JudgePanel(
+            judge_models=list(_JUDGE_MODELS),
+            candidate_model_id=models[0],
+            rubric_version="1.0",
+            api_key_env="LITELLM_MASTER_KEY",
+        )
+        logger.info("Judge panel ON: %s judging candidate %s", _JUDGE_MODELS, models[0])
+
     runner = GridRunner(
         caller=caller,
         journal_writer=journal_writer,
         budget_gate=budget_gate,
         pricing_snapshot={},
+        judge_panel=judge_panel,
     )
 
     logger.info("Executing %d evals...", spec.total_evals())
@@ -1045,6 +1075,14 @@ async def async_main(args: argparse.Namespace) -> int:
         grid_result.budget_breach,
         grid_result.total_cost_usd,
     )
+
+    if with_judges:
+        logger.info(
+            "Judges ON: alpha_gate_breach=%s judge_panel_breach=%s "
+            "(per-eval judge scores + alpha in the manifest)",
+            grid_result.alpha_gate_breach,
+            grid_result.judge_panel_breach,
+        )
 
     # Steps 8-9: evaluators (Phase 2D real dispatch)
     logger.info("Step 8: Running evaluators (Phase 2D — ruff/lizard/gitleaks)...")
@@ -1127,6 +1165,15 @@ def main() -> None:
         type=str,
         default="",
         help=("Comma-separated model IDs (default: 5 ADR-003 canonical routes)."),
+    )
+    parser.add_argument(
+        "--with-judges",
+        action="store_true",
+        help=(
+            "Run the judge panel (RFC-002) on each eval. Requires a SINGLE "
+            "non-judge-family candidate model (GridRunner uses one panel with "
+            "one candidate_model_id). Adds ~3 judge calls per eval."
+        ),
     )
 
     args = parser.parse_args()
