@@ -100,6 +100,14 @@ services:
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
 
+    # RFC-006 decision A (2026-06-02): the proxy is the bastion. It joins BOTH
+    # the default net (Postgres + OpenRouter egress) AND the internal sandbox
+    # net, where it is the only reachable host for harness containers. A harness
+    # on `pollmevals-sandbox` can reach the proxy but has NO external route.
+    networks:
+      - default
+      - sandbox
+
     command:
       - "--config"
       - "/app/config.yaml"
@@ -123,3 +131,10 @@ volumes:
 networks:
   default:
     name: pollmevals-dev
+  # RFC-006 decision A: `internal` = no external route. Harness sandboxes
+  # (RFC-006 Half A) join this net; the proxy is the only host attached to it,
+  # so a harness can reach ONLY the metered proxy — no un-metered egress, and
+  # no NET_ADMIN needed (cap_drop ALL holds). Portable Linux/macOS/CI.
+  sandbox:
+    name: pollmevals-sandbox
+    internal: true

@@ -6,6 +6,7 @@ and the pure builders. Mirrors the test_eval_caller.py class-grouping style.
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -15,6 +16,8 @@ import pytest
 from src.orchestrator.cost import PricingTuple
 from src.orchestrator.stack_executor import (
     DEFAULT_PROXY_BASE_URL,
+    SANDBOX_NETWORK,
+    SANDBOX_PROXY_BASE_URL,
     DockerHarnessLauncher,
     ExecStatus,
     ExecutionMode,
@@ -242,10 +245,17 @@ class TestDockerRunKwargs:
         assert kw["security_opt"] == ["no-new-privileges:true"]
         assert kw["network_mode"] == "none"
 
-    def test_proxy_only_is_an_open_decision(self, tmp_path: Path) -> None:
-        # The crux: the proxy-only egress bridge is not baked in until Phase 2.
-        with pytest.raises(NetworkPolicyNotConfigured, match="open RFC-006 decision"):
-            build_docker_run_kwargs(_plan(NetworkPolicy.PROXY_ONLY, tmp_path))
+    def test_proxy_only_joins_internal_bastion_network(self, tmp_path: Path) -> None:
+        # Decision A: PROXY_ONLY -> join the Docker `internal` sandbox network
+        # (the proxy is the only reachable host). No "none" network_mode.
+        kw = build_docker_run_kwargs(_plan(NetworkPolicy.PROXY_ONLY, tmp_path))
+        assert kw["network"] == SANDBOX_NETWORK
+        assert "network_mode" not in kw
+
+    def test_proxy_only_without_network_raises(self, tmp_path: Path) -> None:
+        plan = dataclasses.replace(_plan(NetworkPolicy.PROXY_ONLY, tmp_path), sandbox_network="")
+        with pytest.raises(NetworkPolicyNotConfigured, match="decision A"):
+            build_docker_run_kwargs(plan)
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +307,12 @@ class TestStackExecutorHappyPath:
         ]
         assert plan.network_policy is NetworkPolicy.PROXY_ONLY
         assert plan.mount_dir == tmp_path
-        assert plan.proxy_host == "localhost"
+        assert plan.sandbox_network == SANDBOX_NETWORK
+        # Default executor proxy is the in-sandbox bastion (container name, not
+        # localhost — the internal net has no host route).
+        assert plan.proxy_host == "pollmevals-litellm-proxy"
         assert plan.proxy_port == 4000
+        assert plan.environment["OPENAI_API_BASE"] == "http://pollmevals-litellm-proxy:4000/v1"
 
     @pytest.mark.asyncio
     async def test_timeout_is_min_of_request_and_limit(self, tmp_path: Path) -> None:
@@ -372,14 +386,14 @@ class TestStackExecutorFailureModes:
 
 
 # ---------------------------------------------------------------------------
-# Phase-2 seam: Docker launcher is intentionally not wired yet
+# Phase-3 seam: the real Docker launcher lands with the first real run
 # ---------------------------------------------------------------------------
 
 
-class TestPhase2Seam:
+class TestPhase3Seam:
     @pytest.mark.asyncio
     async def test_docker_launcher_not_wired(self, tmp_path: Path) -> None:
-        with pytest.raises(NotImplementedError, match="Phase 2"):
+        with pytest.raises(NotImplementedError, match="Phase 3"):
             await DockerHarnessLauncher().launch(_plan(NetworkPolicy.NONE, tmp_path))
 
     def test_default_image_name(self) -> None:
@@ -387,3 +401,7 @@ class TestPhase2Seam:
 
     def test_default_proxy_base_url(self) -> None:
         assert DEFAULT_PROXY_BASE_URL == "http://localhost:4000"
+
+    def test_sandbox_proxy_is_container_addressed(self) -> None:
+        # In-sandbox the proxy is the bastion container, not localhost.
+        assert SANDBOX_PROXY_BASE_URL == "http://pollmevals-litellm-proxy:4000"

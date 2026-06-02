@@ -54,6 +54,17 @@ logger = logging.getLogger(__name__)
 # traverse this so we (a) choose the model and (b) meter every token.
 DEFAULT_PROXY_BASE_URL = "http://localhost:4000"
 
+# RFC-006 network decision A (2026-06-02): the harness runs on a Docker
+# `internal` network with the LiteLLM proxy attached as the only reachable host
+# (bastion). The internal net has NO external route, so the harness reaches ONLY
+# the proxy -- no NET_ADMIN needed, cap_drop ALL holds, portable Linux/macOS/CI.
+SANDBOX_NETWORK = "pollmevals-sandbox"
+PROXY_CONTAINER = "pollmevals-litellm-proxy"
+# In-sandbox the proxy is addressed by its container name (Docker DNS), NOT
+# localhost -- localhost:4000 only works from the host, and the internal net has
+# no host route. This is what gets baked into the harness OPENAI_API_BASE.
+SANDBOX_PROXY_BASE_URL = f"http://{PROXY_CONTAINER}:4000"
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -295,6 +306,7 @@ class HarnessRunPlan:
     network_policy: NetworkPolicy
     proxy_host: str
     proxy_port: int
+    sandbox_network: str = SANDBOX_NETWORK
 
 
 @dataclass(frozen=True)
@@ -357,28 +369,35 @@ def build_docker_run_kwargs(plan: HarnessRunPlan) -> dict[str, object]:
     if plan.network_policy is NetworkPolicy.NONE:
         kwargs["network_mode"] = "none"
     else:
-        # PROXY_ONLY — the security-sensitive bridge is an open RFC-006 decision.
-        raise NetworkPolicyNotConfigured(
-            "PROXY_ONLY egress bridge is an open RFC-006 decision "
-            "(sidecar-in-container-net vs host-gateway firewall). Wire it in "
-            f"Phase 2 for proxy {plan.proxy_host}:{plan.proxy_port}."
-        )
+        # PROXY_ONLY — RFC-006 decision A: join the Docker `internal` sandbox
+        # network where the LiteLLM proxy is the only reachable host (bastion).
+        # No host route on that net, so this is the entire egress surface.
+        if not plan.sandbox_network:
+            raise NetworkPolicyNotConfigured(
+                "PROXY_ONLY requires a sandbox_network (RFC-006 decision A: the "
+                "Docker internal bastion network the proxy is attached to)"
+            )
+        kwargs["network"] = plan.sandbox_network
     return kwargs
 
 
 class DockerHarnessLauncher:
-    """Real HarnessLauncher — RFC-006 Phase 2 (NOT wired in Phase 1).
+    """Real HarnessLauncher — lands in RFC-006 Phase 3 (first real run).
 
-    Present as the typed seam + provenance anchor; ``launch()`` raises until
-    Phase 2 builds the CLI sandbox images and resolves the proxy-only bridge.
-    The pure ``build_docker_run_kwargs`` above is already testable.
+    The image (``pollmevals-harness-aider``) and the network (decision A: the
+    Docker internal bastion net) are ready as of Phase 2. ``launch()`` itself —
+    docker-py run + git-diff patch capture + proxy-spend token metering — is
+    built and validated end-to-end against the first real ``aider x qwen x
+    be_01`` run, so it isn't written blind here. ``build_docker_run_kwargs``
+    above (the security-sensitive surface) is already wired + tested.
     """
 
     async def launch(self, plan: HarnessRunPlan) -> HarnessRunOutcome:
         raise NotImplementedError(
-            "DockerHarnessLauncher.launch is RFC-006 Phase 2 — needs the CLI "
-            "sandbox image + the proxy-only network bridge. Phase 1 uses "
-            "FakeHarnessLauncher."
+            "DockerHarnessLauncher.launch lands in RFC-006 Phase 3 (first real "
+            "run): docker-py run on the internal sandbox network + git-diff "
+            "patch capture + proxy-spend token metering, validated against "
+            "aider x qwen x be_01. Phase 1/2 use FakeHarnessLauncher."
         )
 
 
@@ -502,7 +521,7 @@ class StackExecutor:
         self,
         *,
         launcher: HarnessLauncher,
-        proxy_base_url: str = DEFAULT_PROXY_BASE_URL,
+        proxy_base_url: str = SANDBOX_PROXY_BASE_URL,
         api_key: str = "",
         pricing_snapshot: dict[str, PricingTuple] | None = None,
         image_resolver: Callable[[str], str] = default_image_for_cli,
