@@ -21,6 +21,7 @@ Concurrency is OUTSIDE this module — same discipline as eval_caller.py:13-14.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -82,6 +83,13 @@ _FAMILY_ALIASES: dict[str, str] = {
     "qwen": "qwen",
     "alibaba": "qwen",
 }
+
+# inspect_ai.eval_async is process-global and forbids concurrent invocation
+# ("Multiple concurrent calls to eval_async are not allowed"). Serialize every
+# judge-panel eval_async call through this module-wide lock so concurrent
+# GridRunner evals don't crash the judge step (surfaced by the RFC-006 Phase-4c
+# real grid run — without it, parallel judged evals FAIL).
+_EVAL_ASYNC_LOCK = asyncio.Lock()
 
 # Default judge max_tokens cap per EVID-023 finding (prevents HTTP 402 on
 # OpenRouter when key budget is low — Claude Sonnet native max is 65k).
@@ -1528,12 +1536,14 @@ class JudgePanel:
             # overwrites state.output and never calls it (RFC-002 live run). The
             # real judge calls come from the per-judge scorers.
             judge_models = self._make_judge_models()
-            result = await _inspect_eval_async(
-                judge_task,
-                model=judge_models[0],
-                log_dir="/tmp/pollmevals_judge_logs",
-                log_level="warning",
-            )
+            # Serialize: inspect_ai forbids concurrent eval_async (process-global).
+            async with _EVAL_ASYNC_LOCK:
+                result = await _inspect_eval_async(
+                    judge_task,
+                    model=judge_models[0],
+                    log_dir="/tmp/pollmevals_judge_logs",
+                    log_level="warning",
+                )
             if not result:
                 return []
             return [r for r in result if isinstance(r, _EvalLog)]
