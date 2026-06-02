@@ -16,7 +16,12 @@ project:
 
 tasks:
   build:
-    command: 'uv sync'
+    # --all-extras is load-bearing: a bare `uv sync` prunes the `dev` extra
+    # (mypy/pytest/ruff) from the venv, so the dependent `:typecheck`/`:lint`
+    # tasks then run mypy in an ephemeral env that can't see pydantic/httpx/…
+    # → spurious "Cannot find implementation or library stub" errors. Keep the
+    # dev extra installed so mypy resolves the project's own deps.
+    command: 'uv sync --all-extras'
     toolchain: 'unstable_python'
     inputs:
       - 'pyproject.toml'

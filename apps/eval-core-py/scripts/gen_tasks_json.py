@@ -23,6 +23,66 @@ _PACKS = REPO / "evals" / "task-packs"
 _OUT = REPO / "apps" / "site" / "public" / "tasks.json"
 _REPO_URL = "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs"
 
+# Where each pack came from, keyed by task_id prefix. Drives the catalogue's
+# "where is this from" surface (ADR-007 sourcing transparency). `runnable` marks
+# whether the current executor can score it (own-authored be_01 yes; imports
+# need new runners — see IMPORTED-CATALOGUE.md). order: cheapest provenance first.
+_SOURCE_MAP: list[tuple[str, dict[str, object]]] = [
+    (
+        "bcb-",
+        {
+            "source": "BigCodeBench",
+            "source_url": "https://huggingface.co/datasets/bigcode/bigcodebench",
+            "license": "Apache-2.0",
+            "sourcing": "hybrid",
+            "scored": False,
+        },
+    ),
+    (
+        "lcb-atcoder-",
+        {
+            "source": "LiveCodeBench",
+            "source_url": "https://huggingface.co/datasets/livecodebench/code_generation_lite",
+            "license": "MIT",
+            "sourcing": "hybrid",
+            "scored": False,
+        },
+    ),
+    (
+        "swe-",
+        {
+            "source": "SWE-rebench-V2",
+            "source_url": "https://huggingface.co/datasets/nebius/SWE-rebench-V2",
+            "license": "CC-BY-4.0 (code: per-instance)",
+            "sourcing": "hybrid",
+            "scored": False,
+        },
+    ),
+]
+_OWN_SOURCE: dict[str, object] = {
+    "source": "own-authored",
+    "source_url": None,
+    "license": "MIT",
+    "sourcing": "own",
+    "scored": True,
+}
+
+
+def _source_info(task_id: str, declared_sourcing: str) -> dict[str, object]:
+    """Provenance for a pack: source name, URL, license, tier, scored-status.
+
+    Prefix-derived (reliable + stable); the declared `sourcing:` from task.yaml
+    overrides the tier so the catalogue never disagrees with the pack on disk.
+    """
+    info = dict(_OWN_SOURCE)
+    for prefix, meta in _SOURCE_MAP:
+        if task_id.startswith(prefix):
+            info = dict(meta)
+            break
+    if declared_sourcing:
+        info["sourcing"] = declared_sourcing
+    return info
+
 
 def _summary(description: str) -> str:
     """First 1-2 sentences of the task description, single-spaced."""
@@ -56,6 +116,7 @@ def main() -> int:
         d = yaml.safe_load(task_yaml.read_text(encoding="utf-8"))
         if not isinstance(d, dict):
             continue
+        src = _source_info(pack.name, str(d.get("sourcing", "")))
         tasks.append(
             {
                 "id": str(d.get("id", pack.name)),
@@ -67,6 +128,7 @@ def main() -> int:
                 "summary": _summary(str(d.get("description", ""))),
                 "criteria": _criteria(pack),
                 "repo_url": f"{_REPO_URL}/{pack.name}",
+                **src,
             }
         )
 
@@ -74,7 +136,9 @@ def main() -> int:
     _OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {_OUT} ({len(tasks)} tasks)")
     for t in tasks:
-        print(f"  {t['id']:<7} {t['category']:<9} {t['difficulty']:<7} {t['slug']}")
+        print(
+            f"  {t['id']:<7} {t['category']:<9} {t['difficulty']:<7} {t['source']:<16} {t['slug']}"
+        )
     return 0
 
 
