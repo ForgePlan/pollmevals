@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: RFC-004
   relation: informs
-status: draft
+status: active
 title: RFC-004 Slice 1 code review — PASS (after 8b424e1 fixes)
 ---
 
@@ -106,4 +106,5 @@ Deferred (non-blocking, no activation gate): findings #7, #8 (style), #9 (pre-ex
 verdict: supports
 congruence_level: 3
 evidence_type: review
+
 

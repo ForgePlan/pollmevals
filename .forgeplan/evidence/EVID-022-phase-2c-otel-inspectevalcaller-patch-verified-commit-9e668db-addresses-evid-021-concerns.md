@@ -9,7 +9,7 @@ links:
   relation: informs
 - target: EVID-021
   relation: supersedes
-status: draft
+status: active
 title: Phase 2C OTel + InspectEvalCaller patch verified — commit 9e668db addresses EVID-021 CONCERNS
 ---
 
@@ -121,5 +121,6 @@ H3: pytest fails on token-extraction test(s), or existing usage-dict tests now r
 - Re-reviews: EVID-021 (prior CONCERNS verdict on same scope)
 - Commit reviewed: `9e668db`
 - Commit range: `e26977e..9e668db`
+
 
 

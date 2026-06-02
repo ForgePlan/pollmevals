@@ -9,7 +9,7 @@ links:
   relation: informs
 - target: PRD-002
   relation: informs
-status: draft
+status: active
 title: Phase 3 W1 H1 spike — Inspect AI per-judge access SUPPORTED via list-scorer fallback path
 ---
 
@@ -126,5 +126,6 @@ Full successful run log: `/tmp/h1_spike_output_v2.txt` (local; not committed).
 - Candidate model: `openrouter/google/gemini-3-flash-preview` via `gemini-3-flash` proxy route
 - Judges: `openrouter/anthropic/claude-sonnet-4.6` and `openrouter/openai/gpt-5-mini` via `*-judge` proxy routes with `OPENROUTER_API_KEY_JUDGE` billing isolation
 - Date: 2026-05-24, commit `<post-commit SHA in same change>`
+
 
 

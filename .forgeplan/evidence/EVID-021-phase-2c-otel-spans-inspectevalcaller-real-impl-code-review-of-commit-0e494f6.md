@@ -9,7 +9,7 @@ links:
   relation: informs
 - target: NOTE-003
   relation: informs
-status: draft
+status: active
 title: Phase 2C OTel spans + InspectEvalCaller real impl — code review of commit 0e494f6
 ---
 
@@ -145,6 +145,7 @@ Decision strength: all claims 23-27/27; weakest is OTel error-recording finding 
 - Related EVIDENCE: EVID-020 (Phase 2B bootstrap — predecessor evidence)
 - Related NOTE: NOTE-003 (observability stack research — OTel design rationale)
 - Commit: `0e494f6`
+
 
 
 
