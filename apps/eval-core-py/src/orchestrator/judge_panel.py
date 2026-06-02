@@ -96,6 +96,12 @@ _DEFAULT_JUDGE_MAX_TOKENS = 512
 # (monthly budget exhausted), NOT the cap being inherently too high.  If a
 # reasoning judge still truncates at 2048, cap reasoning via reasoning_effort
 # rather than raising further.  Separate from the binary path (512).
+#
+# DONE (2026-06-02, EVID-050): gpt-5-mini spent ALL 2048 tokens on reasoning
+# (finish_reason="length", empty content → unparseable JSON → false 0.0). Fix =
+# `reasoning_effort: low` on the gpt-5-mini-judge alias in
+# infra/litellm-config.yaml. It lives PROXY-side because inspect_ai 0.3.46
+# GenerateConfig has no reasoning_effort / extra_body passthrough.
 _DEFAULT_JUDGE_MAX_TOKENS_RUBRIC = 2048
 
 # G3: calibration sample file extensions per task language. be_01 uses .ts,
