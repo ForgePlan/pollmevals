@@ -386,15 +386,36 @@ class TestStackExecutorFailureModes:
 
 
 # ---------------------------------------------------------------------------
-# Phase-3 seam: the real Docker launcher lands with the first real run
+# DockerHarnessLauncher — the git patch-capture + token parse plumbing is
+# testable WITHOUT Docker (host git + pure parsing). The container run itself
+# is validated by the live smoke (scripts/stack_exec_live_smoke.py).
 # ---------------------------------------------------------------------------
 
 
-class TestPhase3Seam:
-    @pytest.mark.asyncio
-    async def test_docker_launcher_not_wired(self, tmp_path: Path) -> None:
-        with pytest.raises(NotImplementedError, match="Phase 3"):
-            await DockerHarnessLauncher().launch(_plan(NetworkPolicy.NONE, tmp_path))
+class TestDockerLauncherPlumbing:
+    def test_git_base_then_capture_new_file(self, tmp_path: Path) -> None:
+        (tmp_path / "existing.txt").write_text("v1\n")
+        launcher = DockerHarnessLauncher()
+        base = launcher._ensure_git_base(tmp_path)
+        assert len(base) == 40  # a full git sha
+        # simulate the harness editing the tree: modify + add a NEW file
+        (tmp_path / "existing.txt").write_text("v2\n")
+        (tmp_path / "solution.ts").write_text("export const x = 1;\n")
+        patch = launcher._capture_patch(tmp_path, base)
+        assert "solution.ts" in patch  # new file captured
+        assert "+export const x = 1;" in patch
+        assert "-v1" in patch and "+v2" in patch  # modification captured
+
+    def test_capture_empty_when_no_changes(self, tmp_path: Path) -> None:
+        (tmp_path / "a.txt").write_text("same\n")
+        launcher = DockerHarnessLauncher()
+        base = launcher._ensure_git_base(tmp_path)
+        assert launcher._capture_patch(tmp_path, base).strip() == ""
+
+    def test_parse_aider_tokens(self) -> None:
+        launcher = DockerHarnessLauncher()
+        assert launcher._parse_tokens("Tokens: 1.2k sent, 850 received.") == (1200, 850)
+        assert launcher._parse_tokens("no usage line here") == (0, 0)
 
     def test_default_image_name(self) -> None:
         assert default_image_for_cli("aider") == "pollmevals-harness-aider:0.1.0"

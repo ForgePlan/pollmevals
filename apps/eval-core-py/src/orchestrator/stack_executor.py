@@ -34,14 +34,20 @@ the pure docker-kwargs builder (tested), and the full executor orchestration.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
+import os
+import re
+import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -381,24 +387,155 @@ def build_docker_run_kwargs(plan: HarnessRunPlan) -> dict[str, object]:
     return kwargs
 
 
-class DockerHarnessLauncher:
-    """Real HarnessLauncher — lands in RFC-006 Phase 3 (first real run).
+# aider prints a usage line like "Tokens: 1.2k sent, 850 received." at the end
+# of a run. Best-effort parse for the first run; proxy-spend reconciliation
+# (the harness-agnostic source) is the Phase 4 refinement.
+_AIDER_TOKENS_RE = re.compile(
+    r"Tokens:\s*([\d.]+)\s*([km]?)\s*sent.*?([\d.]+)\s*([km]?)\s*received",
+    re.IGNORECASE,
+)
 
-    The image (``pollmevals-harness-aider``) and the network (decision A: the
-    Docker internal bastion net) are ready as of Phase 2. ``launch()`` itself —
-    docker-py run + git-diff patch capture + proxy-spend token metering — is
-    built and validated end-to-end against the first real ``aider x qwen x
-    be_01`` run, so it isn't written blind here. ``build_docker_run_kwargs``
-    above (the security-sensitive surface) is already wired + tested.
+
+def _scale(value: str, suffix: str) -> int:
+    mult = {"k": 1_000, "m": 1_000_000}.get(suffix.lower(), 1)
+    return int(float(value) * mult)
+
+
+class DockerHarnessLauncher:
+    """Real HarnessLauncher (RFC-006 Phase 3).
+
+    Runs the harness in a fresh container on the internal bastion network
+    (decision A) against a writable /workspace bind, then captures the produced
+    patch HOST-side via git so the harness command stays a clean argv list (no
+    shell-quoting of the multi-line task prompt):
+
+        1. host-side: ensure /workspace is a git repo + record a base commit
+        2. container: run ``plan.command`` (argv, no shell) — the harness edits
+           /workspace and may auto-commit
+        3. host-side: ``git add -A && git diff --cached <base>`` — robustly
+           captures committed + working-tree + new files relative to the base
+
+    Token metering is best-effort from the harness self-report for the first
+    run; the proxy is the metered source of truth for cost reconciliation later.
+
+    docker-py is synchronous; ``launch`` wraps the blocking run in
+    ``asyncio.to_thread`` (same discipline as SandboxRun in Half B).
     """
 
+    def __init__(self) -> None:
+        self._client: Any = None
+
     async def launch(self, plan: HarnessRunPlan) -> HarnessRunOutcome:
-        raise NotImplementedError(
-            "DockerHarnessLauncher.launch lands in RFC-006 Phase 3 (first real "
-            "run): docker-py run on the internal sandbox network + git-diff "
-            "patch capture + proxy-spend token metering, validated against "
-            "aider x qwen x be_01. Phase 1/2 use FakeHarnessLauncher."
+        return await asyncio.to_thread(self._run_sync, plan)
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _ensure_client(self) -> Any:
+        if self._client is None:
+            try:
+                import docker  # type: ignore[import-untyped]
+            except ImportError as exc:
+                raise ImportError(
+                    "docker SDK not installed; add `docker>=7.1,<8` to "
+                    "apps/eval-core-py/pyproject.toml dependencies."
+                ) from exc
+            # docker-py's from_env() defaults to /var/run/docker.sock and does
+            # NOT read the docker CLI context. On macOS Docker Desktop the socket
+            # lives under ~/.docker/run, so discover it like the CLI does.
+            if "DOCKER_HOST" not in os.environ:
+                for cand in (
+                    Path.home() / ".docker" / "run" / "docker.sock",
+                    Path("/var/run/docker.sock"),
+                ):
+                    if cand.exists():
+                        os.environ["DOCKER_HOST"] = f"unix://{cand}"
+                        break
+            self._client = docker.from_env()
+        return self._client
+
+    @staticmethod
+    def _git(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        # -c safe.directory=* avoids "dubious ownership" when the container
+        # (uid 1000) and the host user differ on the bind-mounted .git.
+        return subprocess.run(
+            ["git", "-c", "safe.directory=*", "-C", str(workspace), *args],
+            check=False,
+            capture_output=True,
+            text=True,
         )
+
+    def _ensure_git_base(self, workspace: Path) -> str:
+        """Init (if needed) + commit the snapshot AS GIVEN, return base SHA."""
+        if not (workspace / ".git").exists():
+            self._git(workspace, "init", "-q")
+            self._git(workspace, "config", "user.email", "harness@pollmevals.local")
+            self._git(workspace, "config", "user.name", "pollmevals-harness")
+        self._git(workspace, "add", "-A")
+        self._git(workspace, "commit", "-q", "-m", "pollmevals-base", "--allow-empty")
+        return self._git(workspace, "rev-parse", "HEAD").stdout.strip()
+
+    def _capture_patch(self, workspace: Path, base_sha: str) -> str:
+        """Unified diff of everything (committed + working + new) vs base."""
+        self._git(workspace, "add", "-A")
+        return self._git(workspace, "diff", "--cached", base_sha).stdout
+
+    def _run_sync(self, plan: HarnessRunPlan) -> HarnessRunOutcome:
+        workspace = plan.mount_dir
+        base_sha = self._ensure_git_base(workspace)
+
+        client = self._ensure_client()
+        run_kwargs = build_docker_run_kwargs(plan)
+        run_kwargs["command"] = plan.command  # argv list, no shell
+
+        start_ns = time.monotonic_ns()
+        container = client.containers.run(**run_kwargs)
+
+        timed_out = False
+        try:
+            wait_result = container.wait(timeout=plan.timeout_s)
+            exit_code = int(wait_result.get("StatusCode", -1))
+        except Exception as exc:  # docker-py ReadTimeout on overrun
+            logger.warning("Harness container timed out after %ds: %s", plan.timeout_s, exc)
+            timed_out = True
+            with contextlib.suppress(Exception):
+                container.kill()
+            exit_code = 137
+
+        try:
+            stdout = container.logs(stdout=True, stderr=False).decode(errors="replace")
+            stderr = container.logs(stdout=False, stderr=True).decode(errors="replace")
+        except Exception as exc:
+            logger.warning("Harness log capture failed: %s", exc)
+            stdout, stderr = "", ""
+
+        with contextlib.suppress(Exception):
+            container.remove(v=True, force=True)
+
+        wall_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+        patch = self._capture_patch(workspace, base_sha)
+        in_tok, out_tok = self._parse_tokens(stdout + "\n" + stderr)
+
+        return HarnessRunOutcome(
+            exit_code=exit_code,
+            patch=patch,
+            trace=stdout,
+            stderr=stderr,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            tool_calls=0,
+            wall_ms=int(wall_ms),
+            timed_out=timed_out,
+        )
+
+    @staticmethod
+    def _parse_tokens(text: str) -> tuple[int, int]:
+        """Best-effort token counts from the harness self-report (else 0/0)."""
+        m = _AIDER_TOKENS_RE.search(text)
+        if m is None:
+            return 0, 0
+        return _scale(m.group(1), m.group(2)), _scale(m.group(3), m.group(4))
 
 
 @dataclass
