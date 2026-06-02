@@ -1,0 +1,77 @@
+{
+  "run_hash": "sha256:realboard0000000000000000000000000000000000000000000000000",
+  "run_type": "smoke",
+  "methodology_version": "v0.1.0",
+  "region": "eu-central",
+  "scored": true,
+  "illustrative": false,
+  "solved_threshold": 6.0,
+  "harnesses": [
+    {
+      "stack_id": "aider",
+      "name": "Aider",
+      "level": 4,
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools",
+        "L4_file_memory"
+      ],
+      "family": "agnostic"
+    },
+    {
+      "stack_id": "raw-llm",
+      "name": "Raw LLM",
+      "level": 0,
+      "layers": [
+        "L0_bare_llm"
+      ],
+      "family": "baseline"
+    }
+  ],
+  "models": [
+    {
+      "model_id": "qwen-3-14b",
+      "name": "Qwen 3 14B",
+      "tier": "cheap"
+    }
+  ],
+  "tasks": [
+    "be_01_jwt_auth"
+  ],
+  "cells": [
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "aider",
+      "mean_score": 6.75,
+      "mean_cost_usd": 0.000514,
+      "mean_latency_ms": 47368,
+      "pass_hat_k": null,
+      "quality_per_dollar": 13132.3,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.75,
+          "cost_usd": 0.000514,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "raw-llm",
+      "mean_score": 5.08,
+      "mean_cost_usd": 0.000344,
+      "mean_latency_ms": 12072,
+      "pass_hat_k": null,
+      "quality_per_dollar": 14767.44,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 5.08,
+          "cost_usd": 0.000344,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    }
+  ]
+}

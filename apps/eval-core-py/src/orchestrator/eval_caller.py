@@ -20,6 +20,7 @@ import hashlib
 import logging
 import pathlib
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -175,12 +176,19 @@ class InspectEvalCaller:
         litellm_base_url: str = "http://localhost:4000",
         api_key: str = "",
         openrouter_base_url: str = "https://openrouter.ai/api/v1",
+        prompt_provider: Callable[[str], str] | None = None,
+        max_tokens: int = 512,
     ) -> None:
         self._log_dir = log_dir
         self._litellm_base_url = litellm_base_url.rstrip("/")
         self._api_key = api_key
         # Retained for backward-compat with existing test assertions.
         self._openrouter_base_url = openrouter_base_url
+        # RFC-006 Phase 4c: a real run sends the actual task prompt (so raw-llm
+        # produces a real candidate, not the stub probe) + a budget big enough
+        # for a full solution. Default None/512 preserves the Phase-2A probe.
+        self._prompt_provider = prompt_provider
+        self._max_tokens = max_tokens
 
     async def call(self, request: EvalRequest) -> EvalResult:
         """Execute one invocation via the LiteLLM proxy with 429 retry.
@@ -202,19 +210,19 @@ class InspectEvalCaller:
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
 
+        content = (
+            self._prompt_provider(request.task_id)
+            if self._prompt_provider is not None
+            else (
+                f"[POLLMEVALS task] task={request.task_id} "
+                f"stack={request.stack_id} seed={request.seed}"
+            )
+        )
         payload: dict[str, object] = {
             "model": request.model_id,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        f"[POLLMEVALS task] task={request.task_id} "
-                        f"stack={request.stack_id} seed={request.seed}"
-                    ),
-                }
-            ],
+            "messages": [{"role": "user", "content": content}],
             "seed": request.seed,
-            "max_tokens": 512,
+            "max_tokens": self._max_tokens,
         }
 
         url = f"{self._litellm_base_url}/chat/completions"

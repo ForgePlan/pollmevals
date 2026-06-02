@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Board } from "@/lib/board";
 import { bestCell, cellMap } from "@/lib/board";
@@ -10,7 +10,12 @@ import { PerTaskWinners } from "@/components/PerTaskWinners";
 import { StackTable } from "@/components/StackTable";
 
 function loadBoard(): Board {
-  const path = join(process.cwd(), "public", "board.illustrative.json");
+  // Prefer the REAL run data (board.json, emitted by build_real_board.py) when
+  // present; fall back to the illustrative preview otherwise (RFC-006 Phase 4c).
+  const real = join(process.cwd(), "public", "board.json");
+  const path = existsSync(real)
+    ? real
+    : join(process.cwd(), "public", "board.illustrative.json");
   return JSON.parse(readFileSync(path, "utf-8")) as Board;
 }
 
