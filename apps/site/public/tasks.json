@@ -1,0 +1,109 @@
+{
+  "generated_from": "evals/task-packs",
+  "tasks": [
+    {
+      "id": "be_01",
+      "task_id": "be_01_jwt_auth",
+      "slug": "jwt-auth-middleware-with-refresh",
+      "category": "backend",
+      "difficulty": "medium",
+      "language": "typescript",
+      "summary": "Write a JWT authentication middleware for Express.js in TypeScript. It must validate access tokens from the Authorization header, support refresh token rotation, set secure HTTP-only cookies, add CSRF protection for state-changing operation",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.3
+        },
+        {
+          "name": "security_posture",
+          "weight": 0.25
+        },
+        {
+          "name": "error_handling",
+          "weight": 0.15
+        },
+        {
+          "name": "type_safety",
+          "weight": 0.15
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        },
+        {
+          "name": "test_alignment",
+          "weight": 0.05
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/be_01_jwt_auth"
+    },
+    {
+      "id": "doc_01",
+      "task_id": "doc_01_cli_readme",
+      "slug": "readme-for-pollmevals-fetch-task-cli",
+      "category": "docs",
+      "difficulty": "easy",
+      "language": "markdown",
+      "summary": "Write a production-grade README.md for an imaginary CLI tool named `pollmevals fetch-task`. The tool retrieves and validates POLLMEVALS task packs from a remote catalog and runs them locally for development.",
+      "criteria": [
+        {
+          "name": "structural_completeness",
+          "weight": 0.2
+        },
+        {
+          "name": "factual_accuracy",
+          "weight": 0.2
+        },
+        {
+          "name": "clarity",
+          "weight": 0.2
+        },
+        {
+          "name": "actionability",
+          "weight": 0.2
+        },
+        {
+          "name": "consistency",
+          "weight": 0.2
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/doc_01_cli_readme"
+    },
+    {
+      "id": "fe_01",
+      "task_id": "fe_01_multistep_form",
+      "slug": "accessible-multistep-form-persisted-draft",
+      "category": "frontend",
+      "difficulty": "medium",
+      "language": "typescript-react",
+      "summary": "Build an accessible 3-step React form (personal info \u2192 address \u2192 review) that validates per-field on blur, persists the draft to sessionStorage between steps, manages focus on step transitions, announces state changes to screen readers via",
+      "criteria": [
+        {
+          "name": "correctness",
+          "weight": 0.3
+        },
+        {
+          "name": "accessibility",
+          "weight": 0.25
+        },
+        {
+          "name": "type_safety",
+          "weight": 0.15
+        },
+        {
+          "name": "ux_states",
+          "weight": 0.15
+        },
+        {
+          "name": "code_clarity",
+          "weight": 0.1
+        },
+        {
+          "name": "test_alignment",
+          "weight": 0.05
+        }
+      ],
+      "repo_url": "https://github.com/ForgePlan/pollmevals/tree/main/evals/task-packs/fe_01_multistep_form"
+    }
+  ]
+}
