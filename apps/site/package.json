@@ -1,0 +1,30 @@
+{
+  "name": "@pollmevals/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "POLLMEVALS public site — leaderboard, methodology, run pages (Next.js 15, App Router).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx tests/*.test.ts"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "@pollmevals/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "eslint": "9.18.0",
+    "eslint-config-next": "15.1.6",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2"
+  }
+}

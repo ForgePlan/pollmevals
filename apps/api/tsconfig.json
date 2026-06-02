@@ -1,8 +1,12 @@
 {
   "extends": "../../tsconfig.options.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
   "include": [
-    "**/*"
+    "src/**/*"
   ],
+  "files": [],
   "references": [
     {
       "path": "../../packages/contracts"

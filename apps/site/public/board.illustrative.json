@@ -1,0 +1,628 @@
+{
+  "run_hash": "sha256:illustrative-preview-not-a-real-run",
+  "run_type": "illustrative",
+  "methodology_version": "v0.1.0",
+  "region": "eu-central",
+  "scored": true,
+  "illustrative": true,
+  "solved_threshold": 6,
+  "harnesses": [
+    {
+      "stack_id": "raw-llm",
+      "name": "Raw LLM",
+      "level": 0,
+      "family": "baseline",
+      "layers": [
+        "L0_bare_llm"
+      ]
+    },
+    {
+      "stack_id": "aider",
+      "name": "Aider",
+      "level": 2,
+      "family": "agnostic",
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools",
+        "L4_file_memory"
+      ]
+    },
+    {
+      "stack_id": "claude-code-basic",
+      "name": "Claude Code Basic",
+      "level": 2,
+      "family": "vendor",
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools"
+      ]
+    },
+    {
+      "stack_id": "forgeplan-framework",
+      "name": "ForgePlan Framework",
+      "level": 8,
+      "family": "framework",
+      "layers": [
+        "L3_skills",
+        "L4_file_memory",
+        "L6_subagents",
+        "L7_validator",
+        "L8_framework"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "model_id": "qwen-3-14b",
+      "name": "Qwen 3 14B",
+      "tier": "cheap"
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "name": "Llama 3.3 70B",
+      "tier": "cheap"
+    },
+    {
+      "model_id": "gemini-3-flash",
+      "name": "Gemini 3 Flash",
+      "tier": "mid"
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "name": "GPT-5 mini",
+      "tier": "mid"
+    },
+    {
+      "model_id": "claude-sonnet-4-6",
+      "name": "Claude Sonnet 4.6",
+      "tier": "frontier"
+    }
+  ],
+  "tasks": [
+    "be_01_jwt_auth",
+    "fe_01_multistep_form",
+    "doc_01_cli_readme"
+  ],
+  "cells": [
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "raw-llm",
+      "mean_score": 4.4,
+      "mean_cost_usd": 0.0014,
+      "mean_latency_ms": 2485,
+      "pass_hat_k": 0.19,
+      "quality_per_dollar": 3142.9,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 4.4,
+          "cost_usd": 0.0016,
+          "pass_hat_k": 0.19
+        },
+        "fe_01_multistep_form": {
+          "score": 4.3,
+          "cost_usd": 0.0013,
+          "pass_hat_k": 0.19
+        },
+        "doc_01_cli_readme": {
+          "score": 4.4,
+          "cost_usd": 0.0014,
+          "pass_hat_k": 0.19
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "stack_id": "raw-llm",
+      "mean_score": 4.7,
+      "mean_cost_usd": 0.0037,
+      "mean_latency_ms": 3026,
+      "pass_hat_k": 0.26,
+      "quality_per_dollar": 1270.3,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 4.8,
+          "cost_usd": 0.0039,
+          "pass_hat_k": 0.26
+        },
+        "fe_01_multistep_form": {
+          "score": 4.6,
+          "cost_usd": 0.0037,
+          "pass_hat_k": 0.26
+        },
+        "doc_01_cli_readme": {
+          "score": 4.8,
+          "cost_usd": 0.0035,
+          "pass_hat_k": 0.26
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gemini-3-flash",
+      "stack_id": "raw-llm",
+      "mean_score": 5.4,
+      "mean_cost_usd": 0.0053,
+      "mean_latency_ms": 2755,
+      "pass_hat_k": 0.34,
+      "quality_per_dollar": 1018.9,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 5.2,
+          "cost_usd": 0.0053,
+          "pass_hat_k": 0.34
+        },
+        "fe_01_multistep_form": {
+          "score": 5.6,
+          "cost_usd": 0.0054,
+          "pass_hat_k": 0.34
+        },
+        "doc_01_cli_readme": {
+          "score": 5.4,
+          "cost_usd": 0.0052,
+          "pass_hat_k": 0.34
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "stack_id": "raw-llm",
+      "mean_score": 6.1,
+      "mean_cost_usd": 0.007,
+      "mean_latency_ms": 2945,
+      "pass_hat_k": 0.44,
+      "quality_per_dollar": 871.4,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.1,
+          "cost_usd": 0.007,
+          "pass_hat_k": 0.44
+        },
+        "fe_01_multistep_form": {
+          "score": 6.4,
+          "cost_usd": 0.0069,
+          "pass_hat_k": 0.44
+        },
+        "doc_01_cli_readme": {
+          "score": 5.9,
+          "cost_usd": 0.0071,
+          "pass_hat_k": 0.44
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "claude-sonnet-4-6",
+      "stack_id": "raw-llm",
+      "mean_score": 6.9,
+      "mean_cost_usd": 0.0534,
+      "mean_latency_ms": 3140,
+      "pass_hat_k": 0.56,
+      "quality_per_dollar": 129.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.8,
+          "cost_usd": 0.0546,
+          "pass_hat_k": 0.56
+        },
+        "fe_01_multistep_form": {
+          "score": 7.4,
+          "cost_usd": 0.05,
+          "pass_hat_k": 0.56
+        },
+        "doc_01_cli_readme": {
+          "score": 6.5,
+          "cost_usd": 0.0556,
+          "pass_hat_k": 0.56
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "aider",
+      "mean_score": 6.4,
+      "mean_cost_usd": 0.0484,
+      "mean_latency_ms": 6891,
+      "pass_hat_k": 0.52,
+      "quality_per_dollar": 132.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.1,
+          "cost_usd": 0.0483,
+          "pass_hat_k": 0.52
+        },
+        "fe_01_multistep_form": {
+          "score": 6,
+          "cost_usd": 0.0485,
+          "pass_hat_k": 0.52
+        },
+        "doc_01_cli_readme": {
+          "score": 6.1,
+          "cost_usd": 0.0484,
+          "pass_hat_k": 0.52
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "stack_id": "aider",
+      "mean_score": 6.8,
+      "mean_cost_usd": 0.0638,
+      "mean_latency_ms": 7381,
+      "pass_hat_k": 0.57,
+      "quality_per_dollar": 106.6,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.5,
+          "cost_usd": 0.064,
+          "pass_hat_k": 0.57
+        },
+        "fe_01_multistep_form": {
+          "score": 6.5,
+          "cost_usd": 0.0646,
+          "pass_hat_k": 0.57
+        },
+        "doc_01_cli_readme": {
+          "score": 6.4,
+          "cost_usd": 0.0628,
+          "pass_hat_k": 0.57
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gemini-3-flash",
+      "stack_id": "aider",
+      "mean_score": 7.2,
+      "mean_cost_usd": 0.0703,
+      "mean_latency_ms": 7748,
+      "pass_hat_k": 0.64,
+      "quality_per_dollar": 102.4,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.7,
+          "cost_usd": 0.0705,
+          "pass_hat_k": 0.64
+        },
+        "fe_01_multistep_form": {
+          "score": 7,
+          "cost_usd": 0.0702,
+          "pass_hat_k": 0.64
+        },
+        "doc_01_cli_readme": {
+          "score": 6.8,
+          "cost_usd": 0.0703,
+          "pass_hat_k": 0.64
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "stack_id": "aider",
+      "mean_score": 7.8,
+      "mean_cost_usd": 0.0837,
+      "mean_latency_ms": 6856,
+      "pass_hat_k": 0.72,
+      "quality_per_dollar": 93.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 8.3,
+          "cost_usd": 0.0807,
+          "pass_hat_k": 0.72
+        },
+        "fe_01_multistep_form": {
+          "score": 8,
+          "cost_usd": 0.084,
+          "pass_hat_k": 0.72
+        },
+        "doc_01_cli_readme": {
+          "score": 7.2,
+          "cost_usd": 0.0863,
+          "pass_hat_k": 0.72
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "claude-sonnet-4-6",
+      "stack_id": "aider",
+      "mean_score": 8.5,
+      "mean_cost_usd": 0.3764,
+      "mean_latency_ms": 7298,
+      "pass_hat_k": 0.81,
+      "quality_per_dollar": 22.6,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 8.7,
+          "cost_usd": 0.3668,
+          "pass_hat_k": 0.81
+        },
+        "fe_01_multistep_form": {
+          "score": 9,
+          "cost_usd": 0.384,
+          "pass_hat_k": 0.81
+        },
+        "doc_01_cli_readme": {
+          "score": 7.7,
+          "cost_usd": 0.3783,
+          "pass_hat_k": 0.81
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "claude-code-basic",
+      "mean_score": 3.8,
+      "mean_cost_usd": 0.0508,
+      "mean_latency_ms": 9433,
+      "pass_hat_k": 0,
+      "quality_per_dollar": 74.8,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 4.6,
+          "cost_usd": 0.051,
+          "pass_hat_k": 0
+        },
+        "fe_01_multistep_form": {
+          "score": 3.2,
+          "cost_usd": 0.0509,
+          "pass_hat_k": 0
+        },
+        "doc_01_cli_readme": {
+          "score": 3.6,
+          "cost_usd": 0.0506,
+          "pass_hat_k": 0
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "stack_id": "claude-code-basic",
+      "mean_score": 6,
+      "mean_cost_usd": 0.0705,
+      "mean_latency_ms": 8634,
+      "pass_hat_k": 0.47,
+      "quality_per_dollar": 85.1,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.6,
+          "cost_usd": 0.072,
+          "pass_hat_k": 0.47
+        },
+        "fe_01_multistep_form": {
+          "score": 5.7,
+          "cost_usd": 0.0689,
+          "pass_hat_k": 0.47
+        },
+        "doc_01_cli_readme": {
+          "score": 5.6,
+          "cost_usd": 0.0706,
+          "pass_hat_k": 0.47
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gemini-3-flash",
+      "stack_id": "claude-code-basic",
+      "mean_score": 7.4,
+      "mean_cost_usd": 0.0795,
+      "mean_latency_ms": 9276,
+      "pass_hat_k": 0.66,
+      "quality_per_dollar": 93.1,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 8,
+          "cost_usd": 0.0786,
+          "pass_hat_k": 0.66
+        },
+        "fe_01_multistep_form": {
+          "score": 7.3,
+          "cost_usd": 0.0773,
+          "pass_hat_k": 0.66
+        },
+        "doc_01_cli_readme": {
+          "score": 6.9,
+          "cost_usd": 0.0826,
+          "pass_hat_k": 0.66
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "stack_id": "claude-code-basic",
+      "mean_score": 8,
+      "mean_cost_usd": 0.0997,
+      "mean_latency_ms": 9586,
+      "pass_hat_k": 0.74,
+      "quality_per_dollar": 80.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 8.5,
+          "cost_usd": 0.1011,
+          "pass_hat_k": 0.74
+        },
+        "fe_01_multistep_form": {
+          "score": 8.2,
+          "cost_usd": 0.1008,
+          "pass_hat_k": 0.74
+        },
+        "doc_01_cli_readme": {
+          "score": 7.4,
+          "cost_usd": 0.0971,
+          "pass_hat_k": 0.74
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "claude-sonnet-4-6",
+      "stack_id": "claude-code-basic",
+      "mean_score": 9.2,
+      "mean_cost_usd": 0.47,
+      "mean_latency_ms": 9428,
+      "pass_hat_k": 0.92,
+      "quality_per_dollar": 19.6,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 9.6,
+          "cost_usd": 0.4926,
+          "pass_hat_k": 0.92
+        },
+        "fe_01_multistep_form": {
+          "score": 9.5,
+          "cost_usd": 0.4389,
+          "pass_hat_k": 0.92
+        },
+        "doc_01_cli_readme": {
+          "score": 8.5,
+          "cost_usd": 0.4784,
+          "pass_hat_k": 0.92
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "forgeplan-framework",
+      "mean_score": 7.9,
+      "mean_cost_usd": 0.0615,
+      "mean_latency_ms": 15163,
+      "pass_hat_k": 0.76,
+      "quality_per_dollar": 128.5,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 9.2,
+          "cost_usd": 0.0614,
+          "pass_hat_k": 0.76
+        },
+        "fe_01_multistep_form": {
+          "score": 7.2,
+          "cost_usd": 0.0615,
+          "pass_hat_k": 0.76
+        },
+        "doc_01_cli_readme": {
+          "score": 7.3,
+          "cost_usd": 0.0616,
+          "pass_hat_k": 0.76
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "stack_id": "forgeplan-framework",
+      "mean_score": 8.1,
+      "mean_cost_usd": 0.0953,
+      "mean_latency_ms": 15885,
+      "pass_hat_k": 0.8,
+      "quality_per_dollar": 85,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 9.3,
+          "cost_usd": 0.0947,
+          "pass_hat_k": 0.8
+        },
+        "fe_01_multistep_form": {
+          "score": 7.7,
+          "cost_usd": 0.0938,
+          "pass_hat_k": 0.8
+        },
+        "doc_01_cli_readme": {
+          "score": 7.4,
+          "cost_usd": 0.0975,
+          "pass_hat_k": 0.8
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gemini-3-flash",
+      "stack_id": "forgeplan-framework",
+      "mean_score": 8.6,
+      "mean_cost_usd": 0.1133,
+      "mean_latency_ms": 15473,
+      "pass_hat_k": 0.85,
+      "quality_per_dollar": 75.9,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 9.6,
+          "cost_usd": 0.1152,
+          "pass_hat_k": 0.85
+        },
+        "fe_01_multistep_form": {
+          "score": 8.5,
+          "cost_usd": 0.1141,
+          "pass_hat_k": 0.85
+        },
+        "doc_01_cli_readme": {
+          "score": 7.8,
+          "cost_usd": 0.1107,
+          "pass_hat_k": 0.85
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "gpt-5-mini",
+      "stack_id": "forgeplan-framework",
+      "mean_score": 9.1,
+      "mean_cost_usd": 0.1472,
+      "mean_latency_ms": 15199,
+      "pass_hat_k": 0.92,
+      "quality_per_dollar": 61.8,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 10,
+          "cost_usd": 0.1428,
+          "pass_hat_k": 0.92
+        },
+        "fe_01_multistep_form": {
+          "score": 9,
+          "cost_usd": 0.1483,
+          "pass_hat_k": 0.92
+        },
+        "doc_01_cli_readme": {
+          "score": 8.2,
+          "cost_usd": 0.1504,
+          "pass_hat_k": 0.92
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "claude-sonnet-4-6",
+      "stack_id": "forgeplan-framework",
+      "mean_score": 9.5,
+      "mean_cost_usd": 0.8666,
+      "mean_latency_ms": 15943,
+      "pass_hat_k": 0.99,
+      "quality_per_dollar": 11,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 10,
+          "cost_usd": 0.8088,
+          "pass_hat_k": 0.99
+        },
+        "fe_01_multistep_form": {
+          "score": 10,
+          "cost_usd": 0.9076,
+          "pass_hat_k": 0.99
+        },
+        "doc_01_cli_readme": {
+          "score": 8.6,
+          "cost_usd": 0.8834,
+          "pass_hat_k": 0.99
+        }
+      },
+      "on_frontier": false
+    }
+  ]
+}
