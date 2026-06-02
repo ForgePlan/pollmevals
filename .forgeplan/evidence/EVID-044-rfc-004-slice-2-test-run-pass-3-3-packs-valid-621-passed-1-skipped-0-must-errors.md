@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: RFC-004
   relation: informs
-status: draft
+status: active
 title: 'RFC-004 Slice 2 test run — PASS: 3/3 packs valid, 621 passed / 1 skipped, 0 MUST errors'
 ---
 
@@ -135,5 +135,6 @@ This is the primary outstanding gate before be_01/fe_01 1.1 packs can be promote
 - **PASS**: hand back to guardian/orchestrator for activation gate review.
 - **Deferred gate**: schedule live calibration run (judge LLM calls + Docker sandbox) to verify score-neutrality (α ≥ 0.70, MAD ≤ 1.5) for be_01 1.1 and fe_01 1.1 before pack promotion.
 - **Acceptable gap**: doc_01 SHOULD-6 warning (15 items < 20) is expected and acceptable for a judge-only pack — no action required.
+
 
 

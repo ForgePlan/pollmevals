@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: ADR-008
   relation: informs
-status: draft
+status: active
 title: ADR-008 guardian gate — PASS
 ---
 
@@ -165,5 +165,6 @@ Keep `check_type`/`maps_to` etc. untouched; this is a pure metadata-section resh
 verdict: supports
 congruence_level: 3
 evidence_type: audit
+
 
 

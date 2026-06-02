@@ -4,7 +4,7 @@ id: EVID-036
 kind: evidence
 last_modified_at: 2026-05-29T14:21:48.984612+00:00
 last_modified_by: claude-code/2.1.156
-status: draft
+status: deprecated
 title: RFC-004 Slice 1 guardian gate — BLOCKER
 ---
 
@@ -146,6 +146,8 @@ Do **not** activate RFC-004 before ADR-008 is active and a fresh guardian pass o
 verdict: weakens
 congruence_level: 3
 evidence_type: audit
+
+
 
 
 

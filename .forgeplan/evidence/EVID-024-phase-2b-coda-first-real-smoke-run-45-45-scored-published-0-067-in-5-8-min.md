@@ -11,7 +11,7 @@ links:
   relation: informs
 - target: ADR-003
   relation: informs
-status: draft
+status: active
 title: Phase 2B coda — first real smoke run 45/45 SCORED published $0.067 in 5.8 min
 ---
 
@@ -128,6 +128,7 @@ All claims sum ≥ 12 per NOTE-002 minimum. Decision strength: 95%.
 2. **Cost reconciliation $0** — InspectEvalCaller leaves cost=0 (CostReconciler-style post-run); smoke_run.py was using stub zero pricing. Patched: hardcoded `_MODEL_PRICING` dict + `_compute_eval_cost` helper called in `build_aggregates`. Now `total_cost_usd = $0.067` correctly. **Next iteration**: replace dict with LiteLLM `completion_cost()` API (user-suggested 2026-05-25).
 3. **Determinism check sha256 fail** — was comparing real LLM raw_output vs FakeEvalCaller raw_output, always different (different callers, different outputs). Per ADR-002 reproduce-evaluator semantics, this was incorrect — true determinism check is evaluator replay на cached raw_output. Patched: dropped sha256 comparison with explanatory comment; eval_id structural check retained. Real evaluator replay lands in Phase 2D.
 4. **Default models used full OpenRouter paths but LiteLLM proxy expects aliases** — SMOKE_MODELS constant had `openrouter/anthropic/claude-sonnet-4-6` paths; pre-flight translated via `_LITELLM_MODEL_NAMES` dict but grid execution did not. Patched: translate models in `run_smoke_grid` immediately after parsing args, before GridSpec build.
+
 
 
 

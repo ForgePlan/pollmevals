@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: RFC-004
   relation: informs
-status: draft
+status: active
 title: RFC-004 Slice 2 migration review — PASS
 ---
 
@@ -136,3 +136,4 @@ Remaining multi-tags in fe_01 (`[R1][R2][R5]`, `[R4][R8][R11]`, `[R14][R15]`, `[
 verdict: supports
 congruence_level: 3
 evidence_type: review
+

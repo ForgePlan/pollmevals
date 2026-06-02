@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: ADR-008
   relation: informs
-status: draft
+status: active
 title: ADR-008 decision validation — H2 Feed model sound (ADI + Slice-1 implementability)
 ---
 
@@ -144,4 +144,5 @@ Both grounds are independent. The reasoning ground establishes soundness of the 
 verdict: supports
 congruence_level: 3
 evidence_type: reasoning
+
 

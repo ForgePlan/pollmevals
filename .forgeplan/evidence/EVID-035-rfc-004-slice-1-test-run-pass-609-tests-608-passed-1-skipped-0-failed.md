@@ -7,7 +7,7 @@ last_modified_by: claude-code/2.1.156
 links:
 - target: RFC-004
   relation: informs
-status: draft
+status: active
 title: 'RFC-004 Slice 1 test run — PASS (609 tests: 608 passed, 1 skipped, 0 failed)'
 ---
 
@@ -152,4 +152,5 @@ None observed. No retry runs performed (no --reruns flag, pytest-rerunfailures n
 - **PASS: hand back to guardian for activation gate** — all functional tests pass, 0 regressions, all 48 Slice 1 tests green.
 - **CONCERNS (non-blocking):** The 5 MUST validator rules in `infra/scripts/validate-task-specs.py` have no dedicated unit tests calling `validate_one` with bad inputs (duplicate ids, invalid maps_to, auto→judge-criterion, unresolvable prompt_ref, Σ≠1.0). These rules are implemented in the validator (code confirmed) but not covered by the pytest suite. Recommend coder add validator unit tests before Slice 2 (Phase 2 gate per RFC-004 § Implementation Phases). This is a SHOULD, not a BLOCKER for activation — the end-to-end additivity check confirms the existing packs pass the rules.
 - **CONCERNS (non-blocking):** pytest-cov is absent from the venv. Add `pytest-cov` to dev dependencies to enable coverage reporting on future runs.
+
 

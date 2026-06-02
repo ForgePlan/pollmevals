@@ -9,7 +9,7 @@ links:
   relation: informs
 - target: EVID-036
   relation: supersedes
-status: draft
+status: active
 title: RFC-004 Slice 1 guardian re-gate — PASS (parent ADR-008 active)
 ---
 
@@ -155,4 +155,5 @@ EVID-036 was a **sequencing** BLOCKER, not a quality one — it stated verbatim 
 verdict: supports
 congruence_level: 3
 evidence_type: audit
+
 
