@@ -149,6 +149,14 @@ model_list:
       model: openrouter/openai/gpt-5-mini
       api_key: os.environ/OPENROUTER_API_KEY_JUDGE
       api_base: https://openrouter.ai/api/v1
+      # gpt-5-mini is a REASONING model: at the default effort it spends the
+      # ENTIRE max_tokens budget on reasoning (diagnosed 2026-06-02: 2048/2048
+      # reasoning_tokens, finish_reason="length", EMPTY content → unparseable
+      # rubric JSON → false 0.0). reasoning_effort=low bounds reasoning (~700
+      # tok) so the full rubric JSON fits AND the call is cheaper. This is the
+      # EVID-023 remedy ("cap reasoning, don't raise the token cap"). Scoped to
+      # the JUDGE alias only — candidate gpt-5 use is unaffected.
+      reasoning_effort: low
 
 # General proxy settings
 litellm_settings:
