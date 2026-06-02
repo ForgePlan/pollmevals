@@ -24,7 +24,8 @@ export default function RootLayout({
             </Link>
             <nav className="site-nav">
               <Link href="/">Leaderboard</Link>
-              <a href="#methodology">Methodology</a>
+              <Link href="/tasks">Tasks</Link>
+              <Link href="/#methodology">Methodology</Link>
               <a href="https://github.com/ForgePlan/pollmevals">Source</a>
             </nav>
           </div>
