@@ -1,0 +1,50 @@
+schema_version: pollmevals.stack.v1
+slug: openhands
+name: OpenHands
+base_model_slug: configurable
+agent_cli: openhands
+
+# Proven headless-via-proxy 2026-06-02 (memory: research-cli-harness-execution).
+# Model-agnostic (All-Hands AI), most autonomous of the set (validator loop). Env:
+#   LLM_MODEL=openai/<MODEL>  LLM_BASE_URL=http://localhost:4000/v1
+#   LLM_API_KEY=$LITELLM_MASTER_KEY
+# Run: openhands --headless --json --override-with-envs --exit-without-confirmation -t "<prompt>"
+# NOTE: --override-with-envs is REQUIRED or LLM_* env vars are ignored.
+
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: true
+  L2_tools: true
+  L3_skills: false
+  L4_file_memory: false
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: true # autonomous test-run-fix loop
+  L8_framework: null
+execution:
+  mode: repository_patch
+  command: openhands
+  args:
+    - --headless
+    - --json
+    - --override-with-envs
+    - --exit-without-confirmation
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+limits:
+  max_wall_clock_seconds: 900
+  max_tool_calls: 80
+  max_input_tokens: 50000
+  max_output_tokens: 10000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace

@@ -1,28 +1,32 @@
 schema_version: pollmevals.stack.v1
-slug: gemini-cli
-name: Gemini CLI
-base_model_slug: gemini-2.5
-agent_cli: gemini-cli
-# DEPRECATED 2026-06-02: Google is retiring Gemini CLI on 2026-06-18, replacing it
-# with the closed-source Antigravity CLI (research-cli-harness-execution). Excluded
-# from the active benchmark roster; kept for historical reference. Track Antigravity
-# CLI as a potential future entry.
-deprecated: true
+slug: opencode
+name: OpenCode
+base_model_slug: configurable
+agent_cli: opencode
+
+# Proven headless-via-proxy 2026-06-02 (memory: research-cli-harness-execution).
+# Model-agnostic. Config opencode.json:
+#   provider.litellm = { npm: "@ai-sdk/openai-compatible",
+#     options: { baseURL: "http://localhost:4000/v1",
+#                apiKey: "{env:LITELLM_MASTER_KEY}" },
+#     models: { "<MODEL>": { name: "<MODEL>" } } }
+# Run: opencode run "<prompt>" -m litellm/<MODEL>
+
 layers:
   L0_bare_llm: false
   L1_system_prompt: true
   L2_tools: true
-  L3_skills: false
-  L4_file_memory: false
+  L3_skills: true # reads AGENTS.md
+  L4_file_memory: true
   L5_vector_memory: false
   L6_subagents: false
   L7_validator: false
   L8_framework: null
 execution:
   mode: repository_patch
-  command: gemini
+  command: opencode
   args:
-    - --yolo
+    - run
 input_contract:
   receives:
     - task_prompt

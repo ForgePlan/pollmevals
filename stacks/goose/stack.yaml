@@ -1,13 +1,16 @@
 schema_version: pollmevals.stack.v1
-slug: gemini-cli
-name: Gemini CLI
-base_model_slug: gemini-2.5
-agent_cli: gemini-cli
-# DEPRECATED 2026-06-02: Google is retiring Gemini CLI on 2026-06-18, replacing it
-# with the closed-source Antigravity CLI (research-cli-harness-execution). Excluded
-# from the active benchmark roster; kept for historical reference. Track Antigravity
-# CLI as a potential future entry.
-deprecated: true
+slug: goose
+name: Goose
+base_model_slug: configurable
+agent_cli: goose
+
+# Proven headless-via-proxy 2026-06-02 (memory: research-cli-harness-execution).
+# Model-agnostic (AAIF / ex-Block), MCP-native tools. Env:
+#   GOOSE_PROVIDER=openai  GOOSE_MODEL=<MODEL>
+#   OPENAI_API_KEY=$LITELLM_MASTER_KEY
+#   OPENAI_HOST=http://localhost:4000  OPENAI_BASE_PATH=v1/chat/completions
+# Run: goose run --no-session -t "<prompt>"
+
 layers:
   L0_bare_llm: false
   L1_system_prompt: true
@@ -20,9 +23,10 @@ layers:
   L8_framework: null
 execution:
   mode: repository_patch
-  command: gemini
+  command: goose
   args:
-    - --yolo
+    - run
+    - --no-session
 input_contract:
   receives:
     - task_prompt
