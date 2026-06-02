@@ -40,6 +40,7 @@ from src.orchestrator.stack_caller import (  # noqa: E402
     StackExecutorCaller,
     make_be01_snapshot_provider,
     make_task_prompt_provider,
+    make_task_timeout_provider,
 )
 from src.orchestrator.stack_executor import (  # noqa: E402
     SANDBOX_PROXY_BASE_URL,
@@ -47,16 +48,22 @@ from src.orchestrator.stack_executor import (  # noqa: E402
     StackExecutor,
 )
 
-_CANDIDATE = "qwen-3-14b"  # proxy alias; InspectEvalCaller POSTs this as `model`
+# Candidate ladder — OPEN models only (cheap→strong). Judges are the closed
+# frontier (claude/gpt/gemini), so open candidates never trigger self-judging.
+_MODELS = ["qwen-3-14b", "llama-3-3-70b", "deepseek-v3-5"]
+_STACKS = ["raw-llm", "aider"]
+_SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
 _JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
 _RUN_HASH = "sha256:" + "realboard".ljust(58, "0")[:58]
-_QWEN_PRICING = PricingTuple(
-    model_id=_CANDIDATE,
-    input_per_mtoken_usd=Decimal("0.07"),
-    output_per_mtoken_usd=Decimal("0.24"),
-    snapshot_at=datetime(2026, 6, 2, tzinfo=UTC),
-)
+_SNAP = datetime(2026, 6, 2, tzinfo=UTC)
+# Approximate OpenRouter pricing (per Mtoken) — informational; the proxy meters
+# the authoritative spend.
+_PRICING = {
+    "qwen-3-14b": PricingTuple("qwen-3-14b", Decimal("0.07"), Decimal("0.24"), _SNAP),
+    "llama-3-3-70b": PricingTuple("llama-3-3-70b", Decimal("0.12"), Decimal("0.30"), _SNAP),
+    "deepseek-v3-5": PricingTuple("deepseek-v3-5", Decimal("0.30"), Decimal("0.90"), _SNAP),
+}
 
 
 def _load_env(repo: Path) -> None:
@@ -102,7 +109,8 @@ async def _main() -> int:
         print("ERROR: LITELLM_MASTER_KEY not set (.env)", file=sys.stderr)
         return 2
     if not args.confirm_spend:
-        print("DRY: pass --confirm-spend to run the real 2-cell grid (~$0.25).")
+        n = len(_STACKS) * len(_MODELS) * len(_SEEDS)
+        print(f"DRY: pass --confirm-spend to run {n} evals ({_STACKS} x {_MODELS}).")
         return 0
 
     log_dir = Path(tempfile.mkdtemp(prefix="pollmevals-board-"))
@@ -123,7 +131,7 @@ async def _main() -> int:
             launcher=DockerHarnessLauncher(),
             proxy_base_url=SANDBOX_PROXY_BASE_URL,
             api_key=key,
-            pricing_snapshot={_CANDIDATE: _QWEN_PRICING},
+            pricing_snapshot=_PRICING,
         ),
         stacks_root=stacks_root,
         snapshot_provider=make_be01_snapshot_provider(REPO),
@@ -135,30 +143,37 @@ async def _main() -> int:
     def caller_for(stack_id: str) -> object:
         return stack_caller if stack_id != "raw-llm" else inspect_caller
 
-    panel = JudgePanel(judge_models=_JUDGES, candidate_model_id=_CANDIDATE, rubric_version="1.0")
+    # candidate_model_id only drives self-judging exclusion; all candidates are
+    # open (non-judge-family), so any is safe here.
+    panel = JudgePanel(judge_models=_JUDGES, candidate_model_id=_MODELS[0], rubric_version="1.0")
     runner = GridRunner(
         caller=inspect_caller,
         caller_for_stack=caller_for,  # type: ignore[arg-type]
         journal_writer=JournalWriter(log_dir / "journal.ndjson"),
         budget_gate=BudgetGate(cap_usd=Decimal("5")),
-        pricing_snapshot={_CANDIDATE: _QWEN_PRICING},
+        pricing_snapshot=_PRICING,
         judge_panel=panel,
         # FOLLOW-UP: JudgePanel uses inspect_ai eval_async, which forbids
         # concurrent calls — running evals in parallel crashes the judge step.
         # Serialize for now; the real fix is an asyncio.Lock in JudgePanel.score.
         max_concurrent=1,
     )
+    timeout_of = make_task_timeout_provider(REPO)
     spec = GridSpec(
         run_hash=_RUN_HASH,
-        models=[_CANDIDATE],
+        models=_MODELS,
         tasks=[_TASK],
-        stacks=["raw-llm", "aider"],
-        seeds=[1, 2, 3],
+        stacks=_STACKS,
+        seeds=_SEEDS,
+        # per-task wall-clock budget by difficulty (be_01 is medium -> 600s),
+        # so slow model x harness pairs aren't cut off at the 300s default.
+        task_timeout_s={t: timeout_of(t) for t in [_TASK]},
     )
 
-    print("Running real grid: raw-llm + aider x qwen-3-14b x be_01 (3 seeds) ...")
+    n = len(_STACKS) * len(_MODELS) * len(_SEEDS)
+    print(f"Running grid: {_STACKS} x {_MODELS} x {_TASK} ({len(_SEEDS)} seeds) = {n} evals ...")
     result = await runner.run(spec)
-    rows = _rows_from_result(result, {_CANDIDATE: _QWEN_PRICING})
+    rows = _rows_from_result(result, _PRICING)
 
     print(f"\n=== {len(rows)} eval rows, total cost ${result.total_cost_usd} ===")
     for r in rows:
