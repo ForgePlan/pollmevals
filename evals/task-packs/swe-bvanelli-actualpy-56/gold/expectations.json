@@ -1,0 +1,33 @@
+{
+  "instance_id": "bvanelli__actualpy-56",
+  "repo": "bvanelli/actualpy",
+  "base_commit": "2ad5f638789af3e37a3a07ed3f4d4938a8209ed4",
+  "FAIL_TO_PASS": [
+    "tests/test_rules.py::test_category_rule",
+    "tests/test_rules.py::test_datetime_rule",
+    "tests/test_rules.py::test_string_condition",
+    "tests/test_rules.py::test_numeric_condition",
+    "tests/test_rules.py::test_complex_rule",
+    "tests/test_rules.py::test_invalid_inputs",
+    "tests/test_rules.py::test_value_type_condition_validation",
+    "tests/test_rules.py::test_value_type_value_validation",
+    "tests/test_rules.py::test_value_type_from_field",
+    "tests/test_rules.py::test_set_split_amount[remainder-None-expected_splits0]",
+    "tests/test_rules.py::test_set_split_amount[fixed-amount-100-expected_splits1]",
+    "tests/test_rules.py::test_set_split_amount[fixed-percent-20-expected_splits2]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-1-expected_splits0]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-2-expected_splits1]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-3-expected_splits2]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-4-expected_splits3]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-5-expected_splits4]",
+    "tests/test_rules.py::test_split_amount_equal_parts[remainder-6-expected_splits5]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-1-expected_splits6]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-2-expected_splits7]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-3-expected_splits8]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-4-expected_splits9]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-5-expected_splits10]",
+    "tests/test_rules.py::test_split_amount_equal_parts[fixed-amount-6-expected_splits11]",
+    "tests/test_rules.py::test_set_split_amount_exception"
+  ],
+  "PASS_TO_PASS": []
+}

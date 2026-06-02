@@ -1,0 +1,59 @@
+# source: BigCodeBench task #BigCodeBench/0 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0000
+slug: bcb-0000-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/0"
+  entry_point: task_func
+  libs: ["random", "itertools"]
+  retrieved: 2026-06-03
+
+description: |
+  Calculates the average of the sums of absolute differences between each pair of consecutive numbers for all permutations of a given list. Each permutation is shuffled before calculating the differences. Args: - numbers (list): A list of numbers. Default is numbers from 1 to 10.
+  The function should output with:
+      float: The average of the sums of absolute differences for each shuffled permutation of the list.
+  You should write self-contained code starting with:
+  ```
+  import itertools
+  from random import shuffle
+  def task_func(numbers=list(range(1, 3))):
+  ```
+
+prompt_template: |
+  Calculates the average of the sums of absolute differences between each pair of consecutive numbers for all permutations of a given list. Each permutation is shuffled before calculating the differences. Args: - numbers (list): A list of numbers. Default is numbers from 1 to 10.
+  The function should output with:
+      float: The average of the sums of absolute differences for each shuffled permutation of the list.
+  You should write self-contained code starting with:
+  ```
+  import itertools
+  from random import shuffle
+  def task_func(numbers=list(range(1, 3))):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

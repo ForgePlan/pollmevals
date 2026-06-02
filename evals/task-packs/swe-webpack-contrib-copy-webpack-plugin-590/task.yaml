@@ -1,0 +1,91 @@
+# source: nebius/SWE-rebench-V2 instance webpack-contrib__copy-webpack-plugin-590 (code license: MIT, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_003
+slug: swe-rebench-copy-webpack-plugin-590
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: javascript
+sourcing: hybrid
+license:
+  code: MIT
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: webpack-contrib__copy-webpack-plugin-590
+  repo: webpack-contrib/copy-webpack-plugin
+  base_commit: a9b06a635a7d3458c8e2ed2b10cc3fd1e02b5f37
+  image_name: docker.io/swerebenchv2/webpack-contrib-copy-webpack-plugin:590-a9b06a6
+  test_cmd: npm run test:only -- --verbose --no-color
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - core_feat
+description: "[Feature] Add order option\nHello,\r\n\r\nIn a project I am developing, I have an issue\
+  \ with copying files with the same name from multiple sources.\r\n\r\nConfiguration of copy webpack\
+  \ plugin is as follows:\r\n```\r\nnew CopyWebpackPlugin([\r\n            { from: 'node_modules/engine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: 'node_modules/subengine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: './static', test: /\\.(css|html|png)$/,\
+  \ force: true },\r\n        ]),\r\n```\r\n\r\nThe project has two dependencies, let's call them `engine`\
+  \ and `subengine`. They are both bundled within node_modules.\r\n\r\nEach of these has its own graphical\
+  \ assets. In case the file with an exact same name and path is in more than one repo, then one from\
+  \ \"project\" is more important than one from `subengine`, and one from `subengine` is more important\
+  \ than file from `engine`. \r\n\r\nLet's say each of these contains an `abc.png` file in its own `static`\
+  \ folder. The intended result is to have `abc.png` come from projects's own `./static` folder, but it\
+  \ instead, the one from `subengine` is used.\r\n\r\nHOWEVER.... which is where the fun begins...\r\n\
+  \r\nIf I do this:\r\n```\r\nnew CopyWebpackPlugin([\r\n            { from: 'node_modules/engine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: 'node_modules/subengine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: './static', test: /\\.(css|html|png)$/,\
+  \ force: true },\r\n        ], {debug: 'debug'}),\r\n```\r\n\r\n...then the order is correct, and `abc.png`\
+  \ is taken from project's `static` folder.\r\n\r\nThis might be random behavior and just a coincidence,\
+  \ but it really seems having debug on fixes the issue every time. \r\n\r\nI am using:\r\n`\"webpack\"\
+  : \"~4.17.2\",` (I would like not to update further for now because then the build breaks elsewhere)\r\
+  \n`\"copy-webpack-plugin\": \"^4.6.0\",`\r\n\r\nBuild on Windows 10, Node 8.4.0"
+prompt_template: "# Bug fix: webpack-contrib/copy-webpack-plugin\n\nYou are fixing a real bug in the open-source\
+  \ repository `webpack-contrib/copy-webpack-plugin` at commit `a9b06a635a7d3458c8e2ed2b10cc3fd1e02b5f37`.\n\
+  \n## Issue\n\n[Feature] Add order option\nHello,\r\n\r\nIn a project I am developing, I have an issue\
+  \ with copying files with the same name from multiple sources.\r\n\r\nConfiguration of copy webpack\
+  \ plugin is as follows:\r\n```\r\nnew CopyWebpackPlugin([\r\n            { from: 'node_modules/engine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: 'node_modules/subengine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: './static', test: /\\.(css|html|png)$/,\
+  \ force: true },\r\n        ]),\r\n```\r\n\r\nThe project has two dependencies, let's call them `engine`\
+  \ and `subengine`. They are both bundled within node_modules.\r\n\r\nEach of these has its own graphical\
+  \ assets. In case the file with an exact same name and path is in more than one repo, then one from\
+  \ \"project\" is more important than one from `subengine`, and one from `subengine` is more important\
+  \ than file from `engine`. \r\n\r\nLet's say each of these contains an `abc.png` file in its own `static`\
+  \ folder. The intended result is to have `abc.png` come from projects's own `./static` folder, but it\
+  \ instead, the one from `subengine` is used.\r\n\r\nHOWEVER.... which is where the fun begins...\r\n\
+  \r\nIf I do this:\r\n```\r\nnew CopyWebpackPlugin([\r\n            { from: 'node_modules/engine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: 'node_modules/subengine/static',\
+  \ test: /\\.(css|html|png)$/, force: true },\r\n            { from: './static', test: /\\.(css|html|png)$/,\
+  \ force: true },\r\n        ], {debug: 'debug'}),\r\n```\r\n\r\n...then the order is correct, and `abc.png`\
+  \ is taken from project's `static` folder.\r\n\r\nThis might be random behavior and just a coincidence,\
+  \ but it really seems having debug on fixes the issue every time. \r\n\r\nI am using:\r\n`\"webpack\"\
+  : \"~4.17.2\",` (I would like not to update further for now because then the build breaks elsewhere)\r\
+  \n`\"copy-webpack-plugin\": \"^4.6.0\",`\r\n\r\nBuild on Windows 10, Node 8.4.0\n\nInterface / API notes:\n\
+  Function: pattern.priority\nLocation: src/options.json (pattern object schema) and documentation README.md\n\
+  Inputs: number priority – optional numeric value; defaults to 0 if omitted. Must be a finite number.\n\
+  Outputs: The value is stored on the pattern and used by CopyPlugin to order asset emission; higher numbers\
+  \ are emitted later (thus can overwrite earlier copies when `force` is true).\nDescription: Specifies\
+  \ the copy priority for a given pattern. Assets from patterns with larger priority are processed after\
+  \ those with lower values, allowing later copies to overwrite earlier ones when the `force` option is\
+  \ enabled.\n\n## Task\n\nModify the javascript source so the reported problem is resolved. Produce a\
+  \ patch against the repository at the given base commit that makes the failing tests pass without breaking\
+  \ the existing passing tests.\n\nConstraints:\n  - Change only what the fix requires; keep the diff\
+  \ minimal and focused.\n  - Do not edit the test files — they are the hidden acceptance criteria.\n\
+  \  - Preserve the existing public API unless the issue explicitly requires a change.\n\nOutput a unified\
+  \ diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

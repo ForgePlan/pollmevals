@@ -1,0 +1,14 @@
+{
+  "entry_point": "task_func",
+  "source": {
+    "dataset": "bigcode/bigcodebench",
+    "task_id": "BigCodeBench/3",
+    "libs": [
+      "numpy",
+      "random"
+    ],
+    "license": "Apache-2.0",
+    "retrieved": "2026-06-03",
+    "url": "https://huggingface.co/datasets/bigcode/bigcodebench"
+  }
+}

@@ -1,0 +1,131 @@
+# source: livecodebench/code_generation_lite (release_v6) — ingested 2026-06-02 (license: MIT)
+schema_version: pollmevals.task.v1
+id: lcb_006
+slug: heavy-snake
+version: "1.0"
+category: algo
+difficulty: easy
+language: python
+
+# Sourcing tier per ADR-007: hybrid (Tier-2 sourced-with-attribution).
+# Imported from a third-party benchmark, kept under its upstream license,
+# never edited in place. NOTE: LiveCodeBench is not yet on the ADR-007
+# allowlist and this pack is pre-G4 — catalogue-only (see NOTE.md).
+sourcing: hybrid
+
+description: |
+  There are N snakes.
+  Initially, the thickness of the i-th snake is T_i, and its length is L_i.
+  The weight of a snake is defined as the product of its thickness and length.
+  For each integer k satisfying 1 \leq k \leq D, find the weight of the heaviest snake when every snake's length has increased by k.
+
+  Input
+
+  The input is given from Standard Input in the following format:
+  N D
+  T_1 L_1
+  T_2 L_2
+  \vdots
+  T_N L_N
+
+  Output
+
+  Print D lines. The k-th line should contain the weight of the heaviest snake when every snake's length has increased by k.
+
+  Constraints
+
+
+  - 1 \leq N, D \leq 100
+  - 1 \leq T_i,...
+
+prompt_template: |
+  There are N snakes.
+  Initially, the thickness of the i-th snake is T_i, and its length is L_i.
+  The weight of a snake is defined as the product of its thickness and length.
+  For each integer k satisfying 1 \leq k \leq D, find the weight of the heaviest snake when every snake's length has increased by k.
+
+  Input
+
+  The input is given from Standard Input in the following format:
+  N D
+  T_1 L_1
+  T_2 L_2
+  \vdots
+  T_N L_N
+
+  Output
+
+  Print D lines. The k-th line should contain the weight of the heaviest snake when every snake's length has increased by k.
+
+  Constraints
+
+
+  - 1 \leq N, D \leq 100
+  - 1 \leq T_i, L_i \leq 100
+  - All input values are integers.
+
+  Sample Input 1
+
+  4 3
+  3 3
+  5 1
+  2 4
+  1 10
+
+  Sample Output 1
+
+  12
+  15
+  20
+
+  When every snake’s length has increased by 1, the snakes' weights become 12, 10, 10, 11, so print 12 on the first line.
+  When every snake’s length has increased by 2, the snakes' weights become 15, 15, 12, 12, so print 15 on the second line.
+  When every snake’s length has increased by 3, the snakes' weights become 18, 20, 14, 13, so print 20 on the third line.
+
+  Sample Input 2
+
+  1 4
+  100 100
+
+  Sample Output 2
+
+  10100
+  10200
+  10300
+  10400
+
+  ## I/O contract
+
+  Read all input from standard input and write the answer to standard output, matching the formats shown in the examples above.
+
+  Output only a single self-contained program. No prose, no markdown fences.
+
+success_criteria:
+  - Program is accepted by every gold test in gold/tests.json (2 public + 40 private input/output pairs).
+  - Output matches the expected output exactly (after trailing-whitespace normalisation) for each test.
+  - Solution runs within the contest time/memory limits.
+
+# The objective oracle is the test set (no reference solution ships
+# with LiveCodeBench). Execution needs a stdin/stdout tests runner — see NOTE.md.
+oracle: tests
+
+license:
+  primary: MIT
+  hf_card_tag: cc
+
+source:
+  dataset: livecodebench/code_generation_lite
+  version_tag: release_v6
+  platform: atcoder
+  question_id: abc388_b
+  contest_id: abc388
+  contest_date: 2025-01-11
+
+# Score weights per docs/02-methodology/scoring.md coding-task formula.
+# For an objective algo task, correctness (test pass-rate) dominates;
+# style/complexity components are recorded but secondary.
+weight_components:
+  correctness: 0.70
+  complexity: 0.10
+  linter: 0.10
+  pattern_match: 0.10

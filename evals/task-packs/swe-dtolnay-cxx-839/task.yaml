@@ -1,0 +1,61 @@
+# source: nebius/SWE-rebench-V2 instance dtolnay__cxx-839 (code license: Apache-2.0, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_005
+slug: swe-rebench-cxx-839
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: rust
+sourcing: hybrid
+license:
+  code: Apache-2.0
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: dtolnay__cxx-839
+  repo: dtolnay/cxx
+  base_commit: c5f472ef62f6307521cb1fe8a76a204438a6eee0
+  image_name: docker.io/swerebenchv2/dtolnay-cxx:839-c5f472e
+  test_cmd: cargo test --lib --bins --tests -- --nocapture
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - core_feat
+description: 'CxxVector::push_back
+
+  Adding push_back/pop functionality (and other mutation functionality) to `CxxVector` would be helpful
+  for `CxxVector`s containing types that rust can obtain (e.g. `CxxVector<CxxString>` or `CxxVector<SharedPtr<T>>`).
+  Similarly, `CxxVector::new()` or `CxxVector::default()` would be helpful to create them from Rust.'
+prompt_template: "# Bug fix: dtolnay/cxx\n\nYou are fixing a real bug in the open-source repository `dtolnay/cxx`\
+  \ at commit `c5f472ef62f6307521cb1fe8a76a204438a6eee0`.\n\n## Issue\n\nCxxVector::push_back\nAdding\
+  \ push_back/pop functionality (and other mutation functionality) to `CxxVector` would be helpful for\
+  \ `CxxVector`s containing types that rust can obtain (e.g. `CxxVector<CxxString>` or `CxxVector<SharedPtr<T>>`).\
+  \ Similarly, `CxxVector::new()` or `CxxVector::default()` would be helpful to create them from Rust.\n\
+  \nInterface / API notes:\nMethod: CxxVector<T>.push(self: Pin<&mut Self>, value: T)  \nLocation: src/cxx_vector.rs\
+  \ (impl block for CxxVector)  \nInputs: a pinned mutable reference to a CxxVector holding a trivial\
+  \ extern type `T` (e.g., `f64`, `Shared`), and an owned `value` of type `T`. `T` must satisfy `ExternType<Kind\
+  \ = Trivial>`.  \nOutputs: `()` – the call mutates the underlying C++ `std::vector<T>` by appending\
+  \ the element; no return value.  \nDescription: Appends `value` to the back of the vector. The method\
+  \ creates a `ManuallyDrop<T>` wrapper, then forwards to the hidden FFI routine `__push_back`, which\
+  \ invokes C++ `std::vector::push_back` and destroys the temporary on the Rust side. Use it when you\
+  \ need to grow a `CxxVector` from Rust with element types that can be passed by value.\n\n## Task\n\n\
+  Modify the rust source so the reported problem is resolved. Produce a patch against the repository at\
+  \ the given base commit that makes the failing tests pass without breaking the existing passing tests.\n\
+  \nConstraints:\n  - Change only what the fix requires; keep the diff minimal and focused.\n  - Do not\
+  \ edit the test files — they are the hidden acceptance criteria.\n  - Preserve the existing public API\
+  \ unless the issue explicitly requires a change.\n\nOutput a unified diff (git patch) of your source\
+  \ changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

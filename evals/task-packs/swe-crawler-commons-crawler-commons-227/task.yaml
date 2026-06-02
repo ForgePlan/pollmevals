@@ -1,0 +1,54 @@
+# source: nebius/SWE-rebench-V2 instance crawler-commons__crawler-commons-227 (code license: Apache-2.0, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_004
+slug: swe-rebench-crawler-commons-227
+version: '1.0'
+category: bugfix
+difficulty: easy
+language: java
+sourcing: hybrid
+license:
+  code: Apache-2.0
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: crawler-commons__crawler-commons-227
+  repo: crawler-commons/crawler-commons
+  base_commit: ab9e33a5f9fdb02c57141412867a4ec985135aa7
+  image_name: docker.io/swerebenchv2/crawler-commons-crawler-commons:227-ab9e33a
+  test_cmd: mvn test -B --no-transfer-progress -Dsurefire.printSummary=true
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - minor_bug
+description: "[Sitemaps] Sitemap index: stop URL at closing </loc>\n(cf. [Nutch mailing list](https://lists.apache.org/thread.html/8ebcffbe2bd8edafb6030e4f28fceee07aee08a1ce06a94755ee8d74@%3Cuser.nutch.apache.org%3E)\r\
+  \n\r\nWith #153 the sitemaps SAX parser handles sitemaps with missing or not properly closed <url> elements.\
+  \ This should be also done for sitemap indexes, e.g.:\r\n```\r\n<?xml version=\"1.0\" encoding=\"UTF-8\"\
+  ?>\r\n<sitemapindex>\r\n<sitemap>\r\n<loc>https://www.example.orgl/sitemap1.xml</loc>\r\n<loc>https://www.example.org/sitemap2.xml</loc>\r\
+  \n</sitemap>\r\n</sitemapindex>\r\n```"
+prompt_template: "# Bug fix: crawler-commons/crawler-commons\n\nYou are fixing a real bug in the open-source\
+  \ repository `crawler-commons/crawler-commons` at commit `ab9e33a5f9fdb02c57141412867a4ec985135aa7`.\n\
+  \n## Issue\n\n[Sitemaps] Sitemap index: stop URL at closing </loc>\n(cf. [Nutch mailing list](https://lists.apache.org/thread.html/8ebcffbe2bd8edafb6030e4f28fceee07aee08a1ce06a94755ee8d74@%3Cuser.nutch.apache.org%3E)\r\
+  \n\r\nWith #153 the sitemaps SAX parser handles sitemaps with missing or not properly closed <url> elements.\
+  \ This should be also done for sitemap indexes, e.g.:\r\n```\r\n<?xml version=\"1.0\" encoding=\"UTF-8\"\
+  ?>\r\n<sitemapindex>\r\n<sitemap>\r\n<loc>https://www.example.orgl/sitemap1.xml</loc>\r\n<loc>https://www.example.org/sitemap2.xml</loc>\r\
+  \n</sitemap>\r\n</sitemapindex>\r\n```\n\n## Task\n\nModify the java source so the reported problem\
+  \ is resolved. Produce a patch against the repository at the given base commit that makes the failing\
+  \ tests pass without breaking the existing passing tests.\n\nConstraints:\n  - Change only what the\
+  \ fix requires; keep the diff minimal and focused.\n  - Do not edit the test files — they are the hidden\
+  \ acceptance criteria.\n  - Preserve the existing public API unless the issue explicitly requires a\
+  \ change.\n\nOutput a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15

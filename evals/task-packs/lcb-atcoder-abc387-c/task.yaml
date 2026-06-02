@@ -1,0 +1,126 @@
+# source: livecodebench/code_generation_lite (release_v6) — ingested 2026-06-02 (license: MIT)
+schema_version: pollmevals.task.v1
+id: lcb_004
+slug: snake-numbers
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# Sourcing tier per ADR-007: hybrid (Tier-2 sourced-with-attribution).
+# Imported from a third-party benchmark, kept under its upstream license,
+# never edited in place. NOTE: LiveCodeBench is not yet on the ADR-007
+# allowlist and this pack is pre-G4 — catalogue-only (see NOTE.md).
+sourcing: hybrid
+
+description: |
+  A positive integer not less than 10 whose top digit (the most significant digit) in decimal representation is strictly larger than every other digit in that number is called a Snake number.
+  For example, 31 and 201 are Snake numbers, but 35 and 202 are not.
+  Find how many Snake numbers exist between L and R, inclusive.
+
+  Input
+
+  The input is given from Standard Input in the following format:
+  L R
+
+  Output
+
+  Print the answer.
+
+  Constraints
+
+
+  - 10 \leq L \leq R \leq 10^{18}
+  - All input values are integers.
+
+  Sample Input 1
+
+  97 210
+
+  Sample Output 1
+
+  6
+
+  The Snake numbers between 97 and 210, inclusive, a...
+
+prompt_template: |
+  A positive integer not less than 10 whose top digit (the most significant digit) in decimal representation is strictly larger than every other digit in that number is called a Snake number.
+  For example, 31 and 201 are Snake numbers, but 35 and 202 are not.
+  Find how many Snake numbers exist between L and R, inclusive.
+
+  Input
+
+  The input is given from Standard Input in the following format:
+  L R
+
+  Output
+
+  Print the answer.
+
+  Constraints
+
+
+  - 10 \leq L \leq R \leq 10^{18}
+  - All input values are integers.
+
+  Sample Input 1
+
+  97 210
+
+  Sample Output 1
+
+  6
+
+  The Snake numbers between 97 and 210, inclusive, are 97, 98, 100, 200, 201, and 210: there are six.
+
+  Sample Input 2
+
+  1000 9999
+
+  Sample Output 2
+
+  2025
+
+  Sample Input 3
+
+  252509054433933519 760713016476190692
+
+  Sample Output 3
+
+  221852052834757
+
+  ## I/O contract
+
+  Read all input from standard input and write the answer to standard output, matching the formats shown in the examples above.
+
+  Output only a single self-contained program. No prose, no markdown fences.
+
+success_criteria:
+  - Program is accepted by every gold test in gold/tests.json (3 public + 40 private input/output pairs).
+  - Output matches the expected output exactly (after trailing-whitespace normalisation) for each test.
+  - Solution runs within the contest time/memory limits.
+
+# The objective oracle is the test set (no reference solution ships
+# with LiveCodeBench). Execution needs a stdin/stdout tests runner — see NOTE.md.
+oracle: tests
+
+license:
+  primary: MIT
+  hf_card_tag: cc
+
+source:
+  dataset: livecodebench/code_generation_lite
+  version_tag: release_v6
+  platform: atcoder
+  question_id: abc387_c
+  contest_id: abc387
+  contest_date: 2025-01-04
+
+# Score weights per docs/02-methodology/scoring.md coding-task formula.
+# For an objective algo task, correctness (test pass-rate) dominates;
+# style/complexity components are recorded but secondary.
+weight_components:
+  correctness: 0.70
+  complexity: 0.10
+  linter: 0.10
+  pattern_match: 0.10

@@ -1,0 +1,61 @@
+# source: BigCodeBench task #BigCodeBench/7 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0007
+slug: bcb-0007-task-func
+version: "1.0"
+category: backend
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/7"
+  entry_point: task_func
+  libs: ["operator", "csv", "collections"]
+  retrieved: 2026-06-03
+
+description: |
+  Find the best-selling product from a given CSV file with sales data. This function parses a CSV file assumed to have a header followed by rows containing two columns: 'product' and 'quantity'. It computes the total sales per product and determines the product with the highest cumulative sales. The CSV file must include at least these two columns, where 'product' is the name of the product as a string and 'quantity' is the number of units sold as an integer. Args: csv_file_path (str): The file path to the CSV file containing sales data.
+  The function should output with:
+      str: The name of the top-selling product based on the total quantity sold.
+  You should write self-contained code starting with:
+  ```
+  import csv
+  import collections
+  import operator
+  def task_func(csv_file_path):
+  ```
+
+prompt_template: |
+  Find the best-selling product from a given CSV file with sales data. This function parses a CSV file assumed to have a header followed by rows containing two columns: 'product' and 'quantity'. It computes the total sales per product and determines the product with the highest cumulative sales. The CSV file must include at least these two columns, where 'product' is the name of the product as a string and 'quantity' is the number of units sold as an integer. Args: csv_file_path (str): The file path to the CSV file containing sales data.
+  The function should output with:
+      str: The name of the top-selling product based on the total quantity sold.
+  You should write self-contained code starting with:
+  ```
+  import csv
+  import collections
+  import operator
+  def task_func(csv_file_path):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

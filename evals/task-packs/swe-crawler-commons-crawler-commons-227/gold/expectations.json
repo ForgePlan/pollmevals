@@ -1,0 +1,22 @@
+{
+  "instance_id": "crawler-commons__crawler-commons-227",
+  "repo": "crawler-commons/crawler-commons",
+  "base_commit": "ab9e33a5f9fdb02c57141412867a4ec985135aa7",
+  "FAIL_TO_PASS": [
+    "crawlercommons.sitemaps.SiteMapParserTest",
+    "---NO TEST NAME FOUND YET---"
+  ],
+  "PASS_TO_PASS": [
+    "crawlercommons.domains.EffectiveTldFinderPSLTest",
+    "crawlercommons.domains.EffectiveTldFinderTest",
+    "crawlercommons.domains.PaidLevelDomainTest",
+    "crawlercommons.domains.SuffixTrieTest",
+    "crawlercommons.filters.basic.BasicURLNormalizerTest",
+    "crawlercommons.mimetypes.MimeTypeDetectorTest",
+    "crawlercommons.robots.SimpleRobotRulesParserTest",
+    "crawlercommons.robots.SimpleRobotRulesTest",
+    "crawlercommons.sitemaps.AbstractSiteMapTest",
+    "crawlercommons.sitemaps.SiteMapParserExtensionTest",
+    "crawlercommons.sitemaps.SiteMapURLTest"
+  ]
+}

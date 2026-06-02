@@ -1,0 +1,65 @@
+# source: BigCodeBench task #BigCodeBench/1 (license: Apache-2.0, retrieved 2026-06-03, url: https://huggingface.co/datasets/bigcode/bigcodebench)
+schema_version: pollmevals.task.v1
+id: bcb_0001
+slug: bcb-0001-task-func
+version: "1.0"
+category: algo
+difficulty: medium
+language: python
+
+# ADR-007 Tier 2 (sourced with attribution). The ADR's sourcing enum is
+# `own | hybrid`; there is no `external` value, so a fully-imported pack
+# is `hybrid`. License + provenance recorded below and in LICENSE.md.
+sourcing: hybrid
+license:
+  spec: Apache-2.0
+  code: Apache-2.0
+
+source:
+  dataset: bigcode/bigcodebench
+  task_id: "BigCodeBench/1"
+  entry_point: task_func
+  libs: ["collections", "random", "string"]
+  retrieved: 2026-06-03
+
+description: |
+  Generate a random string of the specified length composed of uppercase and lowercase letters, and then count the occurrence of each character in this string.
+  The function should raise the exception for: ValueError if the length is a negative number
+  The function should output with:
+      dict: A dictionary where each key is a character from the generated string and the value
+      is the count of how many times that character appears in the string.
+  You should write self-contained code starting with:
+  ```
+  import collections
+  import random
+  import string
+  def task_func(length=100):
+  ```
+
+prompt_template: |
+  Generate a random string of the specified length composed of uppercase and lowercase letters, and then count the occurrence of each character in this string.
+  The function should raise the exception for: ValueError if the length is a negative number
+  The function should output with:
+      dict: A dictionary where each key is a character from the generated string and the value
+      is the count of how many times that character appears in the string.
+  You should write self-contained code starting with:
+  ```
+  import collections
+  import random
+  import string
+  def task_func(length=100):
+  ```
+
+success_criteria:
+  - All hidden unittest cases in gold/test.py pass for `task_func`.
+  - The solution is a single self-contained Python module.
+  - Only the listed standard/third-party libraries are imported.
+
+# Standard coding-task formula (docs/02-methodology/scoring.md). Σ == 1.0.
+weight_components:
+  correctness: 0.4
+  test_coverage: 0.15
+  complexity: 0.1
+  linter: 0.1
+  type_safety: 0.1
+  pattern_match: 0.15

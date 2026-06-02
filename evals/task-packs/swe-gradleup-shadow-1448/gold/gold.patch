@@ -1,0 +1,43 @@
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 896dc162c..e35e2c90e 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -36,8 +36,8 @@ kotlin {
+   explicitApi()
+   compilerOptions {
+     // https://docs.gradle.org/current/userguide/compatibility.html#kotlin
+-    @Suppress("DEPRECATION") // TODO: bump apiVersion to 2.0 to match Gradle 9.0
+-    apiVersion = KotlinVersion.KOTLIN_1_8
++    apiVersion = KotlinVersion.KOTLIN_2_0
++    languageVersion = apiVersion
+     jvmTarget = JvmTarget.JVM_11
+     freeCompilerArgs.addAll(
+       "-Xjvm-default=all",
+diff --git a/docs/changes/README.md b/docs/changes/README.md
+index 6cf66cde8..c41c2bb61 100644
+--- a/docs/changes/README.md
++++ b/docs/changes/README.md
+@@ -2,6 +2,11 @@
+ 
+ ## [Unreleased](https://github.com/GradleUp/shadow/compare/9.0.0-beta14...HEAD) - 2025-xx-xx
+ 
++**Fixed**
++
++- Pin the plugin's Kotlin language level on 2.0. ([#1448](https://github.com/GradleUp/shadow/pull/1448))  
++  The language level used in `9.0.0-beta14` is 2.2, which may cause compatibility issues for the plugins depending on
++  Shadow.
+ 
+ ## [9.0.0-beta14](https://github.com/GradleUp/shadow/releases/tag/9.0.0-beta14) - 2025-05-28
+ 
+diff --git a/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/transformers/PropertiesFileTransformer.kt b/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/transformers/PropertiesFileTransformer.kt
+index 4e6d6f377..4f331a0c5 100644
+--- a/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/transformers/PropertiesFileTransformer.kt
++++ b/src/main/kotlin/com/github/jengelman/gradle/plugins/shadow/transformers/PropertiesFileTransformer.kt
+@@ -238,7 +238,6 @@ public open class PropertiesFileTransformer @Inject constructor(
+     public companion object {
+       @JvmStatic
+       public fun from(value: String): MergeStrategy {
+-        @OptIn(ExperimentalStdlibApi::class)
+         return entries.find { it.name.equals(value, ignoreCase = true) }
+           ?: throw IllegalArgumentException("Unknown merge strategy: $value")
+       }

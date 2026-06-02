@@ -22,6 +22,11 @@ required-version = ">=0.5.0"
 line-length = 100
 target-version = "py312"
 src = ["apps/eval-core-py/src"]
+# Imported eval gold/ fixtures are kept VERBATIM (ADR-007 "never edited in place").
+# force-exclude makes ruff skip them even when paths are passed explicitly
+# (e.g. lefthook's `ruff check {staged_files}`, `moon :lint`, CI).
+extend-exclude = ["evals/task-packs"]
+force-exclude = true
 
 [tool.ruff.lint]
 # Enable a sensible default set: pycodestyle, pyflakes, isort, bugbear, comprehensions.

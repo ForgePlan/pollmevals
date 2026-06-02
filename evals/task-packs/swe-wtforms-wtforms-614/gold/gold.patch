@@ -1,0 +1,1082 @@
+diff --git a/CHANGES.rst b/CHANGES.rst
+index 50f43a2..a199f46 100644
+--- a/CHANGES.rst
++++ b/CHANGES.rst
+@@ -34,7 +34,7 @@ Unreleased
+ -   Render attribute names like ``for_`` and ``class_`` are normalized
+     consistently so later values override those specified earlier.
+     :issue:`449`, :pr:`596`
+-
++-   Flags can take non-boolean values. :issue:`406` :pr:`467`
+ 
+ Version 2.3.1
+ -------------
+diff --git a/docs/fields.rst b/docs/fields.rst
+index ed047ce..0bd3e32 100644
+--- a/docs/fields.rst
++++ b/docs/fields.rst
+@@ -182,10 +182,10 @@ The Field base class
+ 
+     .. attribute:: flags
+ 
+-        An object containing boolean flags set either by the field itself, or
++        An object containing flags set either by the field itself, or
+         by validators on the field. For example, the built-in
+         :class:`~wtforms.validators.InputRequired` validator sets the `required` flag.
+-        An unset flag will result in :const:`False`.
++        An unset flag will result in :const:`None`.
+ 
+         .. code-block:: html+django
+ 
+@@ -220,10 +220,14 @@ refer to a single input from the form.
+ 
+ .. autoclass:: DateTimeField(default field arguments, format='%Y-%m-%d %H:%M:%S')
+ 
+-    For better date/time fields, see the :mod:`dateutil extension <wtforms.ext.dateutil.fields>`
++.. autoclass:: DateTimeLocalField(default field arguments, format='%Y-%m-%d %H:%M:%S')
+ 
+ .. autoclass:: DecimalField(default field arguments, places=2, rounding=None, use_locale=False, number_format=None)
+ 
++.. autoclass:: DecimalRangeField(default field arguments)
++
++.. autoclass:: EmailField(default field arguments)
++
+ .. autoclass:: FileField(default field arguments)
+ 
+     Example usage::
+@@ -252,6 +256,8 @@ refer to a single input from the form.
+ 
+ .. autoclass:: IntegerField(default field arguments)
+ 
++.. autoclass:: IntegerRangeField(default field arguments)
++
+ .. autoclass:: RadioField(default field arguments, choices=[], coerce=str)
+ 
+     .. code-block:: jinja
+@@ -323,6 +329,8 @@ refer to a single input from the form.
+     a list of fields each representing an option. The rendering of this can be
+     further controlled by specifying `option_widget=`.
+ 
++.. autoclass:: SearchField(default field arguments)
++
+ .. autoclass:: SelectMultipleField(default field arguments, choices=[], coerce=str, option_widget=None)
+ 
+    The data on the SelectMultipleField is stored as a list of objects, each of
+@@ -338,6 +346,13 @@ refer to a single input from the form.
+ 
+         {{ form.username(size=30, maxlength=50) }}
+ 
++.. autoclass:: TelField(default field arguments)
++
++.. autoclass:: TimeField(default field arguments, format='%H:%M')
++
++.. autoclass:: URLField(default field arguments)
++
++
+ Convenience Fields
+ ------------------
+ 
+@@ -559,40 +574,3 @@ Additional Helper Classes
+     .. attribute:: text
+ 
+         The original label text passed to the field's constructor.
+-
+-HTML5 Fields
+-------------
+-
+-In addition to basic HTML fields, WTForms also supplies fields for the HTML5
+-standard. These fields can be accessed under the :mod:`wtforms.fields.html5` namespace.
+-In reality, these fields are just convenience fields that extend basic fields
+-and implement HTML5 specific widgets. These widgets are located in the :mod:`wtforms.widgets.html5`
+-namespace and can be overridden or modified just like any other widget.
+-
+-.. module:: wtforms.fields.html5
+-
+-.. autoclass:: SearchField(default field arguments)
+-
+-.. autoclass:: TelField(default field arguments)
+-
+-.. autoclass:: URLField(default field arguments)
+-
+-.. autoclass:: EmailField(default field arguments)
+-
+-.. autoclass:: DateTimeField(default field arguments,  format='%Y-%m-%d %H:%M:%S')
+-
+-.. autoclass:: DateField(default field arguments, format='%Y-%m-%d')
+-
+-.. autoclass:: MonthField(default field arguments, format='%Y-%m')
+-
+-.. autoclass:: TimeField(default field arguments, format='%H:%M')
+-
+-.. autoclass:: DateTimeLocalField(default field arguments, format='%Y-%m-%d %H:%M:%S')
+-
+-.. autoclass:: IntegerField(default field arguments)
+-
+-.. autoclass:: DecimalField(default field arguments)
+-
+-.. autoclass:: IntegerRangeField(default field arguments)
+-
+-.. autoclass:: DecimalRangeField(default field arguments)
+diff --git a/docs/validators.rst b/docs/validators.rst
+index cdb9627..818c018 100644
+--- a/docs/validators.rst
++++ b/docs/validators.rst
+@@ -177,22 +177,21 @@ which will then be available on the :attr:`field's flags object
+ 
+ To specify flags on your validator, set the ``field_flags`` attribute on your
+ validator. When the Field is constructed, the flags with the same name will be
+-set to True on your field. For example, let's imagine a validator that
++set on your field. For example, let's imagine a validator that
+ validates that input is valid BBCode. We can set a flag on the field then to
+ signify that the field accepts BBCode::
+ 
+     # class implementation
+     class ValidBBCode(object):
+-        field_flags = ('accepts_bbcode', )
+-
+-        pass # validator implementation here
++        def __init__(self):
++            self.field_flags = {'accepts_bbcode': True}
+ 
+     # factory implementation
+     def valid_bbcode():
+         def _valid_bbcode(form, field):
+             pass # validator implementation here
+ 
+-        _valid_bbcode.field_flags = ('accepts_bbcode', )
++        _valid_bbcode.field_flags = {'accepts_bbcode': True}
+         return _valid_bbcode
+ 
+ Then we can check it in our template, so we can then place a note to the user:
+@@ -206,7 +205,10 @@ Then we can check it in our template, so we can then place a note to the user:
+ 
+ Some considerations on using flags:
+ 
+-* Flags can only set boolean values, and another validator cannot unset them.
+-* If multiple fields set the same flag, its value is still True.
++* Boolean flags will set HTML valueless attributes (e.g. `{required: True}`
++  will give `<input type="text" required>`). Other flag types will set regular
++  HTML attributes (e.g. `{maxlength: 8}` will give `<input type="text" maxlength="8">`).
++* If multiple validators set the same flag, the flag will have the value set
++  by the first validator.
+ * Flags are set from validators only in :meth:`Field.__init__`, so inline
+   validators and extra passed-in validators cannot set them.
+diff --git a/docs/widgets.rst b/docs/widgets.rst
+index 81b96c0..5c4f009 100644
+--- a/docs/widgets.rst
++++ b/docs/widgets.rst
+@@ -14,36 +14,30 @@ recognize as not needing to be auto-escaped.
+ Built-in widgets
+ ----------------
+ 
+-.. autoclass:: wtforms.widgets.ListWidget
+-.. autoclass:: wtforms.widgets.TableWidget
++.. autoclass:: wtforms.widgets.ColorInput
++.. autoclass:: wtforms.widgets.CheckboxInput
++.. autoclass:: wtforms.widgets.DateTimeInput
++.. autoclass:: wtforms.widgets.DateTimeLocalInput
++.. autoclass:: wtforms.widgets.DateInput
++.. autoclass:: wtforms.widgets.EmailInput
++.. autoclass:: wtforms.widgets.FileInput
++.. autoclass:: wtforms.widgets.HiddenInput
+ .. autoclass:: wtforms.widgets.Input
+-.. autoclass:: wtforms.widgets.TextInput()
++.. autoclass:: wtforms.widgets.ListWidget
++.. autoclass:: wtforms.widgets.MonthInput
++.. autoclass:: wtforms.widgets.NumberInput
+ .. autoclass:: wtforms.widgets.PasswordInput
+-.. autoclass:: wtforms.widgets.HiddenInput()
+-.. autoclass:: wtforms.widgets.CheckboxInput()
+-.. autoclass:: wtforms.widgets.FileInput()
+-.. autoclass:: wtforms.widgets.SubmitInput()
+-.. autoclass:: wtforms.widgets.TextArea
++.. autoclass:: wtforms.widgets.RangeInput
++.. autoclass:: wtforms.widgets.SubmitInput
++.. autoclass:: wtforms.widgets.SearchInput
+ .. autoclass:: wtforms.widgets.Select
+-
+-HTML5 widgets
+--------------
+-
+-.. module:: wtforms.widgets.html5
+-
+-.. autoclass:: wtforms.widgets.html5.ColorInput
+-.. autoclass:: wtforms.widgets.html5.DateTimeInput
+-.. autoclass:: wtforms.widgets.html5.DateTimeLocalInput
+-.. autoclass:: wtforms.widgets.html5.DateInput
+-.. autoclass:: wtforms.widgets.html5.EmailInput
+-.. autoclass:: wtforms.widgets.html5.MonthInput
+-.. autoclass:: wtforms.widgets.html5.NumberInput
+-.. autoclass:: wtforms.widgets.html5.RangeInput
+-.. autoclass:: wtforms.widgets.html5.SearchInput
+-.. autoclass:: wtforms.widgets.html5.TelInput
+-.. autoclass:: wtforms.widgets.html5.TimeInput
+-.. autoclass:: wtforms.widgets.html5.URLInput
+-.. autoclass:: wtforms.widgets.html5.WeekInput
++.. autoclass:: wtforms.widgets.TableWidget
++.. autoclass:: wtforms.widgets.TelInput
++.. autoclass:: wtforms.widgets.TextArea
++.. autoclass:: wtforms.widgets.TextInput
++.. autoclass:: wtforms.widgets.TimeInput
++.. autoclass:: wtforms.widgets.URLInput
++.. autoclass:: wtforms.widgets.WeekInput
+ 
+ Widget-Building Utilities
+ -------------------------
+diff --git a/src/wtforms/fields/__init__.py b/src/wtforms/fields/__init__.py
+index 1f770d3..e429631 100644
+--- a/src/wtforms/fields/__init__.py
++++ b/src/wtforms/fields/__init__.py
+@@ -3,6 +3,5 @@ from wtforms.fields.core import Field
+ from wtforms.fields.core import Flags
+ from wtforms.fields.core import Label
+ from wtforms.fields.core import SelectFieldBase
+-from wtforms.fields.html5 import *
+ from wtforms.fields.simple import *
+ from wtforms.utils import unset_value as _unset_value
+diff --git a/src/wtforms/fields/core.py b/src/wtforms/fields/core.py
+index d835092..8724356 100644
+--- a/src/wtforms/fields/core.py
++++ b/src/wtforms/fields/core.py
+@@ -2,6 +2,7 @@ import datetime
+ import decimal
+ import inspect
+ import itertools
++import warnings
+ 
+ from markupsafe import escape
+ from markupsafe import Markup
+@@ -15,18 +16,25 @@ from wtforms.validators import ValidationError
+ __all__ = (
+     "BooleanField",
+     "DecimalField",
++    "DecimalRangeField",
+     "DateField",
+     "DateTimeField",
++    "DateTimeLocalField",
++    "EmailField",
+     "FieldList",
+     "FloatField",
+     "FormField",
+     "IntegerField",
++    "IntegerRangeField",
+     "RadioField",
++    "SearchField",
+     "SelectField",
+     "SelectMultipleField",
+     "StringField",
++    "TelField",
+     "TimeField",
+     "MonthField",
++    "URLField",
+ )
+ 
+ 
+@@ -143,9 +151,21 @@ class Field:
+             self.widget = widget
+ 
+         for v in itertools.chain(self.validators, [self.widget]):
+-            flags = getattr(v, "field_flags", ())
+-            for f in flags:
+-                setattr(self.flags, f, True)
++            flags = getattr(v, "field_flags", {})
++
++            # check for legacy format, remove eventually
++            if isinstance(flags, tuple):
++                warnings.warn(
++                    "Flags should be stored in dicts and not in tuples. "
++                    "The next version of WTForms will abandon support "
++                    "for flags in tuples.",
++                    DeprecationWarning,
++                    stacklevel=2,
++                )
++                flags = {flag_name: True for flag_name in flags}
++
++            for k, v in flags.items():
++                setattr(self.flags, k, v)
+ 
+     def __str__(self):
+         """
+@@ -408,15 +428,15 @@ class UnboundField:
+ 
+ class Flags:
+     """
+-    Holds a set of boolean flags as attributes.
++    Holds a set of flags as attributes.
+ 
+-    Accessing a non-existing attribute returns False for its value.
++    Accessing a non-existing attribute returns None for its value.
+     """
+ 
+     def __getattr__(self, name):
+         if name.startswith("_"):
+             return super().__getattr__(name)
+-        return False
++        return None
+ 
+     def __contains__(self, name):
+         return getattr(self, name)
+@@ -670,7 +690,7 @@ class IntegerField(Field):
+     is ignored and will not be accepted as a value.
+     """
+ 
+-    widget = widgets.TextInput()
++    widget = widgets.NumberInput()
+ 
+     def __init__(self, label=None, validators=None, **kwargs):
+         super().__init__(label, validators, **kwargs)
+@@ -721,7 +741,7 @@ class DecimalField(LocaleAwareNumberField):
+         format for the locale.
+     """
+ 
+-    widget = widgets.TextInput()
++    widget = widgets.NumberInput(step="any")
+ 
+     def __init__(
+         self, label=None, validators=None, places=unset_value, rounding=None, **kwargs
+@@ -842,7 +862,7 @@ class DateTimeField(Field):
+     A text field which stores a `datetime.datetime` matching a format.
+     """
+ 
+-    widget = widgets.TextInput()
++    widget = widgets.DateTimeInput()
+ 
+     def __init__(
+         self, label=None, validators=None, format="%Y-%m-%d %H:%M:%S", **kwargs
+@@ -871,6 +891,8 @@ class DateField(DateTimeField):
+     Same as DateTimeField, except stores a `datetime.date`.
+     """
+ 
++    widget = widgets.DateInput()
++
+     def __init__(self, label=None, validators=None, format="%Y-%m-%d", **kwargs):
+         super().__init__(label, validators, format, **kwargs)
+ 
+@@ -889,6 +911,8 @@ class TimeField(DateTimeField):
+     Same as DateTimeField, except stores a `time`.
+     """
+ 
++    widget = widgets.TimeInput()
++
+     def __init__(self, label=None, validators=None, format="%H:%M", **kwargs):
+         super().__init__(label, validators, format, **kwargs)
+ 
+@@ -908,6 +932,8 @@ class MonthField(DateField):
+     with `day = 1`.
+     """
+ 
++    widget = widgets.MonthInput()
++
+     def __init__(self, label=None, validators=None, format="%Y-%m", **kwargs):
+         super().__init__(label, validators, format, **kwargs)
+ 
+@@ -1189,3 +1215,59 @@ class FieldList(Field):
+     @property
+     def data(self):
+         return [f.data for f in self.entries]
++
++
++class SearchField(StringField):
++    """
++    Represents an ``<input type="search">``.
++    """
++
++    widget = widgets.SearchInput()
++
++
++class TelField(StringField):
++    """
++    Represents an ``<input type="tel">``.
++    """
++
++    widget = widgets.TelInput()
++
++
++class URLField(StringField):
++    """
++    Represents an ``<input type="url">``.
++    """
++
++    widget = widgets.URLInput()
++
++
++class EmailField(StringField):
++    """
++    Represents an ``<input type="email">``.
++    """
++
++    widget = widgets.EmailInput()
++
++
++class DateTimeLocalField(DateTimeField):
++    """
++    Represents an ``<input type="datetime-local">``.
++    """
++
++    widget = widgets.DateTimeLocalInput()
++
++
++class IntegerRangeField(IntegerField):
++    """
++    Represents an ``<input type="range">``.
++    """
++
++    widget = widgets.RangeInput()
++
++
++class DecimalRangeField(DecimalField):
++    """
++    Represents an ``<input type="range">``.
++    """
++
++    widget = widgets.RangeInput(step="any")
+diff --git a/src/wtforms/fields/html5.py b/src/wtforms/fields/html5.py
+deleted file mode 100644
+index 26d7efa..0000000
+--- a/src/wtforms/fields/html5.py
++++ /dev/null
+@@ -1,121 +0,0 @@
+-from . import core
+-from ..widgets import html5 as widgets
+-
+-__all__ = (
+-    "DateField",
+-    "DateTimeField",
+-    "DateTimeLocalField",
+-    "DecimalField",
+-    "DecimalRangeField",
+-    "EmailField",
+-    "IntegerField",
+-    "IntegerRangeField",
+-    "SearchField",
+-    "TelField",
+-    "TimeField",
+-    "URLField",
+-)
+-
+-
+-class SearchField(core.StringField):
+-    """
+-    Represents an ``<input type="search">``.
+-    """
+-
+-    widget = widgets.SearchInput()
+-
+-
+-class TelField(core.StringField):
+-    """
+-    Represents an ``<input type="tel">``.
+-    """
+-
+-    widget = widgets.TelInput()
+-
+-
+-class URLField(core.StringField):
+-    """
+-    Represents an ``<input type="url">``.
+-    """
+-
+-    widget = widgets.URLInput()
+-
+-
+-class EmailField(core.StringField):
+-    """
+-    Represents an ``<input type="email">``.
+-    """
+-
+-    widget = widgets.EmailInput()
+-
+-
+-class DateTimeField(core.DateTimeField):
+-    """
+-    Represents an ``<input type="datetime">``.
+-    """
+-
+-    widget = widgets.DateTimeInput()
+-
+-
+-class DateField(core.DateField):
+-    """
+-    Represents an ``<input type="date">``.
+-    """
+-
+-    widget = widgets.DateInput()
+-
+-
+-class TimeField(core.TimeField):
+-    """
+-    Represents an ``<input type="time">``.
+-    """
+-
+-    widget = widgets.TimeInput()
+-
+-
+-class MonthField(core.MonthField):
+-    """
+-    Represents an ``<input type="month">``.
+-    """
+-
+-    widget = widgets.MonthInput()
+-
+-
+-class DateTimeLocalField(core.DateTimeField):
+-    """
+-    Represents an ``<input type="datetime-local">``.
+-    """
+-
+-    widget = widgets.DateTimeLocalInput()
+-
+-
+-class IntegerField(core.IntegerField):
+-    """
+-    Represents an ``<input type="number">``.
+-    """
+-
+-    widget = widgets.NumberInput()
+-
+-
+-class DecimalField(core.DecimalField):
+-    """
+-    Represents an ``<input type="number">``.
+-    """
+-
+-    widget = widgets.NumberInput(step="any")
+-
+-
+-class IntegerRangeField(core.IntegerField):
+-    """
+-    Represents an ``<input type="range">``.
+-    """
+-
+-    widget = widgets.RangeInput()
+-
+-
+-class DecimalRangeField(core.DecimalField):
+-    """
+-    Represents an ``<input type="range">``.
+-    """
+-
+-    widget = widgets.RangeInput(step="any")
+diff --git a/src/wtforms/validators.py b/src/wtforms/validators.py
+index 2d6bea2..059f32c 100644
+--- a/src/wtforms/validators.py
++++ b/src/wtforms/validators.py
+@@ -114,6 +114,8 @@ class Length:
+         Error message to raise in case of a validation error. Can be
+         interpolated using `%(min)d` and `%(max)d` if desired. Useful defaults
+         are provided depending on the existence of min and max.
++
++    When supported, sets the `minlength` and `maxlength` attributes on widgets.
+     """
+ 
+     def __init__(self, min=-1, max=-1, message=None):
+@@ -124,6 +126,11 @@ class Length:
+         self.min = min
+         self.max = max
+         self.message = message
++        self.field_flags = {}
++        if self.min != -1:
++            self.field_flags["minlength"] = self.min
++        if self.max != -1:
++            self.field_flags["maxlength"] = self.max
+ 
+     def __call__(self, form, field):
+         length = field.data and len(field.data) or 0
+@@ -174,12 +181,19 @@ class NumberRange:
+         Error message to raise in case of a validation error. Can be
+         interpolated using `%(min)s` and `%(max)s` if desired. Useful defaults
+         are provided depending on the existence of min and max.
++
++    When supported, sets the `min` and `max` attributes on widgets.
+     """
+ 
+     def __init__(self, min=None, max=None, message=None):
+         self.min = min
+         self.max = max
+         self.message = message
++        self.field_flags = {}
++        if self.min is not None:
++            self.field_flags["min"] = self.min
++        if self.max is not None:
++            self.field_flags["max"] = self.max
+ 
+     def __call__(self, form, field):
+         data = field.data
+@@ -215,9 +229,9 @@ class Optional:
+     :param strip_whitespace:
+         If True (the default) also stop the validation chain on input which
+         consists of only whitespace.
+-    """
+ 
+-    field_flags = ("optional",)
++    Sets the `optional` attribute on widgets.
++    """
+ 
+     def __init__(self, strip_whitespace=True):
+         if strip_whitespace:
+@@ -225,6 +239,8 @@ class Optional:
+         else:
+             self.string_check = lambda s: s
+ 
++        self.field_flags = {"optional": True}
++
+     def __call__(self, form, field):
+         if (
+             not field.raw_data
+@@ -256,12 +272,13 @@ class DataRequired:
+ 
+     :param message:
+         Error message to raise in case of a validation error.
+-    """
+ 
+-    field_flags = ("required",)
++    Sets the `required` attribute on widgets.
++    """
+ 
+     def __init__(self, message=None):
+         self.message = message
++        self.field_flags = {"required": True}
+ 
+     def __call__(self, form, field):
+         if not field.data or isinstance(field.data, str) and not field.data.strip():
+@@ -281,12 +298,13 @@ class InputRequired:
+     Note there is a distinction between this and DataRequired in that
+     InputRequired looks that form-input data was provided, and DataRequired
+     looks at the post-coercion data.
+-    """
+ 
+-    field_flags = ("required",)
++    Sets the `required` attribute on widgets.
++    """
+ 
+     def __init__(self, message=None):
+         self.message = message
++        self.field_flags = {"required": True}
+ 
+     def __call__(self, form, field):
+         if not field.raw_data or not field.raw_data[0]:
+diff --git a/src/wtforms/widgets/core.py b/src/wtforms/widgets/core.py
+index 3e2a2eb..a0e0e61 100644
+--- a/src/wtforms/widgets/core.py
++++ b/src/wtforms/widgets/core.py
+@@ -3,17 +3,30 @@ from markupsafe import Markup
+ 
+ __all__ = (
+     "CheckboxInput",
++    "ColorInput",
++    "DateInput",
++    "DateTimeInput",
++    "DateTimeLocalInput",
++    "EmailInput",
+     "FileInput",
+     "HiddenInput",
+     "ListWidget",
++    "MonthInput",
++    "NumberInput",
++    "Option",
+     "PasswordInput",
+     "RadioInput",
++    "RangeInput",
++    "SearchInput",
+     "Select",
+     "SubmitInput",
+     "TableWidget",
+     "TextArea",
+     "TextInput",
+-    "Option",
++    "TelInput",
++    "TimeInput",
++    "URLInput",
++    "WeekInput",
+ )
+ 
+ 
+@@ -148,6 +161,7 @@ class Input:
+     """
+ 
+     html_params = staticmethod(html_params)
++    validation_attrs = ["required"]
+ 
+     def __init__(self, input_type=None):
+         if input_type is not None:
+@@ -158,8 +172,10 @@ class Input:
+         kwargs.setdefault("type", self.input_type)
+         if "value" not in kwargs:
+             kwargs["value"] = field._value()
+-        if "required" not in kwargs and "required" in getattr(field, "flags", []):
+-            kwargs["required"] = True
++        flags = getattr(field, "flags", {})
++        for k in dir(flags):
++            if k in self.validation_attrs and k not in kwargs:
++                kwargs[k] = getattr(flags, k)
+         return Markup("<input %s>" % self.html_params(name=field.name, **kwargs))
+ 
+ 
+@@ -169,6 +185,7 @@ class TextInput(Input):
+     """
+ 
+     input_type = "text"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
+ 
+ 
+ class PasswordInput(Input):
+@@ -181,6 +198,7 @@ class PasswordInput(Input):
+     """
+ 
+     input_type = "password"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
+ 
+     def __init__(self, hide_value=True):
+         self.hide_value = hide_value
+@@ -196,9 +214,12 @@ class HiddenInput(Input):
+     Render a hidden input.
+     """
+ 
+-    field_flags = ("hidden",)
+     input_type = "hidden"
+ 
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.field_flags = {"hidden": True}
++
+ 
+ class CheckboxInput(Input):
+     """
+@@ -238,6 +259,7 @@ class FileInput(Input):
+     """
+ 
+     input_type = "file"
++    validation_attrs = ["required", "accept"]
+ 
+     def __init__(self, multiple=False):
+         super().__init__()
+@@ -275,10 +297,14 @@ class TextArea:
+     `rows` and `cols` ought to be passed as keyword args when rendering.
+     """
+ 
++    validation_attrs = ["required", "maxlength", "minlength"]
++
+     def __call__(self, field, **kwargs):
+         kwargs.setdefault("id", field.id)
+-        if "required" not in kwargs and "required" in getattr(field, "flags", []):
+-            kwargs["required"] = True
++        flags = getattr(field, "flags", {})
++        for k in dir(flags):
++            if k in self.validation_attrs and k not in kwargs:
++                kwargs[k] = getattr(flags, k)
+         return Markup(
+             "<textarea %s>\r\n%s</textarea>"
+             % (html_params(name=field.name, **kwargs), escape(field._value()))
+@@ -297,6 +323,8 @@ class Select:
+     `(value, label, selected)`.
+     """
+ 
++    validation_attrs = ["required"]
++
+     def __init__(self, multiple=False):
+         self.multiple = multiple
+ 
+@@ -304,8 +332,10 @@ class Select:
+         kwargs.setdefault("id", field.id)
+         if self.multiple:
+             kwargs["multiple"] = True
+-        if "required" not in kwargs and "required" in getattr(field, "flags", []):
+-            kwargs["required"] = True
++        flags = getattr(field, "flags", {})
++        for k in dir(flags):
++            if k in self.validation_attrs and k not in kwargs:
++                kwargs[k] = getattr(flags, k)
+         html = ["<select %s>" % html_params(name=field.name, **kwargs)]
+         for val, label, selected in field.iter_choices():
+             html.append(self.render_option(val, label, selected))
+@@ -338,3 +368,141 @@ class Option:
+         return Select.render_option(
+             field._value(), field.label.text, field.checked, **kwargs
+         )
++
++
++class SearchInput(Input):
++    """
++    Renders an input with type "search".
++    """
++
++    input_type = "search"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
++
++
++class TelInput(Input):
++    """
++    Renders an input with type "tel".
++    """
++
++    input_type = "tel"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
++
++
++class URLInput(Input):
++    """
++    Renders an input with type "url".
++    """
++
++    input_type = "url"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
++
++
++class EmailInput(Input):
++    """
++    Renders an input with type "email".
++    """
++
++    input_type = "email"
++    validation_attrs = ["required", "maxlength", "minlength", "pattern"]
++
++
++class DateTimeInput(Input):
++    """
++    Renders an input with type "datetime".
++    """
++
++    input_type = "datetime"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class DateInput(Input):
++    """
++    Renders an input with type "date".
++    """
++
++    input_type = "date"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class MonthInput(Input):
++    """
++    Renders an input with type "month".
++    """
++
++    input_type = "month"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class WeekInput(Input):
++    """
++    Renders an input with type "week".
++    """
++
++    input_type = "week"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class TimeInput(Input):
++    """
++    Renders an input with type "time".
++    """
++
++    input_type = "time"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class DateTimeLocalInput(Input):
++    """
++    Renders an input with type "datetime-local".
++    """
++
++    input_type = "datetime-local"
++    validation_attrs = ["required", "max", "min", "step"]
++
++
++class NumberInput(Input):
++    """
++    Renders an input with type "number".
++    """
++
++    input_type = "number"
++    validation_attrs = ["required", "max", "min", "step"]
++
++    def __init__(self, step=None, min=None, max=None):
++        self.step = step
++        self.min = min
++        self.max = max
++
++    def __call__(self, field, **kwargs):
++        if self.step is not None:
++            kwargs.setdefault("step", self.step)
++        if self.min is not None:
++            kwargs.setdefault("min", self.min)
++        if self.max is not None:
++            kwargs.setdefault("max", self.max)
++        return super().__call__(field, **kwargs)
++
++
++class RangeInput(Input):
++    """
++    Renders an input with type "range".
++    """
++
++    input_type = "range"
++    validation_attrs = ["required", "max", "min", "step"]
++
++    def __init__(self, step=None):
++        self.step = step
++
++    def __call__(self, field, **kwargs):
++        if self.step is not None:
++            kwargs.setdefault("step", self.step)
++        return super().__call__(field, **kwargs)
++
++
++class ColorInput(Input):
++    """
++    Renders an input with type "color".
++    """
++
++    input_type = "color"
+diff --git a/src/wtforms/widgets/html5.py b/src/wtforms/widgets/html5.py
+deleted file mode 100644
+index 2a9ea76..0000000
+--- a/src/wtforms/widgets/html5.py
++++ /dev/null
+@@ -1,143 +0,0 @@
+-from .core import Input
+-
+-__all__ = (
+-    "ColorInput",
+-    "DateInput",
+-    "DateTimeInput",
+-    "DateTimeLocalInput",
+-    "EmailInput",
+-    "MonthInput",
+-    "NumberInput",
+-    "RangeInput",
+-    "SearchInput",
+-    "TelInput",
+-    "TimeInput",
+-    "URLInput",
+-    "WeekInput",
+-)
+-
+-
+-class SearchInput(Input):
+-    """
+-    Renders an input with type "search".
+-    """
+-
+-    input_type = "search"
+-
+-
+-class TelInput(Input):
+-    """
+-    Renders an input with type "tel".
+-    """
+-
+-    input_type = "tel"
+-
+-
+-class URLInput(Input):
+-    """
+-    Renders an input with type "url".
+-    """
+-
+-    input_type = "url"
+-
+-
+-class EmailInput(Input):
+-    """
+-    Renders an input with type "email".
+-    """
+-
+-    input_type = "email"
+-
+-
+-class DateTimeInput(Input):
+-    """
+-    Renders an input with type "datetime".
+-    """
+-
+-    input_type = "datetime"
+-
+-
+-class DateInput(Input):
+-    """
+-    Renders an input with type "date".
+-    """
+-
+-    input_type = "date"
+-
+-
+-class MonthInput(Input):
+-    """
+-    Renders an input with type "month".
+-    """
+-
+-    input_type = "month"
+-
+-
+-class WeekInput(Input):
+-    """
+-    Renders an input with type "week".
+-    """
+-
+-    input_type = "week"
+-
+-
+-class TimeInput(Input):
+-    """
+-    Renders an input with type "time".
+-    """
+-
+-    input_type = "time"
+-
+-
+-class DateTimeLocalInput(Input):
+-    """
+-    Renders an input with type "datetime-local".
+-    """
+-
+-    input_type = "datetime-local"
+-
+-
+-class NumberInput(Input):
+-    """
+-    Renders an input with type "number".
+-    """
+-
+-    input_type = "number"
+-
+-    def __init__(self, step=None, min=None, max=None):
+-        self.step = step
+-        self.min = min
+-        self.max = max
+-
+-    def __call__(self, field, **kwargs):
+-        if self.step is not None:
+-            kwargs.setdefault("step", self.step)
+-        if self.min is not None:
+-            kwargs.setdefault("min", self.min)
+-        if self.max is not None:
+-            kwargs.setdefault("max", self.max)
+-        return super().__call__(field, **kwargs)
+-
+-
+-class RangeInput(Input):
+-    """
+-    Renders an input with type "range".
+-    """
+-
+-    input_type = "range"
+-
+-    def __init__(self, step=None):
+-        self.step = step
+-
+-    def __call__(self, field, **kwargs):
+-        if self.step is not None:
+-            kwargs.setdefault("step", self.step)
+-        return super().__call__(field, **kwargs)
+-
+-
+-class ColorInput(Input):
+-    """
+-    Renders an input with type "color".
+-    """
+-
+-    input_type = "color"

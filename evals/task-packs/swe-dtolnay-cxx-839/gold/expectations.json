@@ -1,0 +1,25 @@
+{
+  "instance_id": "dtolnay__cxx-839",
+  "repo": "dtolnay/cxx",
+  "base_commit": "c5f472ef62f6307521cb1fe8a76a204438a6eee0",
+  "FAIL_TO_PASS": [
+    "test_extern_c_function",
+    "test_impl_annotation",
+    "test_async_cxx_string",
+    "test_c_call_r",
+    "test_c_method_calls",
+    "test_c_callback",
+    "test_c_return",
+    "test_c_ns_method_calls",
+    "test_c_take",
+    "test_c_try_return",
+    "test_enum_representations",
+    "test_debug",
+    "test_extern_trivial",
+    "test_extern_opaque",
+    "test_rust_name_attribute",
+    "test_shared_ptr_weak_ptr",
+    "test_raw_ptr"
+  ],
+  "PASS_TO_PASS": []
+}

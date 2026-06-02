@@ -1,0 +1,70 @@
+# source: nebius/SWE-rebench-V2 instance bvanelli__actualpy-56 (code license: MIT, dataset license: CC-BY-4.0, url: https://huggingface.co/datasets/nebius/SWE-rebench-V2)
+schema_version: pollmevals.task.v1
+id: swe_008
+slug: swe-rebench-actualpy-56
+version: '1.0'
+category: bugfix
+difficulty: medium
+language: python
+sourcing: hybrid
+license:
+  code: MIT
+  dataset: CC-BY-4.0
+source:
+  dataset: nebius/SWE-rebench-V2
+  instance_id: bvanelli__actualpy-56
+  repo: bvanelli/actualpy
+  base_commit: 2ad5f638789af3e37a3a07ed3f4d4938a8209ed4
+  image_name: docker.io/swerebenchv2/bvanelli-actualpy:56-2ad5f63
+  test_cmd: pytest --no-header -rA --tb=line --color=no -p no:cacheprovider -W ignore::DeprecationWarning
+    tests/test_rules.py
+  dataset_url: https://huggingface.co/datasets/nebius/SWE-rebench-V2
+  meta_difficulty: medium
+  pr_categories:
+  - core_feat
+description: "Operation ActionType.SET_SPLIT_AMOUNT not supported\n### Description\n\nI've a rule that\
+  \ given a certain payee, it creates a split transaction of 50% each.\r\nit seems that the code here\
+  \ is not supporting it.\r\nis there a way to support this or a hint on how i can create a pr?"
+prompt_template: "# Bug fix: bvanelli/actualpy\n\nYou are fixing a real bug in the open-source repository\
+  \ `bvanelli/actualpy` at commit `2ad5f638789af3e37a3a07ed3f4d4938a8209ed4`.\n\n## Issue\n\nOperation\
+  \ ActionType.SET_SPLIT_AMOUNT not supported\n### Description\n\nI've a rule that given a certain payee,\
+  \ it creates a split transaction of 50% each.\r\nit seems that the code here is not supporting it.\r\
+  \nis there a way to support this or a hint on how i can create a pr?\n\nInterface / API notes:\nMethod:\
+  \ ActionType.SET_SPLIT_AMOUNT\nLocation: actual.rules (enum ActionType)\nInputs: None (enum member)\n\
+  Outputs: Enum value representing the “set‑split‑amount” operation (string value `\"set-split-amount\"\
+  `). Used by Action.op to trigger split‑amount handling.\n\nMethod: Condition.get_value(self) → Any\n\
+  Location: actual.rules (class Condition)\nInputs: self – a Condition instance whose .value may be any\
+  \ type (including None).\nOutputs: Returns the stored .value, preserving None (i.e., returns None when\
+  \ the condition value is None). Allows tests to safely query a condition’s value without raising.\n\n\
+  Method: Rule.set_split_amount(self, transaction: Transactions) → list[Transactions]\nLocation: actual.rules\
+  \ (class Rule)\nInputs:\n- transaction (Transactions): a parent transaction that has no existing splits\
+  \ and is not a child split.\nOutputs:\n- A list of newly created split Transactions ordered as specified\
+  \ by the rule’s Action objects.\n- May raise ActualSplitTransactionError if the sum of split amounts\
+  \ does not equal the parent amount.\n\nMethod: ActualSplitTransactionError\nLocation: actual.exceptions\
+  \ (class)\nInputs: inherits any arguments passed to ActualError.\nOutputs: Exception instance signalling\
+  \ that the split‑transaction amounts are inconsistent. Tests expect this error when the internal sum function\
+  \ is mocked to break amount validation.\n\nFunction: Action.run(self, transaction: Transactions) → None\n\
+  Location: actual.rules (class Action)\nInputs:\n- transaction (Transactions): the target transaction\
+  \ (or the specific split when options `splitIndex` is provided).\n- self.op may be ActionType.SET_SPLIT_AMOUNT,\
+  \ in which case the method does **not** perform the split itself (split handling is done in Rule.set_split_amount);\
+  \ otherwise it sets the appropriate field/value (including handling of splitIndex).\nOutputs: Mutates\
+  \ the given transaction (or its split) in‑place; no return value.\n\n## Task\n\nModify the python source\
+  \ so the reported problem is resolved. Produce a patch against the repository at the given base commit\
+  \ that makes the failing tests pass without breaking the existing passing tests.\n\nConstraints:\n \
+  \ - Change only what the fix requires; keep the diff minimal and focused.\n  - Do not edit the test\
+  \ files — they are the hidden acceptance criteria.\n  - Preserve the existing public API unless the\
+  \ issue explicitly requires a change.\n\nOutput a unified diff (git patch) of your source changes.\n"
+success_criteria:
+- All FAIL_TO_PASS tests in gold/expectations.json pass after the patch is applied.
+- All PASS_TO_PASS tests continue to pass (no regression).
+- Only source files are changed; test files are left untouched.
+execution_shape: repo-checkout
+
+# Standard coding-task scoring weights (scoring.md). Sum = 1.0.
+weight_components:
+  correctness: 0.40
+  coverage: 0.15
+  complexity: 0.10
+  lint: 0.10
+  type_safety: 0.10
+  pattern_match: 0.15
