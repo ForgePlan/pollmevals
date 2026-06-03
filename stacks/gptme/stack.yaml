@@ -1,0 +1,63 @@
+schema_version: pollmevals.stack.v1
+slug: gptme
+name: gptme
+base_model_slug: configurable
+agent_cli: gptme
+
+# gptme (gptme.org): a terminal chat-agent (L1 system prompt) with built-in
+# shell + save/patch file tools (L2) that reads project context files such as
+# gptme.toml / referenced files (L4). Model-agnostic — speaks the OpenAI
+# Chat-Completions API, so it runs the same open coder models as aider/goose/
+# opencode; the board orders harnesses by max true layer.
+#
+# ENV-ONLY config (no config file) — recipe codified + smoked end-to-end
+# 2026-06-03 (memory: research-cli-harness-execution):
+#   env OPENAI_BASE_URL=http://<proxy>:4000/v1
+#       OPENAI_API_KEY=$LITELLM_MASTER_KEY
+#       MODEL=local/<MODEL>      # gptme strips `local/` → proxy gets bare <MODEL>
+#       GPTME_LOGS_HOME=/home/harness/.local/share/gptme/logs
+#       TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache   # baked in image (offline tokenizer)
+#   run gptme -n -w . -m local/<MODEL> "<prompt>"
+#         -n  non-interactive (implies --no-confirm → tools auto-execute)
+#         -w .  pin workspace to cwd (/workspace)
+#         prompt is the trailing positional arg.
+#
+# Loop note: gptme has NO --max-turns/step cap (verified). Some open models
+# (e.g. qwen3-coder-30b) re-`cat` the file to "verify" and don't self-terminate,
+# so the run is bounded ONLY by max_wall_clock_seconds (executor `timeout`
+# wrapper). The patch is already on disk before the loop, so a timeout-bounded
+# exit still yields a valid patch.
+
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: true
+  L2_tools: true
+  L3_skills: false
+  L4_file_memory: true # reads gptme.toml / referenced project context files
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: false
+  L8_framework: null
+execution:
+  mode: repository_patch
+  command: gptme
+  args: []                # -n -w . + -m local/<m> + prompt are built in _gptme_invocation
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+limits:
+  max_wall_clock_seconds: 600
+  max_tool_calls: 50
+  max_input_tokens: 50000
+  max_output_tokens: 10000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace

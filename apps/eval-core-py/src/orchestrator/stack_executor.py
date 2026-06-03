@@ -384,15 +384,148 @@ def _cline_invocation(
     )
 
 
+def _pi_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """pi (@earendil-works/pi-coding-agent) recipe — PROVEN (2026-06-03 smoke).
+
+    Minimal model-agnostic coding agent (read/write/edit/bash). Config rides a
+    models.json that pi finds via ``PI_CODING_AGENT_DIR`` (default ~/.pi/agent —
+    NOT /workspace), so we point that env at /workspace/.pi/agent and write the
+    file there via config_files (the launcher mkdir -p's the parent). api_key is a
+    literal ``$LITELLM_MASTER_KEY`` pi expands from env (never written to a file).
+    ``api: openai-completions`` = native OpenAI chat-completions (tool-calling) ->
+    only run pi on models that emit NATIVE tool_calls on the proxy (devstral /
+    codestral / qwen3-235b / glm-4-32b); qwen3-coder-30b returns text-format tool
+    calls its backend doesn't parse and pi silently no-ops (a real compat finding).
+    """
+    base = proxy_base_url.rstrip("/")
+    models_json = json.dumps(
+        {
+            "providers": {
+                "litellm": {
+                    "baseUrl": f"{base}/v1",
+                    "api": "openai-completions",
+                    "apiKey": "$LITELLM_MASTER_KEY",
+                    "models": [
+                        {
+                            "id": model_alias,
+                            "name": model_alias,
+                            "reasoning": False,
+                            "input": ["text"],
+                            "contextWindow": 32768,
+                            "maxTokens": 8192,
+                            "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                        }
+                    ],
+                }
+            }
+        }
+    )
+    return ProxyInvocation(
+        env={"LITELLM_MASTER_KEY": api_key, "PI_CODING_AGENT_DIR": "/workspace/.pi/agent"},
+        config_files={".pi/agent/models.json": models_json},
+        extra_args=["--model", f"litellm/{model_alias}", "--no-context-files", "-p"],
+        prompt_args=[prompt],
+    )
+
+
+def _gptme_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """gptme recipe — PROVEN (2026-06-03 smoke). ENV-ONLY (no config file).
+
+    gptme reads a custom OpenAI-compatible endpoint from ``OPENAI_BASE_URL`` and
+    selects the model as ``local/<m>`` (the ``local/`` prefix is stripped before
+    the call -> the proxy gets the bare alias). ``-n`` is non-interactive (implies
+    --no-confirm -> tools auto-execute); ``-w .`` pins the workspace to the cwd
+    (/workspace). gptme has NO turn cap and may loop "verifying" after writing -
+    the wall-clock timeout bounds it; the patch is written BEFORE the verify loop,
+    so a timeout-kill still yields a valid patch. The tiktoken cache is baked into
+    the image (the no-egress sandbox can't download encodings).
+    """
+    base = proxy_base_url.rstrip("/")
+    return ProxyInvocation(
+        env={
+            "OPENAI_BASE_URL": f"{base}/v1",
+            "OPENAI_API_KEY": api_key,
+            "MODEL": f"local/{model_alias}",
+            "GPTME_LOGS_HOME": "/home/harness/.local/share/gptme/logs",
+        },
+        config_files={},
+        extra_args=["-n", "-w", "."],
+        prompt_args=["-m", f"local/{model_alias}", prompt],
+    )
+
+
+# mini-SWE-agent's built-in config files (re-added first because ANY -c REPLACES
+# the default config; inline -c specs then merge onto it).
+_MINISWE_CFG = "/usr/local/lib/python3.12/site-packages/minisweagent/config"
+
+
+def _mini_swe_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """mini-SWE-agent recipe — PROVEN (2026-06-03 smoke). The "bare validator loop".
+
+    The 100-line minimal SWE loop (reason -> bash -> observe -> iterate), LiteLLM-
+    backed. ``--environment-class local`` runs bash directly in /workspace (NEVER a
+    nested Docker). Two env guards are load-bearing: ``MSWEA_CONFIGURED=true``
+    (skip the interactive setup wizard -> else it hangs on stdin) and
+    ``MSWEA_COST_TRACKING=ignore_errors`` (proxy reports $0 -> else a RuntimeError
+    on the first response). ``litellm_textbased`` parses ```` ```mswea_bash_command ````
+    fences instead of native tool_calls -> works with open coders (qwen3-coder-30b)
+    whose proxy backend lacks a tool-call parser. The trajectory goes to /tmp (out
+    of /workspace) so it never pollutes the captured patch.
+    """
+    base = proxy_base_url.rstrip("/")
+    return ProxyInvocation(
+        env={
+            "MSWEA_CONFIGURED": "true",
+            "MSWEA_COST_TRACKING": "ignore_errors",
+            "MSWEA_MODEL_NAME": f"openai/{model_alias}",
+            "OPENAI_API_BASE": f"{base}/v1",
+            "OPENAI_API_KEY": api_key,
+        },
+        config_files={},
+        extra_args=[
+            "--environment-class",
+            "local",  # bash in /workspace, NEVER a nested Docker
+            "-y",  # yolo: no confirmation
+            "--exit-immediately",  # no end-of-run prompt
+            "--model-class",
+            "litellm_textbased",
+            "-c",
+            f"{_MINISWE_CFG}/mini_textbased.yaml",  # re-add built-in (any -c drops the default)
+            "-c",
+            f"model.model_name=openai/{model_alias}",
+            "-c",
+            f"model.model_kwargs.api_base={base}/v1",
+            "-c",
+            "model.model_kwargs.custom_llm_provider=openai",
+            "-c",
+            "agent.step_limit=40",  # built-in default is 0 = unbounded
+            "-c",
+            "environment.timeout=600",
+            "-o",
+            "/tmp/mini-trajectory.json",  # out of /workspace -> not in the patch
+        ],
+        prompt_args=["-t", prompt],
+    )
+
+
 # Proven recipes (validated end-to-end via the proxy). aider is the RFC-006 first
-# slice; goose / opencode / crush / cline (all 2026-06-03) are model-agnostic peers
-# that run the same coder models for a clean harness comparison.
+# slice; goose / opencode / crush / cline / pi / gptme / mini-swe (all 2026-06-03)
+# are model-agnostic peers for the harness x model compat matrix.
 _PROVEN_RECIPES: dict[str, _RecipeBuilder] = {
     "aider": _aider_invocation,
     "goose": _goose_invocation,
     "opencode": _opencode_invocation,
     "crush": _crush_invocation,
     "cline": _cline_invocation,
+    "pi": _pi_invocation,
+    "gptme": _gptme_invocation,
+    "mini-swe": _mini_swe_invocation,
 }
 
 # Known harnesses whose recipe is proven in spikes but lands at its per-stack
@@ -403,7 +536,6 @@ _PENDING_RECIPES: frozenset[str] = frozenset(
         "codex",
         "openhands",
         "hermes",
-        "pi",
         "forgeplan-framework",
     }
 )

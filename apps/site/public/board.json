@@ -58,6 +58,37 @@
         "L2_tools"
       ],
       "family": "agnostic"
+    },
+    {
+      "stack_id": "pi",
+      "name": "PI",
+      "level": 2,
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools"
+      ],
+      "family": "vendor"
+    },
+    {
+      "stack_id": "gptme",
+      "name": "gptme",
+      "level": 4,
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools",
+        "L4_file_memory"
+      ],
+      "family": "agnostic"
+    },
+    {
+      "stack_id": "mini-swe",
+      "name": "mini-SWE-agent",
+      "level": 7,
+      "layers": [
+        "L2_tools",
+        "L7_validator"
+      ],
+      "family": "agnostic"
     }
   ],
   "models": [
@@ -924,6 +955,264 @@
         "security_posture": 6.25,
         "test_alignment": 7.0,
         "type_safety": 4.5
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "codestral",
+      "stack_id": "pi",
+      "mean_score": 6.67,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 9099,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.67,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 7.25,
+        "correctness": 7.25,
+        "error_handling": 6.5,
+        "security_posture": 7.5,
+        "test_alignment": 6.5,
+        "type_safety": 5.0
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "pi",
+      "mean_score": 7.46,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 80619,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.46,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 8.5,
+        "correctness": 7.75,
+        "error_handling": 7.0,
+        "security_posture": 8.0,
+        "test_alignment": 7.5,
+        "type_safety": 6.0
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "glm-4-32b",
+      "stack_id": "pi",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 2889,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-235b",
+      "stack_id": "pi",
+      "mean_score": 6.17,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 34632,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.17,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 7.0,
+        "correctness": 5.5,
+        "error_handling": 6.5,
+        "security_posture": 8.0,
+        "test_alignment": 6.0,
+        "type_safety": 4.0
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "codestral",
+      "stack_id": "gptme",
+      "mean_score": 7.17,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 90187,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.17,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 7.0,
+        "correctness": 8.5,
+        "error_handling": 7.5,
+        "security_posture": 8.0,
+        "test_alignment": 6.5,
+        "type_safety": 5.5
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "gptme",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 478462,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "gptme",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 343815,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "stack_id": "gptme",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 29991,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "codestral",
+      "stack_id": "mini-swe",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 262096,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "mini-swe",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 262841,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "mini-swe",
+      "mean_score": 6.54,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 65330,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.54,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 6.75,
+        "correctness": 6.75,
+        "error_handling": 7.25,
+        "security_posture": 7.75,
+        "test_alignment": 6.5,
+        "type_safety": 4.25
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "stack_id": "mini-swe",
+      "mean_score": 7.08,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 60591,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.08,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 7.0,
+        "correctness": 8.0,
+        "error_handling": 8.0,
+        "security_posture": 9.0,
+        "test_alignment": 7.0,
+        "type_safety": 3.5
       },
       "on_frontier": false
     }

@@ -295,8 +295,60 @@ class TestProxyInvocation:
         assert "cline --yolo 'do the thing'" in wrapper
         assert wrapper.rstrip().endswith("|| true")  # exit masked; the patch decides
 
-    def test_supported_harnesses_are_aider_goose_opencode_crush_cline(self) -> None:
-        assert supported_harnesses() == frozenset({"aider", "goose", "opencode", "crush", "cline"})
+    def test_pi_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "pi",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="devstral",
+            prompt="do the thing",
+        )
+        assert inv.env["LITELLM_MASTER_KEY"] == "sk-local-xyz"
+        assert inv.env["PI_CODING_AGENT_DIR"] == "/workspace/.pi/agent"
+        assert inv.extra_args == ["--model", "litellm/devstral", "--no-context-files", "-p"]
+        assert inv.prompt_args == ["do the thing"]
+        cfg = json.loads(inv.config_files[".pi/agent/models.json"])
+        prov = cfg["providers"]["litellm"]
+        assert prov["baseUrl"] == "http://pollmevals-litellm-proxy:4000/v1"
+        assert prov["apiKey"] == "$LITELLM_MASTER_KEY"  # literal; key not in file
+        assert prov["models"][0]["id"] == "devstral"
+
+    def test_gptme_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "gptme",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000/",
+            api_key="sk-local-xyz",
+            model_alias="qwen3-coder-30b",
+            prompt="do the thing",
+        )
+        assert inv.env["OPENAI_BASE_URL"] == "http://pollmevals-litellm-proxy:4000/v1"
+        assert inv.env["OPENAI_API_KEY"] == "sk-local-xyz"
+        assert inv.env["MODEL"] == "local/qwen3-coder-30b"
+        assert inv.config_files == {}
+        assert inv.extra_args == ["-n", "-w", "."]
+        assert inv.prompt_args == ["-m", "local/qwen3-coder-30b", "do the thing"]
+
+    def test_mini_swe_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "mini-swe",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="qwen3-coder-30b",
+            prompt="do the thing",
+        )
+        assert inv.env["MSWEA_CONFIGURED"] == "true"
+        assert inv.env["MSWEA_COST_TRACKING"] == "ignore_errors"
+        assert inv.env["MSWEA_MODEL_NAME"] == "openai/qwen3-coder-30b"
+        assert inv.env["OPENAI_API_BASE"] == "http://pollmevals-litellm-proxy:4000/v1"
+        assert "--environment-class" in inv.extra_args
+        assert "local" in inv.extra_args  # never a nested Docker
+        assert "litellm_textbased" in inv.extra_args
+        assert inv.prompt_args == ["-t", "do the thing"]
+
+    def test_supported_harnesses_are_all_eight(self) -> None:
+        assert supported_harnesses() == frozenset(
+            {"aider", "goose", "opencode", "crush", "cline", "pi", "gptme", "mini-swe"}
+        )
 
 
 # ---------------------------------------------------------------------------

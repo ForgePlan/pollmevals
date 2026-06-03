@@ -94,6 +94,14 @@ _CRUSH_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # Cline: model-agnostic; same coder models (qwen-3-14b is too weak for its
 # tool-use — a real compat data point; the stronger coders work).
 _CLINE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+# pi needs NATIVE tool_calls (openai-completions) → only models whose proxy
+# backend emits them (qwen3-coder-30b returns text-format → pi no-ops). Verified
+# native-tool on the proxy: devstral, codestral, qwen3-235b, glm-4-32b.
+_PI_MODELS = ["devstral", "codestral", "qwen3-235b", "glm-4-32b"]
+# gptme + mini-SWE are text-tolerant (gptme strips local/; mini uses
+# litellm_textbased fences) → run the same 4 coders for comparison.
+_GPTME_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+_MINI_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # Per-stack candidate model lists for --add-stack (merge ONE harness column in).
 _STACK_MODELS = {
     "aider": _AIDER_MODELS,
@@ -101,6 +109,9 @@ _STACK_MODELS = {
     "opencode": _OPENCODE_MODELS,
     "crush": _CRUSH_MODELS,
     "cline": _CLINE_MODELS,
+    "pi": _PI_MODELS,
+    "gptme": _GPTME_MODELS,
+    "mini-swe": _MINI_MODELS,
 }
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
