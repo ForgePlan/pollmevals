@@ -1307,3 +1307,48 @@ table.master td .tier {
   font-weight: 600;
   text-align: right;
 }
+.cap-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+/* "All" mode: four thin metric bars stacked in one row's height */
+.ranked-row.all {
+  grid-template-columns: 22px minmax(150px, 200px) 1fr;
+}
+.all-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.all-bar {
+  display: grid;
+  grid-template-columns: 30px 1fr 56px;
+  align-items: center;
+  gap: 7px;
+}
+.ab-key {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ab-track {
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ab-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.ab-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px;
+  color: var(--text-3);
+  text-align: right;
+}
