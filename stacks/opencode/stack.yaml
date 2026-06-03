@@ -4,13 +4,13 @@ name: OpenCode
 base_model_slug: configurable
 agent_cli: opencode
 
-# Proven headless-via-proxy 2026-06-02 (memory: research-cli-harness-execution).
-# Model-agnostic. Config opencode.json:
-#   provider.litellm = { npm: "@ai-sdk/openai-compatible",
-#     options: { baseURL: "http://localhost:4000/v1",
-#                apiKey: "{env:LITELLM_MASTER_KEY}" },
-#     models: { "<MODEL>": { name: "<MODEL>" } } }
-# Run: opencode run "<prompt>" -m litellm/<MODEL>
+# Model-agnostic (Vercel AI SDK). Recipe codified + smoked 2026-06-03
+# (_opencode_invocation in stack_executor.py; memory: research-cli-harness-execution).
+# Uses opencode's BUILT-IN `openai` provider (bundled in the binary → no run-time
+# npm fetch, works on the no-egress sandbox) with a baseURL override to our proxy.
+# config_files writes opencode.json: provider.openai.options.baseURL=<proxy>/v1 +
+# models.{<MODEL>}; env OPENAI_API_KEY=$LITELLM_MASTER_KEY.
+# Run: opencode run -m openai/<MODEL> "<prompt>"
 
 layers:
   L0_bare_llm: false

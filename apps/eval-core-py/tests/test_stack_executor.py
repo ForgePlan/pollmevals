@@ -7,6 +7,7 @@ and the pure builders. Mirrors the test_eval_caller.py class-grouping style.
 from __future__ import annotations
 
 import dataclasses
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -217,7 +218,7 @@ class TestProxyInvocation:
         )
         assert inv.env["OPENAI_HOST"] == "http://h:4000"
 
-    @pytest.mark.parametrize("cli", ["claude-code", "codex", "openhands", "opencode"])
+    @pytest.mark.parametrize("cli", ["claude-code", "codex", "openhands"])
     def test_known_but_pending_harness_raises_pending(self, cli: str) -> None:
         with pytest.raises(HarnessRecipePending, match="Phase 5"):
             build_proxy_invocation(
@@ -236,8 +237,28 @@ class TestProxyInvocation:
                 None, proxy_base_url="x", api_key="k", model_alias="m", prompt="p"
             )
 
-    def test_supported_harnesses_are_aider_and_goose(self) -> None:
-        assert supported_harnesses() == frozenset({"aider", "goose"})
+    def test_opencode_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "opencode",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="qwen-3-14b",
+            prompt="do the thing",
+        )
+        assert inv.env["OPENAI_API_KEY"] == "sk-local-xyz"
+        assert inv.extra_args == ["-m", "openai/qwen-3-14b"]
+        assert inv.prompt_args == ["do the thing"]
+        # config rides opencode.json (built-in openai provider → our proxy).
+        assert "opencode.json" in inv.config_files
+        cfg = json.loads(inv.config_files["opencode.json"])
+        assert (
+            cfg["provider"]["openai"]["options"]["baseURL"]
+            == "http://pollmevals-litellm-proxy:4000/v1"
+        )
+        assert "qwen-3-14b" in cfg["provider"]["openai"]["models"]
+
+    def test_supported_harnesses_are_aider_goose_opencode(self) -> None:
+        assert supported_harnesses() == frozenset({"aider", "goose", "opencode"})
 
 
 # ---------------------------------------------------------------------------
@@ -440,6 +461,24 @@ class TestDockerLauncherPlumbing:
         launcher = DockerHarnessLauncher()
         base = launcher._ensure_git_base(tmp_path)
         assert launcher._capture_patch(tmp_path, base).strip() == ""
+
+    def test_config_files_written_then_excluded_from_patch(self, tmp_path: Path) -> None:
+        launcher = DockerHarnessLauncher()
+        # harness config (incl. a nested path) is written into the workspace...
+        launcher._write_config_files(
+            tmp_path,
+            {"opencode.json": '{"provider":{}}\n', ".codex/config.toml": "model='x'\n"},
+        )
+        assert (tmp_path / "opencode.json").read_text() == '{"provider":{}}\n'
+        assert (tmp_path / ".codex" / "config.toml").exists()  # nested dir created
+        # ...BEFORE the base commit, so the config lands in the base.
+        base = launcher._ensure_git_base(tmp_path)
+        # the harness then edits a real source file
+        (tmp_path / "solution.ts").write_text("export const x = 1;\n")
+        patch = launcher._capture_patch(tmp_path, base)
+        assert "solution.ts" in patch  # the candidate's edit IS captured
+        assert "opencode.json" not in patch  # config scaffolding is NOT in the patch
+        assert "config.toml" not in patch
 
     def test_parse_aider_tokens(self) -> None:
         launcher = DockerHarnessLauncher()
