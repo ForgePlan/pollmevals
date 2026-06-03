@@ -348,14 +348,51 @@ def _crush_invocation(
     )
 
 
-# Proven recipes (validated end-to-end via the proxy). aider is the RFC-006
-# first slice (aider x qwen x be_01); goose / opencode / crush (all 2026-06-03)
-# are model-agnostic peers that run the same coder models for a clean comparison.
+def _cline_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """Cline recipe — PROVEN (2026-06-03 isolation smoke; memory).
+
+    Cline is model-agnostic over any OpenAI-compatible endpoint, but UNIQUELY a
+    custom base URL is NOT an env var and NOT a run flag — it is seeded only via
+    ``cline auth --provider openai-native --baseurl <proxy>/v1``, which persists to
+    the data dir (kept in /tmp by the image's CLINE_DATA_DIR, out of /workspace).
+    So the run is a two-step ``sh -c``: auth (seed) then ``cline --yolo`` (the
+    one-shot, auto-approve all tools). Cline edits the real cwd (/workspace); its
+    file writes are captured by the host git-diff. Two quirks handled here:
+      * ``openai-native`` is the correct provider id for a generic OpenAI gateway
+        (NOT ``openai-compatible``, whose CLI wizard is buggy — cline #9656).
+      * Cline's exit code is unreliable (a post-submission "verify" call can hit
+        an upstream Responses-API quirk and exit non-zero AFTER the file is
+        written), so the wrapper ends ``|| true`` — the produced PATCH is the real
+        signal (empty diff -> NO_PATCH, non-empty -> OK), not Cline's exit code.
+    The key is the literal ``$LITELLM_MASTER_KEY`` expanded by the in-container
+    shell, so it is never written into a file.
+    """
+    base = proxy_base_url.rstrip("/")
+    safe_prompt = prompt.replace("'", "'\"'\"'")  # single-quote-safe for the shell
+    wrapper = (
+        'cline auth --provider openai-native --apikey "$LITELLM_MASTER_KEY" '
+        f"--modelid {model_alias} --baseurl {base}/v1 && "
+        f"cline --yolo '{safe_prompt}' || true"
+    )
+    return ProxyInvocation(
+        env={"LITELLM_MASTER_KEY": api_key},
+        config_files={},  # cline writes its own providers.json (in /tmp) via auth
+        extra_args=[],
+        prompt_args=["-c", wrapper],  # rides `sh` (stack.yaml command = "sh")
+    )
+
+
+# Proven recipes (validated end-to-end via the proxy). aider is the RFC-006 first
+# slice; goose / opencode / crush / cline (all 2026-06-03) are model-agnostic peers
+# that run the same coder models for a clean harness comparison.
 _PROVEN_RECIPES: dict[str, _RecipeBuilder] = {
     "aider": _aider_invocation,
     "goose": _goose_invocation,
     "opencode": _opencode_invocation,
     "crush": _crush_invocation,
+    "cline": _cline_invocation,
 }
 
 # Known harnesses whose recipe is proven in spikes but lands at its per-stack
@@ -366,7 +403,6 @@ _PENDING_RECIPES: frozenset[str] = frozenset(
         "codex",
         "openhands",
         "hermes",
-        "cline",
         "pi",
         "forgeplan-framework",
     }

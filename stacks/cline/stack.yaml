@@ -3,6 +3,16 @@ slug: cline
 name: Cline
 base_model_slug: configurable
 agent_cli: cline
+# Cline CLI: a system-prompted agent (L1) driving file-edit + shell tools (L2).
+# Model-agnostic over any OpenAI-compatible endpoint. Recipe codified + smoked
+# 2026-06-03 (_cline_invocation in stack_executor.py; memory: research-cli-harness-
+# execution). UNIQUE shape — a custom base URL is seedable ONLY via `cline auth`
+# (persists to the data dir, kept in /tmp), so the run is a two-step sh -c:
+#   sh -c 'cline auth --provider openai-native --apikey "$LITELLM_MASTER_KEY"
+#          --modelid <alias> --baseurl <proxy>/v1 && cline --yolo "<prompt>" || true'
+# Edits land in the real /workspace (captured by git-diff); `|| true` masks Cline's
+# noisy exit code (the produced patch is the real signal). command=sh, the full
+# invocation rides prompt_args=["-c", <wrapper>].
 layers:
   L0_bare_llm: false
   L1_system_prompt: true
@@ -15,7 +25,7 @@ layers:
   L8_framework: null
 execution:
   mode: repository_patch
-  command: cline
+  command: sh             # the full `cline auth && cline --yolo` rides prompt_args=["-c", wrapper]
   args: []
 input_contract:
   receives:

@@ -14,7 +14,7 @@ endif
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
         openrouter-smoke env-check \
         harness-image-aider harness-image-goose harness-image-opencode \
-        harness-image-crush sandbox-net-up
+        harness-image-crush harness-image-cline sandbox-net-up
 
 demo-run:
 	python -m pollmevals_eval_core.demo_run --tasks evals/tasks --output artifacts
@@ -133,6 +133,11 @@ harness-image-opencode:
 # Charmbracelet crush release binary. Model-agnostic (openai-compat provider).
 harness-image-crush:
 	docker build -t pollmevals-harness-crush:0.1.0 infra/docker/harness-crush/
+
+# Build the cline harness image (RFC-006 Phase 5). No spend — node base + npm
+# cline. Model-agnostic via cline's openai-native provider + base-URL override.
+harness-image-cline:
+	docker build -t pollmevals-harness-cline:0.1.0 infra/docker/harness-cline/
 
 # Build the Python eval sandbox image (Phase 5 — PythonCorrectnessEvaluator,
 # runs BigCodeBench unittest suites). No spend — pulls base + pip scientific stack.
