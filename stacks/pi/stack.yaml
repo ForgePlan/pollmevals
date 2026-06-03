@@ -1,6 +1,6 @@
 schema_version: pollmevals.stack.v1
 slug: pi
-name: Pi Terminal Coding Harness
+name: PI
 base_model_slug: configurable
 agent_cli: pi
 # pi (@earendil-works/pi-coding-agent): minimal agent (L1 system prompt) with
