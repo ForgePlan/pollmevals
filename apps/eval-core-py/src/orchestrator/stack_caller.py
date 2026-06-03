@@ -25,6 +25,7 @@ from pathlib import Path
 import yaml
 
 from src.contracts import ErrorClass, EvalRow, EvalStats, EvalStatus
+from src.orchestrator.auto_metrics import run_auto_evaluators
 from src.orchestrator.eval_caller import (
     EvalRequest,
     EvalResult,
@@ -103,9 +104,26 @@ class StackExecutorCaller:
         exec_result = await self.executor.execute(exec_request)
 
         if exec_result.status is ExecStatus.OK:
-            return exec_result_to_eval_result(
+            eval_result = exec_result_to_eval_result(
                 exec_result, log_dir=self.log_dir, run_hash=self.run_hash
             )
+            # Run lint + type_safety on the real filesystem snapshot produced by
+            # the harness.  The submission dir is the repo_snapshot_dir that the
+            # harness wrote its changes into (not the concatenated text blob).
+            # Evaluators self-skip gracefully when binaries are absent.
+            assert eval_result.eval_row is not None
+            auto_metrics = await run_auto_evaluators(
+                str(exec_request.repo_snapshot_dir), request.task_id
+            )
+            import dataclasses
+
+            eval_result = dataclasses.replace(
+                eval_result,
+                eval_row=eval_result.eval_row.model_copy(
+                    update={"automatic_metrics": auto_metrics}
+                ),
+            )
+            return eval_result
         return self._failed_result(request, exec_result, started_at)
 
     def _failed_result(

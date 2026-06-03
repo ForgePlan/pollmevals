@@ -25,6 +25,7 @@ from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 
 from src.contracts import ErrorClass, EvalStatus
+from src.orchestrator.auto_metrics import compute_final_score
 from src.orchestrator.cost import BudgetGate, PricingTuple, compute_cost
 from src.orchestrator.eval_caller import (
     EvalCaller,
@@ -456,14 +457,24 @@ class GridRunner:
             span.set_attribute("pollmevals.judge_alpha_point", aggregation.alpha_point)
         span.set_attribute("pollmevals.judge_cost_usd", float(judge_cost))
 
+        # Assemble the row with judge results, then compute the weighted
+        # final_score from automatic_metrics + judge pattern_match.
+        # compute_final_score reads both fields and returns None when neither
+        # is present (e.g. raw-llm without auto metrics — score stays None).
+        judged_row = result.eval_row.model_copy(
+            update={
+                "judgments": judgments,
+                "judge_aggregate": aggregation,
+            }
+        )
+        final_score = compute_final_score(judged_row)
+        if final_score is not None:
+            judged_row = judged_row.model_copy(update={"final_score": final_score})
+            span.set_attribute("pollmevals.computed_final_score", final_score)
+
         return dataclasses.replace(
             result,
-            eval_row=result.eval_row.model_copy(
-                update={
-                    "judgments": judgments,
-                    "judge_aggregate": aggregation,
-                }
-            ),
+            eval_row=judged_row,
             completed_at=datetime.now(UTC),
         )
 

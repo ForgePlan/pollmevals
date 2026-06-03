@@ -36,9 +36,17 @@ from .protocol import EvaluatorResult
 logger = logging.getLogger(__name__)
 
 # Task-id prefix -> canonical language (when file extension is absent/ambiguous).
+# NOTE: "be_" is intentionally absent — the reference be_01_jwt_auth task is
+# TypeScript (Express), and the file-extension scan already handles it correctly
+# when real files are present.  Including a Python fallback here would cause
+# LintEvaluator to invoke ruff on a TypeScript submission when the path is a
+# text blob with no extension, silently producing 0 findings rather than calling
+# eslint.  When the path is a directory with real .ts files the extension scan
+# correctly returns "typescript" without consulting this map.
 _TASK_LANG_MAP: dict[str, str] = {
-    "be_": "python",  # backend tasks -- JWT auth in Express/TS or Python
     "fe_": "typescript",  # frontend tasks -- React / TS
+    "ts_": "typescript",  # explicit TypeScript tasks
+    "fs_": "typescript",  # fullstack tasks (TS frontend + TS backend)
     "doc_": "none",  # documentation tasks -- no linting applicable
 }
 
