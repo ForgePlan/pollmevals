@@ -118,6 +118,11 @@ stack-status:
 harness-image-aider:
 	docker build -t pollmevals-harness-aider:0.1.0 infra/docker/harness-aider/
 
+# Build the Python eval sandbox image (Phase 5 — PythonCorrectnessEvaluator,
+# runs BigCodeBench unittest suites). No spend — pulls base + pip scientific stack.
+eval-image-py:
+	docker build -t pollmevals-eval-py:0.1.0 infra/docker/eval-py/
+
 # Attach the proxy to the internal sandbox bastion net (RFC-006 decision A) on
 # an ALREADY-running stack, without a full `stack-up` recreate. Idempotent.
 sandbox-net-up:
