@@ -257,8 +257,27 @@ class TestProxyInvocation:
         )
         assert "qwen-3-14b" in cfg["provider"]["openai"]["models"]
 
-    def test_supported_harnesses_are_aider_goose_opencode(self) -> None:
-        assert supported_harnesses() == frozenset({"aider", "goose", "opencode"})
+    def test_crush_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "crush",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="qwen-3-14b",
+            prompt="do the thing",
+        )
+        assert inv.env["LITELLM_MASTER_KEY"] == "sk-local-xyz"
+        assert inv.env["CRUSH_GLOBAL_CONFIG"] == "/workspace"  # crush wants a dir
+        assert inv.env["CRUSH_GLOBAL_DATA"].startswith("/tmp")  # data out of the patch
+        assert inv.prompt_args == ["do the thing"]
+        cfg = json.loads(inv.config_files["crush.json"])
+        prov = cfg["providers"]["litellm"]
+        assert prov["type"] == "openai-compat"
+        assert prov["base_url"] == "http://pollmevals-litellm-proxy:4000/v1"
+        assert prov["api_key"] == "$LITELLM_MASTER_KEY"  # literal var; key not in file
+        assert prov["models"][0]["id"] == "qwen-3-14b"
+
+    def test_supported_harnesses_are_aider_goose_opencode_crush(self) -> None:
+        assert supported_harnesses() == frozenset({"aider", "goose", "opencode", "crush"})
 
 
 # ---------------------------------------------------------------------------

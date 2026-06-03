@@ -13,7 +13,8 @@ endif
         smoke-run smoke-dry resume postmortem \
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
         openrouter-smoke env-check \
-        harness-image-aider harness-image-goose harness-image-opencode sandbox-net-up
+        harness-image-aider harness-image-goose harness-image-opencode \
+        harness-image-crush sandbox-net-up
 
 demo-run:
 	python -m pollmevals_eval_core.demo_run --tasks evals/tasks --output artifacts
@@ -127,6 +128,11 @@ harness-image-goose:
 # npm opencode-ai. Model-agnostic via opencode's built-in openai provider (proxy).
 harness-image-opencode:
 	docker build -t pollmevals-harness-opencode:0.1.0 infra/docker/harness-opencode/
+
+# Build the crush harness image (RFC-006 Phase 5). No spend — base + the
+# Charmbracelet crush release binary. Model-agnostic (openai-compat provider).
+harness-image-crush:
+	docker build -t pollmevals-harness-crush:0.1.0 infra/docker/harness-crush/
 
 # Build the Python eval sandbox image (Phase 5 — PythonCorrectnessEvaluator,
 # runs BigCodeBench unittest suites). No spend — pulls base + pip scientific stack.
