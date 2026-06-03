@@ -1352,3 +1352,174 @@ table.master td .tier {
   color: var(--text-3);
   text-align: right;
 }
+.ranked-row.clickable {
+  cursor: pointer;
+}
+
+/* === Stack drawer (right slide-out) === */
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  animation: drawer-fade 0.15s ease;
+}
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(400px, 92vw);
+  background: var(--bg);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.4);
+  padding: 22px 22px 28px;
+  overflow-y: auto;
+  animation: drawer-slide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes drawer-slide {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes drawer-fade {
+  from {
+    opacity: 0;
+  }
+}
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dw-model {
+  font-size: 18px;
+  font-weight: 680;
+}
+.drawer-close {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  flex: none;
+}
+.drawer-close:hover {
+  color: var(--text);
+}
+.drawer-harness {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dw-plus {
+  opacity: 0.5;
+}
+.dw-level {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.dw-frontier {
+  font-size: 10.5px;
+  color: var(--good);
+  border: 1px solid var(--good-faint);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.drawer-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-top: 20px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dw-metric {
+  background: var(--surface);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dw-mlabel {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.dw-mval {
+  font-size: 16px;
+  font-weight: 680;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.drawer-section {
+  margin-top: 22px;
+}
+.drawer-section h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+.dw-crits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dw-crit {
+  display: grid;
+  grid-template-columns: 96px 1fr 30px;
+  align-items: center;
+  gap: 10px;
+}
+.dw-cname {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.dw-ctrack {
+  height: 7px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.dw-cfill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.dw-cval {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+.drawer-note {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-3);
+}
