@@ -30,7 +30,7 @@ REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "apps" / "eval-core-py"))
 
 from src.contracts import EvalRow  # noqa: E402
-from src.leaderboard.board import build_board  # noqa: E402
+from src.leaderboard.board import Board, build_board  # noqa: E402
 from src.orchestrator.cost import BudgetGate, PricingTuple, compute_cost  # noqa: E402
 from src.orchestrator.eval_caller import EvalResult, InspectEvalCaller  # noqa: E402
 from src.orchestrator.grid_runner import GridRunner, GridSpec  # noqa: E402
@@ -151,6 +151,13 @@ def _rows_from_result(result: object, pricing: dict[str, PricingTuple]) -> list[
 async def _main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--confirm-spend", action="store_true", help="real $ (~$0.25)")
+    ap.add_argument(
+        "--fill",
+        default="",
+        help="comma-separated models to re-run on raw-llm and MERGE into the "
+        "existing board.json (fills previously-failed cells without re-running "
+        "the rest). e.g. --fill grok-4",
+    )
     args = ap.parse_args()
 
     os.chdir(REPO)
@@ -220,6 +227,35 @@ async def _main() -> int:
     # per-task wall-clock budget by difficulty (be_01 is medium -> 600s), so slow
     # model x harness pairs aren't cut off at the 300s default.
     task_timeout = {t: timeout_of(t) for t in [_TASK]}
+    out = REPO / "apps" / "site" / "public" / "board.json"
+
+    # --fill: re-run ONLY the named models on raw-llm and merge their cells into
+    # the existing board.json (fills previously-failed cells, leaves the rest).
+    if args.fill:
+        fill_models = [m.strip() for m in args.fill.split(",") if m.strip()]
+        print(f"FILL: raw-llm x {fill_models} → merge into {out.name} ...")
+        result = await runner.run(
+            GridSpec(
+                run_hash=_RUN_HASH,
+                models=fill_models,
+                tasks=[_TASK],
+                stacks=["raw-llm"],
+                seeds=_SEEDS,
+                task_timeout_s=task_timeout,
+            )
+        )
+        rows = _rows_from_result(result, _PRICING)
+        partial = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")
+        existing = Board.model_validate_json(out.read_text(encoding="utf-8"))
+        new_by_key = {(c.model_id, c.stack_id): c for c in partial.cells}
+        merged = [new_by_key.get((c.model_id, c.stack_id), c) for c in existing.cells]
+        scored_now = sum(1 for c in merged if c.mean_score is not None)
+        existing = existing.model_copy(update={"cells": merged, "scored": scored_now > 0})
+        out.write_text(existing.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        print(f"  board now {scored_now}/{len(merged)} cells scored. filled:")
+        for c in partial.cells:
+            print(f"    {c.stack_id} x {c.model_id}: score={c.mean_score} cost=${c.mean_cost_usd}")
+        return 0
 
     # Two specs so the grid is non-cartesian: raw-llm on every candidate, aider
     # only on the models that follow its edit format. Same run_hash + runner so

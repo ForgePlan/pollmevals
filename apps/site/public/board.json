@@ -292,15 +292,15 @@
     {
       "model_id": "grok-4",
       "stack_id": "raw-llm",
-      "mean_score": null,
-      "mean_cost_usd": 0.0,
-      "mean_latency_ms": 0,
+      "mean_score": 7.17,
+      "mean_cost_usd": 0.021598,
+      "mean_latency_ms": 7516,
       "pass_hat_k": null,
-      "quality_per_dollar": null,
+      "quality_per_dollar": 331.98,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": null,
-          "cost_usd": 0.0,
+          "score": 7.17,
+          "cost_usd": 0.021598,
           "pass_hat_k": null
         }
       },

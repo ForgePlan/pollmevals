@@ -84,10 +84,10 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
-  # Grok 4 via OpenRouter
+  # Grok 4 via OpenRouter — `x-ai/grok-4` 404'd (dead id); grok-4.20 is current.
   - model_name: grok-4
     litellm_params:
-      model: openrouter/x-ai/grok-4
+      model: openrouter/x-ai/grok-4.20
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
@@ -106,17 +106,19 @@ model_list:
       model: cerebras/llama3.3-70b
       api_key: os.environ/CEREBRAS_API_KEY
 
-  # Qwen3 32B via Cerebras
+  # Qwen3 32B — Cerebras 500'd on full (4096-tok) requests; route via OpenRouter.
   - model_name: qwen-3-32b
     litellm_params:
-      model: cerebras/qwen-3-32b
-      api_key: os.environ/CEREBRAS_API_KEY
+      model: openrouter/qwen/qwen3-32b
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
 
-  # GLM-4.7 via Cerebras
+  # GLM-4.7 — Cerebras 500'd on full requests; route via OpenRouter.
   - model_name: glm-4-7
     litellm_params:
-      model: cerebras/glm-4.7
-      api_key: os.environ/CEREBRAS_API_KEY
+      model: openrouter/z-ai/glm-4.7
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
 
   # gpt-oss-120B via Cerebras
   - model_name: gpt-oss-120b
