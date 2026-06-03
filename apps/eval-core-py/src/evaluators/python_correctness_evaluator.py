@@ -47,9 +47,12 @@ _DEFAULT_TIMEOUT_S = 120  # pure-Python unittest; 120s ample (some seed RNG/mock
 # Programmatic unittest runner — loads test_run, runs it, prints a vitest-shaped
 # JSON document on stdout so the score path matches the TS evaluator exactly.
 _RUNNER_PY = """\
-import json, sys, unittest
+import json, os, sys, unittest
 
 sys.path.insert(0, "/workspace")
+# Some BigCodeBench suites write fixture files (CSVs, images) relative to the
+# CWD. /workspace is mounted read-only, so run from the writable tmpfs instead.
+os.chdir("/tmp")
 try:
     import test_run  # imports solution via `from solution import *`
 except BaseException as exc:  # collection/import error → 0 passed, 1 failed
