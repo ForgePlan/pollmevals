@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import re
@@ -264,12 +265,48 @@ def _goose_invocation(
     )
 
 
+def _opencode_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """opencode (sst) recipe — PROVEN (2026-06-03 isolation smoke; memory).
+
+    opencode is model-agnostic via AI-SDK providers. Its custom-provider packages
+    (e.g. @ai-sdk/openai-compatible) resolve over npm at RUN time, which the
+    no-egress sandbox can't do — so we use the BUILT-IN ``openai`` provider
+    (bundled in the binary) with a ``baseURL`` override pointed at our proxy. The
+    provider config rides an ``opencode.json`` written into the workspace via
+    ``config_files`` (the launcher writes it before the git base commit, so it
+    stays out of the captured patch). The model is selected as ``openai/<alias>``;
+    the prompt is the positional arg to ``opencode run`` (stack.yaml).
+    """
+    base = proxy_base_url.rstrip("/")
+    config = json.dumps(
+        {
+            "$schema": "https://opencode.ai/config.json",
+            "provider": {
+                "openai": {
+                    "options": {"baseURL": f"{base}/v1"},
+                    "models": {model_alias: {"name": model_alias}},
+                }
+            },
+        },
+        indent=2,
+    )
+    return ProxyInvocation(
+        env={"OPENAI_API_KEY": api_key},
+        config_files={"opencode.json": config},
+        extra_args=["-m", f"openai/{model_alias}"],
+        prompt_args=[prompt],
+    )
+
+
 # Proven recipes (validated end-to-end via the proxy). aider is the RFC-006
-# first slice (aider x qwen x be_01); goose is the second harness (2026-06-03),
-# a model-agnostic peer that runs the same coder models for a clean comparison.
+# first slice (aider x qwen x be_01); goose (2026-06-03) and opencode (2026-06-03)
+# are model-agnostic peers that run the same coder models for a clean comparison.
 _PROVEN_RECIPES: dict[str, _RecipeBuilder] = {
     "aider": _aider_invocation,
     "goose": _goose_invocation,
+    "opencode": _opencode_invocation,
 }
 
 # Known harnesses whose recipe is proven in spikes but lands at its per-stack
@@ -278,7 +315,6 @@ _PENDING_RECIPES: frozenset[str] = frozenset(
     {
         "claude-code",
         "codex",
-        "opencode",
         "openhands",
         "hermes",
         "cline",
@@ -515,8 +551,24 @@ class DockerHarnessLauncher:
         self._git(workspace, "add", "-A")
         return self._git(workspace, "diff", "--cached", base_sha).stdout
 
+    @staticmethod
+    def _write_config_files(workspace: Path, config_files: dict[str, str]) -> None:
+        """Write a harness's config files (e.g. opencode.json, codex config.toml)
+        into the workspace BEFORE the base commit.
+
+        Two effects: (a) the harness finds its config when it runs, and (b) the
+        files land in the git base, so they're EXCLUDED from the captured patch
+        (the diff is the candidate's real edits, not its config scaffolding).
+        Relative paths only; parent dirs are created.
+        """
+        for relpath, content in config_files.items():
+            dest = workspace / relpath
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content, encoding="utf-8")
+
     def _run_sync(self, plan: HarnessRunPlan) -> HarnessRunOutcome:
         workspace = plan.mount_dir
+        self._write_config_files(workspace, plan.config_files)
         base_sha = self._ensure_git_base(workspace)
 
         client = self._ensure_client()
