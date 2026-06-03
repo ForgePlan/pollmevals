@@ -14,7 +14,8 @@ endif
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
         openrouter-smoke env-check \
         harness-image-aider harness-image-goose harness-image-opencode \
-        harness-image-crush harness-image-cline sandbox-net-up
+        harness-image-crush harness-image-cline \
+        harness-image-pi harness-image-gptme harness-image-mini-swe sandbox-net-up
 
 demo-run:
 	python -m pollmevals_eval_core.demo_run --tasks evals/tasks --output artifacts
@@ -138,6 +139,15 @@ harness-image-crush:
 # cline. Model-agnostic via cline's openai-native provider + base-URL override.
 harness-image-cline:
 	docker build -t pollmevals-harness-cline:0.1.0 infra/docker/harness-cline/
+
+# Build the pi / gptme / mini-SWE harness images (RFC-006 Phase 5). No spend.
+# pi = node+npm (native tool_calls); gptme + mini-swe = python+pip (text-tolerant).
+harness-image-pi:
+	docker build -t pollmevals-harness-pi:0.1.0 infra/docker/harness-pi/
+harness-image-gptme:
+	docker build -t pollmevals-harness-gptme:0.1.0 infra/docker/harness-gptme/
+harness-image-mini-swe:
+	docker build -t pollmevals-harness-mini-swe:0.1.0 infra/docker/harness-mini-swe/
 
 # Build the Python eval sandbox image (Phase 5 — PythonCorrectnessEvaluator,
 # runs BigCodeBench unittest suites). No spend — pulls base + pip scientific stack.

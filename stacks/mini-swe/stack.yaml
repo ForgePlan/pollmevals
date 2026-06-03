@@ -1,0 +1,50 @@
+schema_version: pollmevals.stack.v1
+slug: mini-swe
+name: mini-SWE-agent
+base_model_slug: configurable
+agent_cli: mini-swe
+# mini-SWE-agent (SWE-agent/mini-swe-agent): the ~100-line minimal SWE loop — a
+# bare model (L0) + a single bash tool (L2) inside a reason→run→observe→iterate
+# validator loop (L7). No persona/skills/memory/subagents. Recipe codified +
+# smoked 2026-06-03 (_mini_swe_invocation; memory: research-cli-harness-execution):
+#   env MSWEA_CONFIGURED=true (skip wizard) + MSWEA_COST_TRACKING=ignore_errors
+#       (proxy $0 → else RuntimeError) + MSWEA_MODEL_NAME=openai/<m> +
+#       OPENAI_API_BASE=<proxy>/v1 + OPENAI_API_KEY.
+#   run: mini --environment-class local (bash in /workspace, NO nested Docker) -y
+#        --exit-immediately --model-class litellm_textbased (open coders emit
+#        fenced bash, not native tool_calls) -c <builtin>/mini_textbased.yaml -c
+#        model.* -c agent.step_limit=40 -c environment.timeout=600 -o /tmp/... -t "<p>"
+#   (all flags built in the recipe; command/args here are minimal).
+layers:
+  L0_bare_llm: false
+  L1_system_prompt: false
+  L2_tools: true
+  L3_skills: false
+  L4_file_memory: false
+  L5_vector_memory: false
+  L6_subagents: false
+  L7_validator: true
+  L8_framework: null
+execution:
+  mode: repository_patch
+  command: mini
+  args: []                # all flags + prompt are built in _mini_swe_invocation
+input_contract:
+  receives:
+    - task_prompt
+    - repository_snapshot
+    - allowed_files
+output_contract:
+  produces:
+    - final_answer
+    - patch
+    - trace
+limits:
+  max_wall_clock_seconds: 600
+  max_tool_calls: 50
+  max_input_tokens: 50000
+  max_output_tokens: 10000
+sandbox:
+  network: false
+  writable_paths:
+    - /workspace

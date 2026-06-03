@@ -3,12 +3,20 @@ slug: pi
 name: Pi Terminal Coding Harness
 base_model_slug: configurable
 agent_cli: pi
+# pi (@earendil-works/pi-coding-agent): minimal agent (L1 system prompt) with
+# read/write/edit/bash tools (L2). Recipe codified + smoked 2026-06-03
+# (_pi_invocation; memory: research-cli-harness-execution). config rides
+# .pi/agent/models.json via config_files; pi finds it via PI_CODING_AGENT_DIR=
+# /workspace/.pi/agent. Run: pi --model litellm/<m> --no-context-files -p "<p>".
+# `--no-context-files` disables L3 skills + L4 context-memory for a clean agnostic
+# column. api:openai-completions = native tool_calls → run only on models that emit
+# them on the proxy (devstral/codestral/qwen3-235b/glm-4-32b; NOT qwen3-coder-30b).
 layers:
   L0_bare_llm: false
   L1_system_prompt: true
   L2_tools: true
-  L3_skills: true
-  L4_file_memory: true
+  L3_skills: false
+  L4_file_memory: false
   L5_vector_memory: false
   L6_subagents: false
   L7_validator: false
