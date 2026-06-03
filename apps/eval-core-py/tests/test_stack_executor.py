@@ -276,8 +276,27 @@ class TestProxyInvocation:
         assert prov["api_key"] == "$LITELLM_MASTER_KEY"  # literal var; key not in file
         assert prov["models"][0]["id"] == "qwen-3-14b"
 
-    def test_supported_harnesses_are_aider_goose_opencode_crush(self) -> None:
-        assert supported_harnesses() == frozenset({"aider", "goose", "opencode", "crush"})
+    def test_cline_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "cline",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="qwen3-coder-30b",
+            prompt="do the thing",
+        )
+        assert inv.env["LITELLM_MASTER_KEY"] == "sk-local-xyz"
+        assert inv.config_files == {}
+        assert inv.prompt_args[0] == "-c"
+        wrapper = inv.prompt_args[1]
+        assert "cline auth --provider openai-native" in wrapper
+        assert '"$LITELLM_MASTER_KEY"' in wrapper  # key referenced, not inlined
+        assert "--modelid qwen3-coder-30b" in wrapper
+        assert "--baseurl http://pollmevals-litellm-proxy:4000/v1" in wrapper
+        assert "cline --yolo 'do the thing'" in wrapper
+        assert wrapper.rstrip().endswith("|| true")  # exit masked; the patch decides
+
+    def test_supported_harnesses_are_aider_goose_opencode_crush_cline(self) -> None:
+        assert supported_harnesses() == frozenset({"aider", "goose", "opencode", "crush", "cline"})
 
 
 # ---------------------------------------------------------------------------
