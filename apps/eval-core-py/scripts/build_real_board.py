@@ -115,7 +115,19 @@ _STACK_MODELS = {
 }
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
-_JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
+# methodology v0.2 (2026-06-03): 5 frontier judges, 5 distinct families
+# (Anthropic/OpenAI/Google/xAI/DeepSeek) — the most powerful June-2026 models
+# (user decision). These are the REFERENCE tier; candidates that share a judge
+# family (grok-4, deepseek-*) need per-eval self-judging exclusion (follow-up) or
+# curation out of the scored roster. Routes wired in infra/litellm-config.yaml
+# (-judge aliases, billed to OPENROUTER_API_KEY_JUDGE, reasoning_effort=low).
+_JUDGES = [
+    "claude-opus-4-8-judge",
+    "gpt-5-5-judge",
+    "gemini-3-1-pro-judge",
+    "grok-4-judge",
+    "deepseek-v4-pro-judge",
+]
 _RUN_HASH = "sha256:" + "realboard".ljust(58, "0")[:58]
 _SNAP = datetime(2026, 6, 3, tzinfo=UTC)
 
@@ -191,6 +203,65 @@ def _rows_from_result(result: object, pricing: dict[str, PricingTuple]) -> list[
     return rows
 
 
+def _merge_into_board(existing: Board, partial: Board) -> Board:
+    """Merge *partial* cells/harnesses/models into *existing*, replacing by (model, stack) key.
+
+    This is the shared merge logic reused by --add-stack, --fill, and --fill-missing.
+    ``partial`` is the newly-run sub-grid; ``existing`` is the current board on disk.
+    The returned Board is a new model instance (existing is not mutated).
+    """
+    by_key = {(c.model_id, c.stack_id): c for c in existing.cells}
+    for c in partial.cells:
+        by_key[(c.model_id, c.stack_id)] = c
+    h_by_id = {h.stack_id: h for h in existing.harnesses}
+    for h in partial.harnesses:
+        h_by_id[h.stack_id] = h
+    m_by_id = {m.model_id: m for m in existing.models}
+    for m in partial.models:
+        m_by_id.setdefault(m.model_id, m)
+    cells = list(by_key.values())
+    scored_now = sum(1 for c in cells if c.mean_score is not None)
+    return existing.model_copy(
+        update={
+            "cells": cells,
+            "harnesses": list(h_by_id.values()),
+            "models": list(m_by_id.values()),
+            "scored": scored_now > 0,
+        }
+    )
+
+
+def _compute_gap(
+    out: Path,
+    stacks: list[str] | None,
+) -> list[tuple[str, str]]:
+    """Return (model_id, stack_id) pairs that are in _STACK_MODELS but absent from board.json.
+
+    Args:
+        out:    Path to the current board.json.
+        stacks: Optional list of stack IDs to limit the desired grid.
+                If None, all stacks in _STACK_MODELS are included.
+    """
+    # Build desired (model, stack) set.
+    stacks_to_check = stacks if stacks is not None else list(_STACK_MODELS.keys())
+    desired: set[tuple[str, str]] = set()
+    for stack_id in stacks_to_check:
+        for model_id in _STACK_MODELS.get(stack_id, []):
+            desired.add((model_id, stack_id))
+
+    # Load present set from board.json (empty set if file missing/unreadable).
+    present: set[tuple[str, str]] = set()
+    if out.exists():
+        try:
+            board = Board.model_validate_json(out.read_text(encoding="utf-8"))
+            present = {(c.model_id, c.stack_id) for c in board.cells}
+        except Exception:  # board may be malformed/missing; default to empty
+            pass
+
+    missing = sorted(desired - present)
+    return missing
+
+
 async def _main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--confirm-spend", action="store_true", help="real $ (~$0.25)")
@@ -209,15 +280,53 @@ async def _main() -> int:
         "board.json, without re-spending on the other harnesses. e.g. "
         "--add-stack goose",
     )
+    ap.add_argument(
+        "--fill-missing",
+        action="store_true",
+        help="run ONLY the (model, stack) cells absent from the current board.json "
+        "across all stacks in _STACK_MODELS (or a subset via --stacks), then "
+        "merge them in. Use --dry-run to preview the gap without spending.",
+    )
+    ap.add_argument(
+        "--stacks",
+        default="",
+        help="comma-separated stack IDs to limit --fill-missing scope. "
+        "e.g. --stacks goose,opencode",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --fill-missing: print the missing (model, stack) list grouped "
+        "by stack and the count, then exit WITHOUT spending.",
+    )
     args = ap.parse_args()
 
     os.chdir(REPO)
     _load_env(REPO)
+    out = REPO / "apps" / "site" / "public" / "board.json"
+
+    # --fill-missing --dry-run: compute gap and print summary, NO spend.
+    if args.fill_missing and args.dry_run:
+        stacks_filter = [s.strip() for s in args.stacks.split(",") if s.strip()] or None
+        missing = _compute_gap(out, stacks_filter)
+        if not missing:
+            print("DRY-RUN fill-missing: gap is EMPTY — all cells present.")
+            return 0
+        # Group by stack for readability.
+        by_stack: dict[str, list[str]] = {}
+        for model_id, stack_id in missing:
+            by_stack.setdefault(stack_id, []).append(model_id)
+        print(f"DRY-RUN fill-missing: {len(missing)} missing cells across {len(by_stack)} stacks:")
+        for stack_id in sorted(by_stack):
+            models = sorted(by_stack[stack_id])
+            print(f"  {stack_id} ({len(models)}): {', '.join(models)}")
+        return 0
+
     key = os.environ.get("LITELLM_MASTER_KEY", "")
     if not key:
         print("ERROR: LITELLM_MASTER_KEY not set (.env)", file=sys.stderr)
         return 2
-    if not args.confirm_spend:
+    if not args.confirm_spend and not args.fill_missing and not args.add_stack and not args.fill:
         n = (len(_RAW_MODELS) + len(_AIDER_MODELS)) * len(_SEEDS)
         print(
             f"DRY: pass --confirm-spend to run {n} evals "
@@ -260,10 +369,13 @@ async def _main() -> int:
     def caller_for(stack_id: str) -> object:
         return stack_caller if stack_id != "raw-llm" else inspect_caller
 
-    # candidate_model_id only drives self-judging exclusion; all candidates are
-    # open (non-judge-family), so any is safe here.
+    # candidate_model_id only drives the CONSTRUCTION-time self-judging guard.
+    # _RAW_MODELS[0] must be a non-judge-family (open) model — clash-free against
+    # the 5-frontier judge roster. Per-eval exclusion for candidates that share a
+    # judge family (grok-4, deepseek-*) is a follow-up; until then the scored
+    # candidate roster excludes those families.
     panel = JudgePanel(
-        judge_models=_JUDGES, candidate_model_id=_RAW_MODELS[0], rubric_version="1.0"
+        judge_models=_JUDGES, candidate_model_id=_RAW_MODELS[0], rubric_version="2.0"
     )
     runner = GridRunner(
         caller=inspect_caller,
@@ -283,7 +395,6 @@ async def _main() -> int:
     # per-task wall-clock budget by difficulty (be_01 is medium -> 600s), so slow
     # model x harness pairs aren't cut off at the 300s default.
     task_timeout = {t: timeout_of(t) for t in [_TASK]}
-    out = REPO / "apps" / "site" / "public" / "board.json"
 
     # --fill: re-run ONLY the named models on raw-llm and merge their cells into
     # the existing board.json (fills previously-failed cells, leaves the rest).
@@ -334,30 +445,63 @@ async def _main() -> int:
         rows = _rows_from_result(result, _PRICING)
         partial = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")
         existing = Board.model_validate_json(out.read_text(encoding="utf-8"))
-        # Replace-or-append cells by (model, stack); union harnesses + models.
-        by_key = {(c.model_id, c.stack_id): c for c in existing.cells}
-        for c in partial.cells:
-            by_key[(c.model_id, c.stack_id)] = c
-        h_by_id = {h.stack_id: h for h in existing.harnesses}
-        for h in partial.harnesses:
-            h_by_id[h.stack_id] = h
-        m_by_id = {m.model_id: m for m in existing.models}
-        for m in partial.models:
-            m_by_id.setdefault(m.model_id, m)
-        cells = list(by_key.values())
-        scored_now = sum(1 for c in cells if c.mean_score is not None)
-        merged_board = existing.model_copy(
-            update={
-                "cells": cells,
-                "harnesses": list(h_by_id.values()),
-                "models": list(m_by_id.values()),
-                "scored": scored_now > 0,
-            }
-        )
+        merged_board = _merge_into_board(existing, partial)
         out.write_text(merged_board.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        cells = merged_board.cells
+        scored_now = sum(1 for c in cells if c.mean_score is not None)
         print(f"  board now {scored_now}/{len(cells)} cells scored. new {stack_id} cells:")
         for c in partial.cells:
             print(f"    {c.stack_id} x {c.model_id}: score={c.mean_score} cost=${c.mean_cost_usd}")
+        return 0
+
+    # --fill-missing (with --confirm-spend): run only the cells absent from the
+    # current board.json, grouped by stack into one GridSpec per stack, then
+    # merge each partial result using the same logic as --add-stack.
+    if args.fill_missing:
+        if not args.confirm_spend:
+            print("ERROR: --fill-missing requires --confirm-spend (real $).", file=sys.stderr)
+            return 2
+        stacks_filter = [s.strip() for s in args.stacks.split(",") if s.strip()] or None
+        missing = _compute_gap(out, stacks_filter)
+        if not missing:
+            print("fill-missing: gap is EMPTY — all cells present. Nothing to run.")
+            return 0
+        # Group missing by stack so we run one GridSpec per stack.
+        by_stack: dict[str, list[str]] = {}
+        for model_id, stack_id in missing:
+            by_stack.setdefault(stack_id, []).append(model_id)
+        print(f"FILL-MISSING: {len(missing)} cells across {len(by_stack)} stacks — running ...")
+        for stack_id in sorted(by_stack):
+            models = by_stack[stack_id]
+            print(f"  stack {stack_id}: {models}")
+        existing = Board.model_validate_json(out.read_text(encoding="utf-8"))
+        for stack_id, models in sorted(by_stack.items()):
+            print(f"\n--- fill-missing: {stack_id} x {models} ---", flush=True)
+            result = await runner.run(
+                GridSpec(
+                    run_hash=_RUN_HASH,
+                    models=models,
+                    tasks=[_TASK],
+                    stacks=[stack_id],
+                    seeds=_SEEDS,
+                    task_timeout_s=task_timeout,
+                )
+            )
+            rows = _rows_from_result(result, _PRICING)
+            partial = build_board(
+                rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke"
+            )
+            existing = _merge_into_board(existing, partial)
+            # Write after each stack so a crash mid-run leaves a partial board.
+            out.write_text(existing.model_dump_json(indent=2) + "\n", encoding="utf-8")
+            cells_done = sum(1 for c in existing.cells if c.mean_score is not None)
+            print(f"  {stack_id} done — board now {cells_done}/{len(existing.cells)} scored.")
+            for c in partial.cells:
+                print(
+                    f"    {c.stack_id} x {c.model_id}: score={c.mean_score} cost=${c.mean_cost_usd}"
+                )
+        total_scored = sum(1 for c in existing.cells if c.mean_score is not None)
+        print(f"\nfill-missing complete: {total_scored}/{len(existing.cells)} cells scored.")
         return 0
 
     # Two specs so the grid is non-cartesian: raw-llm on every candidate, aider
@@ -389,7 +533,6 @@ async def _main() -> int:
     )
     rows = []
     total_cost = Decimal("0")
-    out = REPO / "apps" / "site" / "public" / "board.json"
 
     def _emit() -> None:
         board = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")

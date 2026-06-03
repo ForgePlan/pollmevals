@@ -82,6 +82,17 @@ _FAMILY_ALIASES: dict[str, str] = {
     # Qwen (Alibaba)
     "qwen": "qwen",
     "alibaba": "qwen",
+    # xAI (Grok) — added methodology v0.2 (2026-06-03). Without this, the proxy
+    # alias "grok-4-judge" and candidate "grok-4" both fall through to their raw
+    # names (which differ), so the self-judging guard would MISS a grok-judges-grok
+    # clash. The startswith("grok") branch maps both to "xai".
+    "x-ai": "xai",
+    "xai": "xai",
+    "grok": "xai",
+    # DeepSeek — same rationale (candidate "deepseek-v4-pro" vs "deepseek-v4-pro-judge").
+    "deepseek": "deepseek",
+    # MiniMax (alternate cheap 5th judge / candidate family).
+    "minimax": "minimax",
 }
 
 # inspect_ai.eval_async is process-global and forbids concurrent invocation
