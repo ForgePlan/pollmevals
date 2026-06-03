@@ -4,12 +4,16 @@ name: Goose
 base_model_slug: configurable
 agent_cli: goose
 
-# Proven headless-via-proxy 2026-06-02 (memory: research-cli-harness-execution).
-# Model-agnostic (AAIF / ex-Block), MCP-native tools. Env:
-#   GOOSE_PROVIDER=openai  GOOSE_MODEL=<MODEL>
-#   OPENAI_API_KEY=$LITELLM_MASTER_KEY
-#   OPENAI_HOST=http://localhost:4000  OPENAI_BASE_PATH=v1/chat/completions
-# Run: goose run --no-session -t "<prompt>"
+# Block's goose: a system-prompted agent (L1) driving the built-in "developer"
+# tool extension — shell + file editor (L2). Model-agnostic (OpenAI-compatible
+# provider), so it runs the same coder models as aider; the board orders
+# harnesses by max true layer, placing goose (L2) between raw-llm (L0) and
+# aider (L4). Recipe codified + smoked end-to-end 2026-06-03
+# (_goose_invocation in stack_executor.py; memory: research-cli-harness-execution):
+#   env GOOSE_PROVIDER=openai GOOSE_MODEL=<alias> GOOSE_MODE=auto
+#       GOOSE_DISABLE_KEYRING=1 OPENAI_API_KEY=$LITELLM_MASTER_KEY
+#       OPENAI_HOST=http://<proxy>:4000 OPENAI_BASE_PATH=v1/chat/completions
+#   run goose run --no-session --with-builtin developer -t "<prompt>"
 
 layers:
   L0_bare_llm: false
@@ -26,7 +30,13 @@ execution:
   command: goose
   args:
     - run
-    - --no-session
+    - --no-session            # automated run, no session-file persistence
+    - --with-builtin
+    - developer               # enable the file-editor + shell tools (writes the patch)
+    - --max-turns
+    - "25"                    # bound the agent loop (single-file middleware scope)
+    - --max-tool-repetitions
+    - "3"                     # stop identical-tool loops (aider's llama/deepseek failure mode)
 input_contract:
   receives:
     - task_prompt

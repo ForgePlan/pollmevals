@@ -13,7 +13,7 @@ endif
         smoke-run smoke-dry resume postmortem \
         eval-core-test litellm-up litellm-down stack-up stack-down stack-status \
         openrouter-smoke env-check \
-        harness-image-aider sandbox-net-up
+        harness-image-aider harness-image-goose sandbox-net-up
 
 demo-run:
 	python -m pollmevals_eval_core.demo_run --tasks evals/tasks --output artifacts
@@ -117,6 +117,11 @@ stack-status:
 # Build the aider harness image (RFC-006 Phase 2). No spend — pulls base + pip.
 harness-image-aider:
 	docker build -t pollmevals-harness-aider:0.1.0 infra/docker/harness-aider/
+
+# Build the goose harness image (RFC-006 Phase 5). No spend — pulls base +
+# the Block goose release binary. goose is model-agnostic (OpenAI-compatible).
+harness-image-goose:
+	docker build -t pollmevals-harness-goose:0.1.0 infra/docker/harness-goose/
 
 # Build the Python eval sandbox image (Phase 5 — PythonCorrectnessEvaluator,
 # runs BigCodeBench unittest suites). No spend — pulls base + pip scientific stack.
