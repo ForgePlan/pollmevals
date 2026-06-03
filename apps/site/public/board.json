@@ -122,51 +122,75 @@
     {
       "model_id": "codestral",
       "stack_id": "aider",
-      "mean_score": 7.46,
-      "mean_cost_usd": 0.001269,
-      "mean_latency_ms": 27194,
+      "mean_score": 7.04,
+      "mean_cost_usd": 0.001234,
+      "mean_latency_ms": 28859,
       "pass_hat_k": null,
-      "quality_per_dollar": 5878.64,
+      "quality_per_dollar": 5705.02,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.46,
-          "cost_usd": 0.001269,
+          "score": 7.04,
+          "cost_usd": 0.001234,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.5,
+        "correctness": 8.75,
+        "error_handling": 7.5,
+        "security_posture": 6.75,
+        "test_alignment": 7.0,
+        "type_safety": 4.75
       },
       "on_frontier": false
     },
     {
       "model_id": "codestral",
       "stack_id": "raw-llm",
-      "mean_score": 7.71,
-      "mean_cost_usd": 0.001231,
-      "mean_latency_ms": 6451,
+      "mean_score": 7.29,
+      "mean_cost_usd": 0.001311,
+      "mean_latency_ms": 7010,
       "pass_hat_k": null,
-      "quality_per_dollar": 6263.2,
+      "quality_per_dollar": 5560.64,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.71,
-          "cost_usd": 0.001231,
+          "score": 7.29,
+          "cost_usd": 0.001311,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 9.0,
+        "correctness": 7.25,
+        "error_handling": 7.0,
+        "security_posture": 8.0,
+        "test_alignment": 7.0,
+        "type_safety": 5.5
       },
       "on_frontier": false
     },
     {
       "model_id": "deepseek-v3-2",
       "stack_id": "raw-llm",
-      "mean_score": 8.09,
-      "mean_cost_usd": 0.000746,
-      "mean_latency_ms": 30265,
+      "mean_score": 7.42,
+      "mean_cost_usd": 0.000716,
+      "mean_latency_ms": 109857,
       "pass_hat_k": null,
-      "quality_per_dollar": 10844.5,
+      "quality_per_dollar": 10363.13,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 8.09,
-          "cost_usd": 0.000746,
+          "score": 7.42,
+          "cost_usd": 0.000716,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.0,
+        "correctness": 7.75,
+        "error_handling": 7.5,
+        "security_posture": 8.25,
+        "test_alignment": 7.5,
+        "type_safety": 5.5
       },
       "on_frontier": false
     },
@@ -185,294 +209,424 @@
           "pass_hat_k": null
         }
       },
+      "per_criterion": {},
       "on_frontier": false
     },
     {
       "model_id": "deepseek-v4-pro",
       "stack_id": "raw-llm",
-      "mean_score": 7.92,
-      "mean_cost_usd": 0.007463,
-      "mean_latency_ms": 114603,
+      "mean_score": null,
+      "mean_cost_usd": 0.00375,
+      "mean_latency_ms": 83187,
       "pass_hat_k": null,
-      "quality_per_dollar": 1061.24,
+      "quality_per_dollar": null,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.92,
-          "cost_usd": 0.007463,
+          "score": null,
+          "cost_usd": 0.00375,
           "pass_hat_k": null
         }
       },
+      "per_criterion": {},
       "on_frontier": false
     },
     {
       "model_id": "devstral",
       "stack_id": "aider",
-      "mean_score": 6.92,
-      "mean_cost_usd": 0.00276,
-      "mean_latency_ms": 42183,
+      "mean_score": 7.42,
+      "mean_cost_usd": 0.00346,
+      "mean_latency_ms": 181601,
       "pass_hat_k": null,
-      "quality_per_dollar": 2507.25,
+      "quality_per_dollar": 2144.51,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.92,
-          "cost_usd": 0.00276,
+          "score": 7.42,
+          "cost_usd": 0.00346,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.5,
+        "correctness": 7.25,
+        "error_handling": 7.75,
+        "security_posture": 8.5,
+        "test_alignment": 7.0,
+        "type_safety": 5.5
       },
       "on_frontier": false
     },
     {
       "model_id": "devstral",
       "stack_id": "raw-llm",
-      "mean_score": 7.46,
-      "mean_cost_usd": 0.003057,
-      "mean_latency_ms": 17604,
+      "mean_score": 7.88,
+      "mean_cost_usd": 0.003698,
+      "mean_latency_ms": 32219,
       "pass_hat_k": null,
-      "quality_per_dollar": 2440.3,
+      "quality_per_dollar": 2130.88,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.46,
-          "cost_usd": 0.003057,
+          "score": 7.88,
+          "cost_usd": 0.003698,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.5,
+        "correctness": 9.25,
+        "error_handling": 8.0,
+        "security_posture": 9.0,
+        "test_alignment": 6.0,
+        "type_safety": 6.5
       },
       "on_frontier": false
     },
     {
       "model_id": "glm-4-32b",
       "stack_id": "raw-llm",
-      "mean_score": 6.79,
-      "mean_cost_usd": 0.000142,
-      "mean_latency_ms": 16600,
+      "mean_score": 7.5,
+      "mean_cost_usd": 0.000136,
+      "mean_latency_ms": 21327,
       "pass_hat_k": null,
-      "quality_per_dollar": 47816.9,
+      "quality_per_dollar": 55147.06,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.79,
-          "cost_usd": 0.000142,
+          "score": 7.5,
+          "cost_usd": 0.000136,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.5,
+        "correctness": 7.25,
+        "error_handling": 9.0,
+        "security_posture": 8.0,
+        "test_alignment": 8.0,
+        "type_safety": 4.25
       },
       "on_frontier": false
     },
     {
       "model_id": "glm-4-7",
       "stack_id": "raw-llm",
-      "mean_score": null,
-      "mean_cost_usd": 0.0,
-      "mean_latency_ms": 0,
+      "mean_score": 7.67,
+      "mean_cost_usd": 0.007679,
+      "mean_latency_ms": 28164,
       "pass_hat_k": null,
-      "quality_per_dollar": null,
+      "quality_per_dollar": 998.83,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": null,
-          "cost_usd": 0.0,
+          "score": 7.67,
+          "cost_usd": 0.007679,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.0,
+        "correctness": 9.0,
+        "error_handling": 7.5,
+        "security_posture": 9.0,
+        "test_alignment": 7.0,
+        "type_safety": 5.5
       },
       "on_frontier": false
     },
     {
       "model_id": "glm-5",
       "stack_id": "raw-llm",
-      "mean_score": null,
-      "mean_cost_usd": 0.008771,
-      "mean_latency_ms": 45822,
+      "mean_score": 7.67,
+      "mean_cost_usd": 0.020003,
+      "mean_latency_ms": 247763,
       "pass_hat_k": null,
-      "quality_per_dollar": null,
+      "quality_per_dollar": 383.44,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": null,
-          "cost_usd": 0.008771,
+          "score": 7.67,
+          "cost_usd": 0.020003,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.0,
+        "correctness": 9.0,
+        "error_handling": 7.75,
+        "security_posture": 9.0,
+        "test_alignment": 6.5,
+        "type_safety": 5.75
       },
       "on_frontier": false
     },
     {
       "model_id": "grok-4",
       "stack_id": "raw-llm",
-      "mean_score": 7.17,
-      "mean_cost_usd": 0.021598,
-      "mean_latency_ms": 7516,
+      "mean_score": 0.0,
+      "mean_cost_usd": 0.004124,
+      "mean_latency_ms": 2860,
       "pass_hat_k": null,
-      "quality_per_dollar": 331.98,
+      "quality_per_dollar": 0.0,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.17,
-          "cost_usd": 0.021598,
+          "score": 0.0,
+          "cost_usd": 0.004124,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 0.0,
+        "correctness": 0.0,
+        "error_handling": 0.0,
+        "security_posture": 0.0,
+        "test_alignment": 0.0,
+        "type_safety": 0.0
       },
       "on_frontier": false
     },
     {
       "model_id": "kimi-k2-5",
       "stack_id": "raw-llm",
-      "mean_score": null,
-      "mean_cost_usd": 0.007952,
-      "mean_latency_ms": 143431,
+      "mean_score": 6.75,
+      "mean_cost_usd": 0.028595,
+      "mean_latency_ms": 360811,
       "pass_hat_k": null,
-      "quality_per_dollar": null,
+      "quality_per_dollar": 236.06,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": null,
-          "cost_usd": 0.007952,
+          "score": 6.75,
+          "cost_usd": 0.028595,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.75,
+        "correctness": 6.25,
+        "error_handling": 6.75,
+        "security_posture": 6.75,
+        "test_alignment": 7.5,
+        "type_safety": 5.5
       },
       "on_frontier": false
     },
     {
       "model_id": "llama-3-1-8b",
       "stack_id": "raw-llm",
-      "mean_score": 2.75,
-      "mean_cost_usd": 0.000052,
-      "mean_latency_ms": 18881,
+      "mean_score": 3.5,
+      "mean_cost_usd": 0.00013,
+      "mean_latency_ms": 71577,
       "pass_hat_k": null,
-      "quality_per_dollar": 52884.62,
+      "quality_per_dollar": 26923.08,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 2.75,
-          "cost_usd": 0.000052,
+          "score": 3.5,
+          "cost_usd": 0.00013,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 4.0,
+        "correctness": 3.5,
+        "error_handling": 4.0,
+        "security_posture": 3.25,
+        "test_alignment": 4.0,
+        "type_safety": 2.25
       },
       "on_frontier": false
     },
     {
       "model_id": "llama-3-3-70b",
       "stack_id": "raw-llm",
-      "mean_score": 6.29,
-      "mean_cost_usd": 0.0003,
-      "mean_latency_ms": 33682,
+      "mean_score": 6.25,
+      "mean_cost_usd": 0.000281,
+      "mean_latency_ms": 27860,
       "pass_hat_k": null,
-      "quality_per_dollar": 20966.67,
+      "quality_per_dollar": 22241.99,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.29,
-          "cost_usd": 0.0003,
+          "score": 6.25,
+          "cost_usd": 0.000281,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.5,
+        "correctness": 6.5,
+        "error_handling": 6.5,
+        "security_posture": 8.0,
+        "test_alignment": 6.0,
+        "type_safety": 3.0
       },
       "on_frontier": false
     },
     {
       "model_id": "llama-4-scout",
       "stack_id": "raw-llm",
-      "mean_score": 6.67,
-      "mean_cost_usd": 0.000307,
-      "mean_latency_ms": 9367,
+      "mean_score": 6.33,
+      "mean_cost_usd": 0.000309,
+      "mean_latency_ms": 28002,
       "pass_hat_k": null,
-      "quality_per_dollar": 21726.38,
+      "quality_per_dollar": 20485.44,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.67,
-          "cost_usd": 0.000307,
+          "score": 6.33,
+          "cost_usd": 0.000309,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 6.5,
+        "correctness": 6.75,
+        "error_handling": 6.75,
+        "security_posture": 7.75,
+        "test_alignment": 6.0,
+        "type_safety": 4.25
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen-3-14b",
       "stack_id": "aider",
-      "mean_score": 6.71,
-      "mean_cost_usd": 0.000554,
-      "mean_latency_ms": 55119,
+      "mean_score": 6.75,
+      "mean_cost_usd": 0.000518,
+      "mean_latency_ms": 54032,
       "pass_hat_k": null,
-      "quality_per_dollar": 12111.91,
+      "quality_per_dollar": 13030.89,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.71,
-          "cost_usd": 0.000554,
+          "score": 6.75,
+          "cost_usd": 0.000518,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.25,
+        "correctness": 5.75,
+        "error_handling": 6.5,
+        "security_posture": 7.5,
+        "test_alignment": 7.5,
+        "type_safety": 6.0
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen-3-14b",
       "stack_id": "raw-llm",
-      "mean_score": 6.5,
-      "mean_cost_usd": 0.00031,
-      "mean_latency_ms": 11421,
+      "mean_score": 6.67,
+      "mean_cost_usd": 0.000289,
+      "mean_latency_ms": 11673,
       "pass_hat_k": null,
-      "quality_per_dollar": 20967.74,
+      "quality_per_dollar": 23079.58,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.5,
-          "cost_usd": 0.00031,
+          "score": 6.67,
+          "cost_usd": 0.000289,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.0,
+        "correctness": 6.25,
+        "error_handling": 7.5,
+        "security_posture": 8.0,
+        "test_alignment": 6.5,
+        "type_safety": 4.75
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen-3-32b",
       "stack_id": "raw-llm",
-      "mean_score": null,
-      "mean_cost_usd": 0.0,
-      "mean_latency_ms": 0,
+      "mean_score": 7.42,
+      "mean_cost_usd": 0.002033,
+      "mean_latency_ms": 202727,
       "pass_hat_k": null,
-      "quality_per_dollar": null,
+      "quality_per_dollar": 3649.78,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": null,
-          "cost_usd": 0.0,
+          "score": 7.42,
+          "cost_usd": 0.002033,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.0,
+        "correctness": 9.0,
+        "error_handling": 8.0,
+        "security_posture": 7.5,
+        "test_alignment": 7.0,
+        "type_safety": 5.0
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen3-235b",
       "stack_id": "raw-llm",
-      "mean_score": 6.75,
-      "mean_cost_usd": 0.000176,
-      "mean_latency_ms": 31159,
+      "mean_score": 7.42,
+      "mean_cost_usd": 0.000164,
+      "mean_latency_ms": 29434,
       "pass_hat_k": null,
-      "quality_per_dollar": 38352.27,
+      "quality_per_dollar": 45243.9,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.75,
-          "cost_usd": 0.000176,
+          "score": 7.42,
+          "cost_usd": 0.000164,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 7.25,
+        "correctness": 9.25,
+        "error_handling": 7.5,
+        "security_posture": 8.5,
+        "test_alignment": 7.5,
+        "type_safety": 4.5
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen3-coder-30b",
       "stack_id": "aider",
-      "mean_score": 6.54,
-      "mean_cost_usd": 0.000543,
-      "mean_latency_ms": 48887,
+      "mean_score": 6.5,
+      "mean_cost_usd": 0.000557,
+      "mean_latency_ms": 52409,
       "pass_hat_k": null,
-      "quality_per_dollar": 12044.2,
+      "quality_per_dollar": 11669.66,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.54,
-          "cost_usd": 0.000543,
+          "score": 6.5,
+          "cost_usd": 0.000557,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 6.75,
+        "correctness": 6.25,
+        "error_handling": 7.0,
+        "security_posture": 8.0,
+        "test_alignment": 6.0,
+        "type_safety": 5.0
       },
       "on_frontier": false
     },
     {
       "model_id": "qwen3-coder-30b",
       "stack_id": "raw-llm",
-      "mean_score": 7.29,
-      "mean_cost_usd": 0.00036,
-      "mean_latency_ms": 12627,
+      "mean_score": 7.79,
+      "mean_cost_usd": 0.000434,
+      "mean_latency_ms": 16409,
       "pass_hat_k": null,
-      "quality_per_dollar": 20250.0,
+      "quality_per_dollar": 17949.31,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 7.29,
-          "cost_usd": 0.00036,
+          "score": 7.79,
+          "cost_usd": 0.000434,
           "pass_hat_k": null
         }
+      },
+      "per_criterion": {
+        "code_clarity": 8.5,
+        "correctness": 8.5,
+        "error_handling": 8.0,
+        "security_posture": 9.0,
+        "test_alignment": 7.5,
+        "type_safety": 5.25
       },
       "on_frontier": false
     }
