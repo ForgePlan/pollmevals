@@ -91,12 +91,16 @@ _GOOSE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 _OPENCODE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # Crush (charmbracelet): model-agnostic, same coder models for a clean comparison.
 _CRUSH_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+# Cline: model-agnostic; same coder models (qwen-3-14b is too weak for its
+# tool-use — a real compat data point; the stronger coders work).
+_CLINE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # Per-stack candidate model lists for --add-stack (merge ONE harness column in).
 _STACK_MODELS = {
     "aider": _AIDER_MODELS,
     "goose": _GOOSE_MODELS,
     "opencode": _OPENCODE_MODELS,
     "crush": _CRUSH_MODELS,
+    "cline": _CLINE_MODELS,
 }
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
