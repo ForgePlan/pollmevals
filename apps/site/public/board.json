@@ -30,9 +30,89 @@
   ],
   "models": [
     {
+      "model_id": "codestral",
+      "name": "codestral",
+      "tier": "mid"
+    },
+    {
+      "model_id": "deepseek-v3-2",
+      "name": "deepseek-v3-2",
+      "tier": "mid"
+    },
+    {
+      "model_id": "deepseek-v3-5",
+      "name": "DeepSeek V3.5",
+      "tier": "mid"
+    },
+    {
+      "model_id": "deepseek-v4-pro",
+      "name": "deepseek-v4-pro",
+      "tier": "mid"
+    },
+    {
+      "model_id": "devstral",
+      "name": "devstral",
+      "tier": "mid"
+    },
+    {
+      "model_id": "glm-4-32b",
+      "name": "glm-4-32b",
+      "tier": "mid"
+    },
+    {
+      "model_id": "glm-4-7",
+      "name": "glm-4-7",
+      "tier": "mid"
+    },
+    {
+      "model_id": "glm-5",
+      "name": "glm-5",
+      "tier": "mid"
+    },
+    {
+      "model_id": "grok-4",
+      "name": "grok-4",
+      "tier": "mid"
+    },
+    {
+      "model_id": "kimi-k2-5",
+      "name": "kimi-k2-5",
+      "tier": "mid"
+    },
+    {
+      "model_id": "llama-3-1-8b",
+      "name": "llama-3-1-8b",
+      "tier": "mid"
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "name": "Llama 3.3 70B",
+      "tier": "cheap"
+    },
+    {
+      "model_id": "llama-4-scout",
+      "name": "llama-4-scout",
+      "tier": "mid"
+    },
+    {
       "model_id": "qwen-3-14b",
       "name": "Qwen 3 14B",
       "tier": "cheap"
+    },
+    {
+      "model_id": "qwen-3-32b",
+      "name": "Qwen 3 32B",
+      "tier": "cheap"
+    },
+    {
+      "model_id": "qwen3-235b",
+      "name": "qwen3-235b",
+      "tier": "mid"
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "name": "qwen3-coder-30b",
+      "tier": "mid"
     }
   ],
   "tasks": [
@@ -40,17 +120,272 @@
   ],
   "cells": [
     {
-      "model_id": "qwen-3-14b",
+      "model_id": "codestral",
       "stack_id": "aider",
-      "mean_score": 6.75,
-      "mean_cost_usd": 0.000514,
-      "mean_latency_ms": 47368,
+      "mean_score": 7.46,
+      "mean_cost_usd": 0.001269,
+      "mean_latency_ms": 27194,
       "pass_hat_k": null,
-      "quality_per_dollar": 13132.3,
+      "quality_per_dollar": 5878.64,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 6.75,
-          "cost_usd": 0.000514,
+          "score": 7.46,
+          "cost_usd": 0.001269,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "codestral",
+      "stack_id": "raw-llm",
+      "mean_score": 7.71,
+      "mean_cost_usd": 0.001231,
+      "mean_latency_ms": 6451,
+      "pass_hat_k": null,
+      "quality_per_dollar": 6263.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.71,
+          "cost_usd": 0.001231,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "deepseek-v3-2",
+      "stack_id": "raw-llm",
+      "mean_score": 8.09,
+      "mean_cost_usd": 0.000746,
+      "mean_latency_ms": 30265,
+      "pass_hat_k": null,
+      "quality_per_dollar": 10844.5,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 8.09,
+          "cost_usd": 0.000746,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "deepseek-v3-5",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 0,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "deepseek-v4-pro",
+      "stack_id": "raw-llm",
+      "mean_score": 7.92,
+      "mean_cost_usd": 0.007463,
+      "mean_latency_ms": 114603,
+      "pass_hat_k": null,
+      "quality_per_dollar": 1061.24,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.92,
+          "cost_usd": 0.007463,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "aider",
+      "mean_score": 6.92,
+      "mean_cost_usd": 0.00276,
+      "mean_latency_ms": 42183,
+      "pass_hat_k": null,
+      "quality_per_dollar": 2507.25,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.92,
+          "cost_usd": 0.00276,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "raw-llm",
+      "mean_score": 7.46,
+      "mean_cost_usd": 0.003057,
+      "mean_latency_ms": 17604,
+      "pass_hat_k": null,
+      "quality_per_dollar": 2440.3,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.46,
+          "cost_usd": 0.003057,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "glm-4-32b",
+      "stack_id": "raw-llm",
+      "mean_score": 6.79,
+      "mean_cost_usd": 0.000142,
+      "mean_latency_ms": 16600,
+      "pass_hat_k": null,
+      "quality_per_dollar": 47816.9,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.79,
+          "cost_usd": 0.000142,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "glm-4-7",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 0,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "glm-5",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.008771,
+      "mean_latency_ms": 45822,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.008771,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "grok-4",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 0,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "kimi-k2-5",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.007952,
+      "mean_latency_ms": 143431,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.007952,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-1-8b",
+      "stack_id": "raw-llm",
+      "mean_score": 2.75,
+      "mean_cost_usd": 0.000052,
+      "mean_latency_ms": 18881,
+      "pass_hat_k": null,
+      "quality_per_dollar": 52884.62,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 2.75,
+          "cost_usd": 0.000052,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-3-3-70b",
+      "stack_id": "raw-llm",
+      "mean_score": 6.29,
+      "mean_cost_usd": 0.0003,
+      "mean_latency_ms": 33682,
+      "pass_hat_k": null,
+      "quality_per_dollar": 20966.67,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.29,
+          "cost_usd": 0.0003,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "llama-4-scout",
+      "stack_id": "raw-llm",
+      "mean_score": 6.67,
+      "mean_cost_usd": 0.000307,
+      "mean_latency_ms": 9367,
+      "pass_hat_k": null,
+      "quality_per_dollar": 21726.38,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.67,
+          "cost_usd": 0.000307,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "aider",
+      "mean_score": 6.71,
+      "mean_cost_usd": 0.000554,
+      "mean_latency_ms": 55119,
+      "pass_hat_k": null,
+      "quality_per_dollar": 12111.91,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.71,
+          "cost_usd": 0.000554,
           "pass_hat_k": null
         }
       },
@@ -59,15 +394,83 @@
     {
       "model_id": "qwen-3-14b",
       "stack_id": "raw-llm",
-      "mean_score": 5.08,
-      "mean_cost_usd": 0.000344,
-      "mean_latency_ms": 12072,
+      "mean_score": 6.5,
+      "mean_cost_usd": 0.00031,
+      "mean_latency_ms": 11421,
       "pass_hat_k": null,
-      "quality_per_dollar": 14767.44,
+      "quality_per_dollar": 20967.74,
       "per_task": {
         "be_01_jwt_auth": {
-          "score": 5.08,
-          "cost_usd": 0.000344,
+          "score": 6.5,
+          "cost_usd": 0.00031,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-32b",
+      "stack_id": "raw-llm",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 0,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-235b",
+      "stack_id": "raw-llm",
+      "mean_score": 6.75,
+      "mean_cost_usd": 0.000176,
+      "mean_latency_ms": 31159,
+      "pass_hat_k": null,
+      "quality_per_dollar": 38352.27,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.75,
+          "cost_usd": 0.000176,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "stack_id": "aider",
+      "mean_score": 6.54,
+      "mean_cost_usd": 0.000543,
+      "mean_latency_ms": 48887,
+      "pass_hat_k": null,
+      "quality_per_dollar": 12044.2,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.54,
+          "cost_usd": 0.000543,
+          "pass_hat_k": null
+        }
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "stack_id": "raw-llm",
+      "mean_score": 7.29,
+      "mean_cost_usd": 0.00036,
+      "mean_latency_ms": 12627,
+      "pass_hat_k": null,
+      "quality_per_dollar": 20250.0,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 7.29,
+          "cost_usd": 0.00036,
           "pass_hat_k": null
         }
       },

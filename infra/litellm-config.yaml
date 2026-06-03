@@ -134,6 +134,86 @@ model_list:
       api_base: os.environ/RUNPOD_VLLM_API_BASE
       api_key: os.environ/RUNPOD_VLLM_API_KEY
 
+  # ── Coding-model ladder (be_01 sweep, 2026-06-03) — OpenRouter routes ───────
+  # Added to measure a broad coding-model roster (by family, cheap→expensive)
+  # on the leaderboard. All non-reasoning -instruct variants picked so raw-llm
+  # completion returns content (reasoning variants would burn the token budget).
+
+  # Qwen — coding MoE + big instruct
+  - model_name: qwen3-coder-30b
+    litellm_params:
+      model: openrouter/qwen/qwen3-coder-30b-a3b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: qwen3-235b
+    litellm_params:
+      model: openrouter/qwen/qwen3-235b-a22b-2507
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # DeepSeek — newer cheaper v3.2 (v3-5 already wired above)
+  - model_name: deepseek-v3-2
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v3.2
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Mistral — Codestral (coding) + Devstral (coding-agent, aider-friendly)
+  - model_name: codestral
+    litellm_params:
+      model: openrouter/mistralai/codestral-2508
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: devstral
+    litellm_params:
+      model: openrouter/mistralai/devstral-2512
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # Llama — small 3.1-8b + Llama-4 Scout (3.3-70b already wired above)
+  - model_name: llama-3-1-8b
+    litellm_params:
+      model: openrouter/meta-llama/llama-3.1-8b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: llama-4-scout
+    litellm_params:
+      model: openrouter/meta-llama/llama-4-scout
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # GLM — cheap 4-32b (glm-4-7 via Cerebras already wired above)
+  - model_name: glm-4-32b
+    litellm_params:
+      model: openrouter/z-ai/glm-4-32b
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  # ── Frontier-open tier (the "more powerful" candidates, 2026-06-03) ─────────
+  # Strong open models — non-judge families (moonshot / z-ai / deepseek), so
+  # safe as candidates without tripping self-judging. grok-4 already wired above.
+
+  - model_name: kimi-k2-5
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: glm-5
+    litellm_params:
+      model: openrouter/z-ai/glm-5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
   # ── Judge routes (RFC-002 Phase 3 W1 H1 spike + future JudgePanel) ──────────
   # Separate routes billed to OPENROUTER_API_KEY_JUDGE for billing isolation
   # per RFC-002 NFR-005. Naming convention: <base-model>-judge.
