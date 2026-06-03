@@ -1,60 +1,68 @@
+"use client";
+
+import { useState } from "react";
 import type { Board, Cell } from "@/lib/board";
-import { frontierKeys } from "@/lib/board";
-import { formatUsd } from "@/lib/format";
+import { cellMap, frontierKeys } from "@/lib/board";
+import { formatUsd, formatScore } from "@/lib/format";
 
 /**
  * Cost vs quality scatter — one point per STACK (model × harness). The thesis
  * made visual: scaffolded cheap models sit up-and-left of bare expensive ones.
- * Color encodes the model; the marker glyph encodes the harness family; the
- * Pareto frontier is connected in emerald. Hand-built SVG (no chart lib).
+ *
+ * With many models a per-model legend doesn't fit, so points are colored by the
+ * model's PRICE TIER (cheap / mid / frontier) — few colors, clean legend — and
+ * hovering a point reveals the exact stack + its full metrics in an in-SVG card.
  */
-const MODEL_COLORS: Record<string, string> = {
-  "qwen-3-14b": "#f59e0b",
-  "llama-3-3-70b": "#f472b6",
-  "gemini-3-flash": "#38bdf8",
-  "gpt-5-mini": "#34d399",
-  "claude-sonnet-4-6": "#8b83e6",
-};
-const FALLBACK = "#a8a8b3";
+const TIER_COLOR = {
+  cheap: "#34d399",
+  mid: "#8b83e6",
+  frontier: "#f472b6",
+} as const;
 
 export function StackParetoChart({ board }: { board: Board }) {
+  const [hover, setHover] = useState<string | null>(null);
   const W = 760;
   const H = 380;
-  const pad = { t: 20, r: 140, b: 48, l: 52 };
+  const pad = { t: 20, r: 28, b: 48, l: 52 };
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
   const scored = board.cells.filter((c) => c.mean_score !== null);
   if (scored.length === 0) return null;
   const frontier = frontierKeys(board);
+  const map = cellMap(board);
+  const tierOf = new Map(board.models.map((m) => [m.model_id, m.tier]));
+  const nameOf = new Map(board.models.map((m) => [m.model_id, m.name]));
+  const hOf = new Map(board.harnesses.map((h) => [h.stack_id, h.name]));
 
   const costs = scored.map((c) => c.mean_cost_usd);
   const xMax = Math.max(...costs) * 1.12 || 1;
-  const xMin = 0;
   const yMin = Math.max(
     0,
     Math.min(...scored.map((c) => c.mean_score ?? 0)) - 1
   );
   const yMax = 10;
 
-  const sx = (x: number) => pad.l + ((x - xMin) / (xMax - xMin)) * plotW;
+  const sx = (x: number) => pad.l + (x / xMax) * plotW;
   const sy = (y: number) =>
     pad.t + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
 
-  const xTicks = ticks(xMin, xMax, 4);
+  const xTicks = ticks(0, xMax, 4);
   const yTicks = ticks(yMin, yMax, 4);
-
   const frontierPts = scored
     .filter((c) => frontier.has(`${c.model_id}::${c.stack_id}`))
     .sort((a, b) => a.mean_cost_usd - b.mean_cost_usd);
 
-  const color = (c: Cell) => MODEL_COLORS[c.model_id] ?? FALLBACK;
+  const color = (c: Cell) => TIER_COLOR[tierOf.get(c.model_id) ?? "mid"];
+  const hovered = hover ? map.get(hover) : undefined;
 
   return (
     <div className="chart-card">
       <div className="chart-head">
         <span className="title">Cost vs quality — every stack</span>
-        <span className="hint">upper-left wins: cheaper + better</span>
+        <span className="hint">
+          upper-left wins: cheaper + better · hover a point
+        </span>
       </div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -106,7 +114,6 @@ export function StackParetoChart({ board }: { board: Board }) {
           </g>
         ))}
 
-        {/* frontier line */}
         {frontierPts.length >= 2 && (
           <path
             d={frontierPts
@@ -125,28 +132,27 @@ export function StackParetoChart({ board }: { board: Board }) {
           />
         )}
 
-        {/* points */}
-        {scored.map((c, i) => {
-          const onF = frontier.has(`${c.model_id}::${c.stack_id}`);
+        {scored.map((c) => {
+          const k = `${c.model_id}::${c.stack_id}`;
+          const onF = frontier.has(k);
+          const isH = hover === k;
           return (
             <circle
-              key={i}
+              key={k}
               cx={sx(c.mean_cost_usd)}
               cy={sy(c.mean_score ?? 0)}
-              r={onF ? 6.5 : 4.5}
+              r={isH ? 8 : onF ? 6.5 : 4.5}
               fill={color(c)}
-              fillOpacity={onF ? 1 : 0.7}
-              stroke={onF ? "#0b0b0d" : "none"}
+              fillOpacity={hover && !isH ? 0.35 : onF ? 1 : 0.78}
+              stroke={isH ? "#fff" : onF ? "#0b0b0d" : "none"}
               strokeWidth={1.5}
-            >
-              <title>{`${c.model_id} × ${c.stack_id}: ${
-                c.mean_score
-              } @ ${formatUsd(c.mean_cost_usd)}`}</title>
-            </circle>
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHover(k)}
+              onMouseLeave={() => setHover((h) => (h === k ? null : h))}
+            />
           );
         })}
 
-        {/* axis labels */}
         <text
           x={pad.l + plotW / 2}
           y={H - 6}
@@ -167,27 +173,107 @@ export function StackParetoChart({ board }: { board: Board }) {
           Quality (0–10)
         </text>
 
-        {/* model legend */}
-        {board.models.map((model, i) => (
+        {/* tier legend (compact, few colors) */}
+        {(["cheap", "mid", "frontier"] as const).map((tier, i) => (
           <g
-            key={model.model_id}
-            transform={`translate(${pad.l + plotW + 18}, ${
-              pad.t + 6 + i * 22
-            })`}
+            key={tier}
+            transform={`translate(${pad.l + 8 + i * 92}, ${pad.t + 6})`}
           >
-            <circle
-              cx={5}
-              cy={-4}
-              r={5}
-              fill={MODEL_COLORS[model.model_id] ?? FALLBACK}
-            />
-            <text x={16} y={0} fontSize={11.5} fill="#a8a8b3">
-              {model.name}
+            <circle cx={5} cy={-4} r={5} fill={TIER_COLOR[tier]} />
+            <text x={15} y={0} fontSize={11} fill="#a8a8b3">
+              {tier.charAt(0).toUpperCase() + tier.slice(1)}
             </text>
           </g>
         ))}
+
+        {hovered && (
+          <Tooltip
+            cell={hovered}
+            sx={sx}
+            sy={sy}
+            W={W}
+            nameOf={nameOf}
+            hOf={hOf}
+          />
+        )}
       </svg>
     </div>
+  );
+}
+
+function Tooltip({
+  cell,
+  sx,
+  sy,
+  W,
+  nameOf,
+  hOf,
+}: {
+  cell: Cell;
+  sx: (x: number) => number;
+  sy: (y: number) => number;
+  W: number;
+  nameOf: Map<string, string>;
+  hOf: Map<string, string>;
+}) {
+  const px = sx(cell.mean_cost_usd);
+  const py = sy(cell.mean_score ?? 0);
+  const bw = 188;
+  const bh = 86;
+  // flip left if near the right edge
+  const left = px + bw + 14 > W ? px - bw - 12 : px + 12;
+  const top = Math.max(6, py - bh - 8);
+  const lines = [
+    `quality ${formatScore(cell.mean_score)} · pass^k ${
+      cell.pass_hat_k === null ? "—" : Math.round(cell.pass_hat_k * 100) + "%"
+    }`,
+    `${formatUsd(cell.mean_cost_usd)}/task · ${
+      cell.mean_latency_ms
+        ? (cell.mean_latency_ms / 1000).toFixed(1) + "s"
+        : "—"
+    }`,
+    `q/$ ${
+      cell.quality_per_dollar === null
+        ? "—"
+        : Math.round(cell.quality_per_dollar)
+    }`,
+  ];
+  return (
+    <g pointerEvents="none">
+      <rect
+        x={left}
+        y={top}
+        width={bw}
+        height={bh}
+        rx={8}
+        fill="#16161c"
+        stroke="#34343f"
+      />
+      <text
+        x={left + 12}
+        y={top + 20}
+        fontSize={12.5}
+        fontWeight={700}
+        fill="#f4f4f6"
+      >
+        {nameOf.get(cell.model_id) ?? cell.model_id}
+      </text>
+      <text x={left + 12} y={top + 36} fontSize={11} fill="#8b83e6">
+        {hOf.get(cell.stack_id) ?? cell.stack_id}
+      </text>
+      {lines.map((l, i) => (
+        <text
+          key={i}
+          x={left + 12}
+          y={top + 52 + i * 14}
+          fontSize={11}
+          fill="#a8a8b3"
+          fontFamily="var(--font-mono)"
+        >
+          {l}
+        </text>
+      ))}
+    </g>
   );
 }
 

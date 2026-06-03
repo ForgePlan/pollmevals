@@ -5,9 +5,10 @@ import { bestCell, cellMap } from "@/lib/board";
 import { formatUsd, formatScore } from "@/lib/format";
 import { HarnessModelMatrix } from "@/components/HarnessModelMatrix";
 import { StackParetoChart } from "@/components/StackParetoChart";
+import { ParallelCoordinates } from "@/components/ParallelCoordinates";
 import { ScaffoldingLift } from "@/components/ScaffoldingLift";
 import { PerTaskWinners } from "@/components/PerTaskWinners";
-import { StackTable } from "@/components/StackTable";
+import { StackMasterTable } from "@/components/StackMasterTable";
 import { TaskTeaser } from "@/components/TaskTeaser";
 
 function loadBoard(): Board {
@@ -129,6 +130,16 @@ export default function Home() {
         <StackParetoChart board={board} />
       </section>
 
+      <section className="section" id="distribution">
+        <h2>The whole field, across every axis</h2>
+        <p className="section-lede">
+          Each stack as a line through quality, cost, latency, reliability, and
+          quality-per-dollar — all oriented so up is better. Where the lines fan
+          out is where stacks really differ; hover one to trace a single stack.
+        </p>
+        <ParallelCoordinates board={board} />
+      </section>
+
       <section className="section" id="lift">
         <h2>What scaffolding buys each model</h2>
         <p className="section-lede">
@@ -162,7 +173,12 @@ export default function Home() {
 
       <section className="section" id="leaderboard">
         <h2>All stacks · {board.cells.length} combinations</h2>
-        <StackTable board={board} />
+        <p className="section-lede">
+          The raw numbers — sort by any column, filter by harness. The matrix
+          and charts give the shape; this gives the exact ranking for the metric
+          you care about.
+        </p>
+        <StackMasterTable board={board} />
       </section>
 
       <section className="section method" id="methodology">
