@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Board, Cell } from "@/lib/board";
 import { formatUsd, formatScore } from "@/lib/format";
+import { StackDrawer } from "@/components/StackDrawer";
 
 /**
  * Ranked horizontal bars — the canonical leaderboard visual (Artificial Analysis,
@@ -79,6 +80,7 @@ function fmtVal(c: Cell, id: BaseMetric): string {
 
 export function RankedBars({ board }: { board: Board }) {
   const [metric, setMetric] = useState<MetricId>("mean_score");
+  const [selected, setSelected] = useState<Cell | null>(null);
 
   const nameOf = new Map(board.models.map((m) => [m.model_id, m]));
   const hOf = new Map(board.harnesses.map((h) => [h.stack_id, h.name]));
@@ -128,105 +130,118 @@ export function RankedBars({ board }: { board: Board }) {
   const activeLabel = isAll ? "all metrics" : sortMetric.label.toLowerCase();
 
   return (
-    <div className="ranked-card">
-      <div className="matrix-toolbar">
-        <div className="seg" role="tablist" aria-label="ranking metric">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={metric === t.id}
-              className={`seg-btn ${metric === t.id ? "on" : ""}`}
-              onClick={() => setMetric(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <p className="matrix-caption">
-          {isAll ? (
-            <>
-              All four metrics per stack — sorted by overall (longer = better).{" "}
-              {BASE.map((m) => (
-                <span key={m.id} className="cap-key" style={{ color: m.color }}>
-                  ▮ {m.short}{" "}
-                </span>
-              ))}
-            </>
-          ) : (
-            <>
-              Stacks ranked by {activeLabel} —{" "}
-              {sortMetric.lowerBetter ? "lower" : "higher"} is better; longest
-              bar wins.
-            </>
-          )}
-        </p>
-      </div>
-      <ol className="ranked-list">
-        {rows.map(({ c }, i) => {
-          const tier = nameOf.get(c.model_id)?.tier ?? "mid";
-          return (
-            <li
-              key={`${c.model_id}::${c.stack_id}`}
-              className={`ranked-row ${isAll ? "all" : ""}`}
-            >
-              <span className="rk-pos">{i + 1}</span>
-              <span className="rk-label">
-                <span className="rk-model">
-                  {nameOf.get(c.model_id)?.name ?? c.model_id}
-                </span>
-                <span className="rk-harness">
-                  {hOf.get(c.stack_id) ?? c.stack_id}
-                </span>
-              </span>
-              {isAll ? (
-                <span className="all-bars">
-                  {BASE.map((m) => {
-                    const g = good(c, m);
-                    return (
-                      <span
-                        className="all-bar"
-                        key={m.id}
-                        title={`${m.label}: ${fmtVal(c, m.id)}`}
-                      >
-                        <span className="ab-key" style={{ color: m.color }}>
-                          {m.short}
-                        </span>
-                        <span className="ab-track">
-                          <span
-                            className="ab-fill"
-                            style={{
-                              width: `${Math.max(2, (g ?? 0) * 100)}%`,
-                              background: m.color,
-                            }}
-                          />
-                        </span>
-                        <span className="ab-val">{fmtVal(c, m.id)}</span>
-                      </span>
-                    );
-                  })}
-                </span>
-              ) : (
-                <>
-                  <span className="rk-track">
-                    <span
-                      className="rk-fill"
-                      style={{
-                        width: `${Math.max(
-                          2,
-                          (good(c, sortMetric) ?? 0) * 100
-                        )}%`,
-                        background: TIER_COLOR[tier],
-                      }}
-                    />
+    <>
+      <div className="ranked-card">
+        <div className="matrix-toolbar">
+          <div className="seg" role="tablist" aria-label="ranking metric">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={metric === t.id}
+                className={`seg-btn ${metric === t.id ? "on" : ""}`}
+                onClick={() => setMetric(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="matrix-caption">
+            {isAll ? (
+              <>
+                All four metrics per stack — sorted by overall (longer =
+                better).{" "}
+                {BASE.map((m) => (
+                  <span
+                    key={m.id}
+                    className="cap-key"
+                    style={{ color: m.color }}
+                  >
+                    ▮ {m.short}{" "}
                   </span>
-                  <span className="rk-val">{fmtVal(c, sortMetric.id)}</span>
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+                ))}
+              </>
+            ) : (
+              <>
+                Stacks ranked by {activeLabel} —{" "}
+                {sortMetric.lowerBetter ? "lower" : "higher"} is better; longest
+                bar wins.
+              </>
+            )}
+          </p>
+        </div>
+        <ol className="ranked-list">
+          {rows.map(({ c }, i) => {
+            const tier = nameOf.get(c.model_id)?.tier ?? "mid";
+            return (
+              <li
+                key={`${c.model_id}::${c.stack_id}`}
+                className={`ranked-row clickable ${isAll ? "all" : ""}`}
+                onClick={() => setSelected(c)}
+              >
+                <span className="rk-pos">{i + 1}</span>
+                <span className="rk-label">
+                  <span className="rk-model">
+                    {nameOf.get(c.model_id)?.name ?? c.model_id}
+                  </span>
+                  <span className="rk-harness">
+                    {hOf.get(c.stack_id) ?? c.stack_id}
+                  </span>
+                </span>
+                {isAll ? (
+                  <span className="all-bars">
+                    {BASE.map((m) => {
+                      const g = good(c, m);
+                      return (
+                        <span
+                          className="all-bar"
+                          key={m.id}
+                          title={`${m.label}: ${fmtVal(c, m.id)}`}
+                        >
+                          <span className="ab-key" style={{ color: m.color }}>
+                            {m.short}
+                          </span>
+                          <span className="ab-track">
+                            <span
+                              className="ab-fill"
+                              style={{
+                                width: `${Math.max(2, (g ?? 0) * 100)}%`,
+                                background: m.color,
+                              }}
+                            />
+                          </span>
+                          <span className="ab-val">{fmtVal(c, m.id)}</span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  <>
+                    <span className="rk-track">
+                      <span
+                        className="rk-fill"
+                        style={{
+                          width: `${Math.max(
+                            2,
+                            (good(c, sortMetric) ?? 0) * 100
+                          )}%`,
+                          background: TIER_COLOR[tier],
+                        }}
+                      />
+                    </span>
+                    <span className="rk-val">{fmtVal(c, sortMetric.id)}</span>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <StackDrawer
+        cell={selected}
+        board={board}
+        onClose={() => setSelected(null)}
+      />
+    </>
   );
 }
