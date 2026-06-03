@@ -12,7 +12,7 @@
 
 schema_version: pollmevals.rubric.v1
 task_id: be_01_jwt_auth
-rubric_version: "1.0"
+rubric_version: "2.0"  # methodology v0.2: type_safety criterion → design_appropriateness (lint/typing are deterministic; judges score subjective axes only)
 sourcing: own  # ADR-007 Tier 1
 license:
   spec: CC-BY-SA-4.0
@@ -85,24 +85,30 @@ criteria:
         next(err) when appropriate. No try/catch swallowing without logging.
         Logs structured (one JSON object per event).
 
-  type_safety:
+  design_appropriateness:
     weight: 0.15
     description: |
-      Strict mode compliance. No `any`. No `as` casts on user-provided
-      values. JWT payload narrowed via type guard (jsonwebtoken returns
-      string | JwtPayload; narrowing required). Discriminated unions or
-      branded types for token kinds where appropriate.
+      Is the SOLUTION SHAPE well-chosen for the task — beyond what a compiler or
+      linter can check? (Type-correctness and lint are scored SEPARATELY by the
+      deterministic tsc/eslint evaluators per methodology v0.2 — judges do NOT
+      re-grade them, to avoid double-counting one signal.) Judge here: middleware
+      composition and layering, separation of auth concerns, naming that maps to
+      the JWT/refresh domain, idiomatic Express patterns, and whether the
+      abstraction boundaries (token verify vs cookie rotation vs store) are drawn
+      where a senior engineer would draw them.
     anchors:
       0: |
-        Liberal `any` use; `as unknown as Whatever` casts on req.body;
-        strict mode disabled or many ts-ignore comments.
+        One monolithic handler; auth, rotation, and storage tangled together.
+        Structure fights the framework (manual header parsing where Express
+        idioms exist). A reviewer would redesign it from scratch.
       5: |
-        Strict mode on, but one or two unsafe casts on jwt.verify return
-        value or req.cookies. Payload accessed without narrowing.
+        Reasonable decomposition but one boundary is off — e.g. cookie rotation
+        bleeds into the verify path, or the store contract leaks framework types.
+        Works, but a senior would ask for one structural change.
       10: |
-        Zero `any`, zero `as` casts on external input. jwt.verify return
-        narrowed via type guard before use. Public API types match prompt
-        verbatim. No ts-ignore.
+        Clean, idiomatic composition. Verify / rotate / store are cleanly
+        separated with intention-revealing boundaries. The shape is what an
+        experienced Express+JWT engineer would ship. Nothing to restructure.
 
   code_clarity:
     weight: 0.10
@@ -148,7 +154,7 @@ output_schema:
     correctness: 0..10
     security_posture: 0..10
     error_handling: 0..10
-    type_safety: 0..10
+    design_appropriateness: 0..10
     code_clarity: 0..10
     test_alignment: 0..10
   total_score: 0..10  # weighted sum per criteria.weight above

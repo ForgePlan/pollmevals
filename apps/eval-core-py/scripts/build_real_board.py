@@ -115,7 +115,19 @@ _STACK_MODELS = {
 }
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
-_JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
+# methodology v0.2 (2026-06-03): 5 frontier judges, 5 distinct families
+# (Anthropic/OpenAI/Google/xAI/DeepSeek) — the most powerful June-2026 models
+# (user decision). These are the REFERENCE tier; candidates that share a judge
+# family (grok-4, deepseek-*) need per-eval self-judging exclusion (follow-up) or
+# curation out of the scored roster. Routes wired in infra/litellm-config.yaml
+# (-judge aliases, billed to OPENROUTER_API_KEY_JUDGE, reasoning_effort=low).
+_JUDGES = [
+    "claude-opus-4-8-judge",
+    "gpt-5-5-judge",
+    "gemini-3-1-pro-judge",
+    "grok-4-judge",
+    "deepseek-v4-pro-judge",
+]
 _RUN_HASH = "sha256:" + "realboard".ljust(58, "0")[:58]
 _SNAP = datetime(2026, 6, 3, tzinfo=UTC)
 
@@ -357,10 +369,13 @@ async def _main() -> int:
     def caller_for(stack_id: str) -> object:
         return stack_caller if stack_id != "raw-llm" else inspect_caller
 
-    # candidate_model_id only drives self-judging exclusion; all candidates are
-    # open (non-judge-family), so any is safe here.
+    # candidate_model_id only drives the CONSTRUCTION-time self-judging guard.
+    # _RAW_MODELS[0] must be a non-judge-family (open) model — clash-free against
+    # the 5-frontier judge roster. Per-eval exclusion for candidates that share a
+    # judge family (grok-4, deepseek-*) is a follow-up; until then the scored
+    # candidate roster excludes those families.
     panel = JudgePanel(
-        judge_models=_JUDGES, candidate_model_id=_RAW_MODELS[0], rubric_version="1.0"
+        judge_models=_JUDGES, candidate_model_id=_RAW_MODELS[0], rubric_version="2.0"
     )
     runner = GridRunner(
         caller=inspect_caller,
