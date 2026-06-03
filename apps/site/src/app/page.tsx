@@ -100,9 +100,9 @@ export default function Home() {
       <section className="section" id="matrix">
         <h2>Which harness, with which model</h2>
         <p className="section-lede">
-          Rows are harnesses from bare (L0) down to the deepest scaffold;
-          columns are models from cheapest to priciest. Read a column
-          top-to-bottom to watch scaffolding lift a single model
+          Rows are models (cheapest at the top); columns are harnesses from bare
+          (L0) rightward to the deepest scaffold. Read a model&apos;s row
+          left-to-right to watch scaffolding lift it
           {best && (
             <>
               {" "}
