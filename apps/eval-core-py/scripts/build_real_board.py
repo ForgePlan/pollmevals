@@ -116,6 +116,19 @@ _PRICING = {
     "grok-4": _pt("grok-4", "3.00", "15.00"),
 }
 
+# Reasoning-heavy candidates that exhausted a 4-8k budget on reasoning_tokens and
+# returned empty content. Give them a large output budget (their model size) so
+# reasoning + answer both fit. Non-reasoning models stay at the 4096 default.
+_REASONING_HEAVY = {"glm-5", "kimi-k2-5", "qwen-3-32b", "glm-4-7"}
+# A large output budget so reasoning_tokens + the answer both fit, without the
+# 32k generations that make a full re-run take hours. If they still finish=length
+# with empty content here, they're unscoreable as bare completion (a finding).
+_REASONING_MAX_TOKENS = 16000
+
+
+def _max_tokens_for(model_id: str) -> int:
+    return _REASONING_MAX_TOKENS if model_id in _REASONING_HEAVY else 4096
+
 
 def _load_env(repo: Path) -> None:
     envf = repo / ".env"
@@ -185,6 +198,11 @@ async def _main() -> int:
         api_key=key,
         prompt_provider=prompt_provider,
         max_tokens=4096,
+        # Reasoning-heavy models spend the whole budget on reasoning_tokens and
+        # return empty content at 4-8k; give them their full output size so the
+        # reasoning AND the answer fit. (Billed by actual usage, so the larger
+        # cap costs nothing for models that stop early.)
+        max_tokens_for=_max_tokens_for,
     )
     # aider: harness → patch via the sandbox bastion.
     stack_caller = StackExecutorCaller(

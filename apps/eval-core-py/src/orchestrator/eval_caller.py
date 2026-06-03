@@ -178,6 +178,7 @@ class InspectEvalCaller:
         openrouter_base_url: str = "https://openrouter.ai/api/v1",
         prompt_provider: Callable[[str], str] | None = None,
         max_tokens: int = 512,
+        max_tokens_for: Callable[[str], int] | None = None,
     ) -> None:
         self._log_dir = log_dir
         self._litellm_base_url = litellm_base_url.rstrip("/")
@@ -189,6 +190,10 @@ class InspectEvalCaller:
         # for a full solution. Default None/512 preserves the Phase-2A probe.
         self._prompt_provider = prompt_provider
         self._max_tokens = max_tokens
+        # Optional per-model budget override: reasoning models need a much larger
+        # max_tokens (reasoning_tokens + answer) than a normal completion. Returns
+        # the budget for a given model_id; falls back to the fixed max_tokens.
+        self._max_tokens_for = max_tokens_for
 
     async def call(self, request: EvalRequest) -> EvalResult:
         """Execute one invocation via the LiteLLM proxy with 429 retry.
@@ -218,11 +223,16 @@ class InspectEvalCaller:
                 f"stack={request.stack_id} seed={request.seed}"
             )
         )
+        budget = (
+            self._max_tokens_for(request.model_id)
+            if self._max_tokens_for is not None
+            else self._max_tokens
+        )
         payload: dict[str, object] = {
             "model": request.model_id,
             "messages": [{"role": "user", "content": content}],
             "seed": request.seed,
-            "max_tokens": self._max_tokens,
+            "max_tokens": budget,
         }
 
         url = f"{self._litellm_base_url}/chat/completions"

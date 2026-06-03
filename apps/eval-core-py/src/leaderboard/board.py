@@ -112,6 +112,9 @@ class Cell(BaseModel):
     pass_hat_k: float | None = None
     quality_per_dollar: float | None
     per_task: dict[str, TaskScore]
+    # Median rubric score per criterion (correctness, security_posture, …) across
+    # the cell's judged rows — the stack's quality "profile" for the radar chart.
+    per_criterion: dict[str, float] = {}
     on_frontier: bool = False
 
 
@@ -163,6 +166,21 @@ def _row_score(row: EvalRow) -> float | None:
     if agg is not None and agg.median_per_criterion:
         return round(statistics.mean(agg.median_per_criterion.values()), 2)
     return None
+
+
+def _cell_per_criterion(rows: list[EvalRow]) -> dict[str, float]:
+    """Median rubric score per criterion across a cell's judged rows.
+
+    Each row carries judge_aggregate.median_per_criterion (criterion -> 0-10).
+    Aggregate to one profile per cell (median over seeds), for the radar chart.
+    """
+    by_crit: dict[str, list[float]] = defaultdict(list)
+    for r in rows:
+        agg = r.judge_aggregate
+        if agg is not None and agg.median_per_criterion:
+            for crit, val in agg.median_per_criterion.items():
+                by_crit[crit].append(float(val))
+    return {crit: round(statistics.median(vals), 2) for crit, vals in by_crit.items() if vals}
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +249,7 @@ def build_board(
                     else None
                 ),
                 per_task=per_task,
+                per_criterion=_cell_per_criterion(all_rows),
             )
         )
 

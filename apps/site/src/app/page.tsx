@@ -5,7 +5,8 @@ import { bestCell, cellMap } from "@/lib/board";
 import { formatUsd, formatScore } from "@/lib/format";
 import { HarnessModelMatrix } from "@/components/HarnessModelMatrix";
 import { StackParetoChart } from "@/components/StackParetoChart";
-import { ParallelCoordinates } from "@/components/ParallelCoordinates";
+import { RankedBars } from "@/components/RankedBars";
+import { RadarChart } from "@/components/RadarChart";
 import { ScaffoldingLift } from "@/components/ScaffoldingLift";
 import { PerTaskWinners } from "@/components/PerTaskWinners";
 import { StackMasterTable } from "@/components/StackMasterTable";
@@ -99,9 +100,9 @@ export default function Home() {
       <section className="section" id="matrix">
         <h2>Which harness, with which model</h2>
         <p className="section-lede">
-          Rows are harnesses from bare (L0) down to the deepest scaffold;
-          columns are models from cheapest to priciest. Read a column
-          top-to-bottom to watch scaffolding lift a single model
+          Rows are models (cheapest at the top); columns are harnesses from bare
+          (L0) rightward to the deepest scaffold. Read a model&apos;s row
+          left-to-right to watch scaffolding lift it
           {best && (
             <>
               {" "}
@@ -130,14 +131,26 @@ export default function Home() {
         <StackParetoChart board={board} />
       </section>
 
-      <section className="section" id="distribution">
-        <h2>The whole field, across every axis</h2>
+      <section className="section" id="ranked">
+        <h2>Ranked — pick a metric</h2>
         <p className="section-lede">
-          Each stack as a line through quality, cost, latency, reliability, and
-          quality-per-dollar — all oriented so up is better. Where the lines fan
-          out is where stacks really differ; hover one to trace a single stack.
+          Every stack ranked, longest bar wins. Switch the metric to re-rank by
+          quality, quality-per-dollar, cost, or speed — the question is rarely
+          &ldquo;best overall&rdquo;, it&apos;s &ldquo;best for what I
+          optimise&rdquo;.
         </p>
-        <ParallelCoordinates board={board} />
+        <RankedBars board={board} />
+      </section>
+
+      <section className="section" id="profile">
+        <h2>Stack profiles — strong where, weak where</h2>
+        <p className="section-lede">
+          The judged score is a mean of rubric criteria. The radar opens that
+          up: each axis a criterion (correctness, security, clarity…), each
+          polygon a stack — so you see <em>why</em> a stack scores what it does,
+          not just the number. Toggle stacks to compare profiles.
+        </p>
+        <RadarChart board={board} />
       </section>
 
       <section className="section" id="lift">

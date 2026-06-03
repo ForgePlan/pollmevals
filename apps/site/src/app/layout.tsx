@@ -14,8 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    // suppressHydrationWarning: browser extensions (LanguageTool, Grammarly…)
+    // inject attributes like `data-lt-installed` onto <html>/<body> before React
+    // hydrates, which trips a false hydration mismatch. This only suppresses the
+    // top-level element's own attributes — real content mismatches still warn.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <header className="site-header">
           <div className="shell">
             <Link className="wordmark" href="/">

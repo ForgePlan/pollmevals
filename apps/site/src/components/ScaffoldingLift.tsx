@@ -1,18 +1,24 @@
 import type { Board } from "@/lib/board";
 import { scaffoldingLift } from "@/lib/board";
+import { formatScore } from "@/lib/format";
 
 /**
  * Scaffolding-lift ablation: one line per model, quality climbing as harness
- * depth increases (L0 → L8). The thesis per model — weak models climb steepest,
- * and a cheap model's line can cross above an expensive model's bare baseline.
+ * depth increases (L0 → L8). Only models that actually have ≥2 harness levels
+ * draw a line (those are the ones that "lift"); models with a single bare (L0)
+ * point are shown as faint baseline dots for context. A small palette keeps the
+ * lifting lines distinguishable + the legend compact even with many models.
  */
-const MODEL_COLORS: Record<string, string> = {
-  "qwen-3-14b": "#f59e0b",
-  "llama-3-3-70b": "#f472b6",
-  "gemini-3-flash": "#38bdf8",
-  "gpt-5-mini": "#34d399",
-  "claude-sonnet-4-6": "#8b83e6",
-};
+const PALETTE = [
+  "#34d399",
+  "#8b83e6",
+  "#f472b6",
+  "#38bdf8",
+  "#fbbf24",
+  "#fb7185",
+  "#a3e635",
+  "#22d3ee",
+];
 
 export function ScaffoldingLift({ board }: { board: Board }) {
   const series = scaffoldingLift(board).filter((s) =>
@@ -20,14 +26,18 @@ export function ScaffoldingLift({ board }: { board: Board }) {
   );
   if (series.length === 0) return null;
 
-  // x positions: ordered harness levels shared across models.
+  const scoredPts = (s: (typeof series)[number]) =>
+    s.points.filter((p) => p.cell.mean_score !== null);
+  const lifting = series.filter((s) => scoredPts(s).length >= 2);
+  const baselineOnly = series.filter((s) => scoredPts(s).length === 1);
+
   const harnessOrder = [...board.harnesses].sort((a, b) => a.level - b.level);
   const W = 760;
   const H = 360;
-  const pad = { t: 18, r: 150, b: 56, l: 48 };
+  const pad = { t: 18, r: lifting.length ? 168 : 28, b: 56, l: 48 };
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
-  const yMin = 3;
+  const yMin = 0;
   const yMax = 10;
 
   const xAt = (i: number) =>
@@ -39,6 +49,7 @@ export function ScaffoldingLift({ board }: { board: Board }) {
     pad.t + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
   const idxOf = (stackId: string) =>
     harnessOrder.findIndex((h) => h.stack_id === stackId);
+  const colorOf = (i: number) => PALETTE[i % PALETTE.length];
 
   return (
     <div className="chart-card">
@@ -53,7 +64,7 @@ export function ScaffoldingLift({ board }: { board: Board }) {
         aria-label="Quality lift per model as harness scaffolding deepens"
         style={{ display: "block" }}
       >
-        {[4, 6, 8, 10].map((t) => (
+        {[0, 2, 4, 6, 8, 10].map((t) => (
           <g key={t}>
             <line
               x1={pad.l}
@@ -97,14 +108,33 @@ export function ScaffoldingLift({ board }: { board: Board }) {
           </text>
         ))}
 
-        {series.map((s) => {
-          const pts = s.points
-            .filter((p) => p.cell.mean_score !== null)
-            .map((p) => ({
-              x: xAt(idxOf(p.harness.stack_id)),
-              y: sy(p.cell.mean_score ?? 0),
-            }));
-          const color = MODEL_COLORS[s.model.model_id] ?? "#a8a8b3";
+        {/* baseline-only models: faint context dots at their single level */}
+        {baselineOnly.map((s) => {
+          const p = scoredPts(s)[0];
+          if (!p) return null;
+          return (
+            <circle
+              key={s.model.model_id}
+              cx={xAt(idxOf(p.harness.stack_id))}
+              cy={sy(p.cell.mean_score ?? 0)}
+              r={3}
+              fill="#3a3a44"
+            >
+              <title>{`${s.model.name}: ${formatScore(
+                p.cell.mean_score
+              )} (bare only)`}</title>
+            </circle>
+          );
+        })}
+
+        {/* lifting models: a line each */}
+        {lifting.map((s, li) => {
+          const pts = scoredPts(s).map((p) => ({
+            x: xAt(idxOf(p.harness.stack_id)),
+            y: sy(p.cell.mean_score ?? 0),
+            s: p.cell.mean_score,
+          }));
+          const color = colorOf(li);
           const d = pts
             .map(
               (p, i) =>
@@ -117,11 +147,13 @@ export function ScaffoldingLift({ board }: { board: Board }) {
                 d={d}
                 fill="none"
                 stroke={color}
-                strokeWidth={2}
-                strokeOpacity={0.9}
+                strokeWidth={2.2}
+                strokeOpacity={0.95}
               />
               {pts.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={color} />
+                <circle key={i} cx={p.x} cy={p.y} r={4} fill={color}>
+                  <title>{`${s.model.name}: ${formatScore(p.s)}`}</title>
+                </circle>
               ))}
             </g>
           );
@@ -137,11 +169,12 @@ export function ScaffoldingLift({ board }: { board: Board }) {
           Harness depth (scaffolding layers) →
         </text>
 
-        {board.models.map((model, i) => (
+        {/* legend: only the lifting models (compact) */}
+        {lifting.map((s, li) => (
           <g
-            key={model.model_id}
+            key={s.model.model_id}
             transform={`translate(${pad.l + plotW + 18}, ${
-              pad.t + 6 + i * 22
+              pad.t + 6 + li * 22
             })`}
           >
             <line
@@ -149,14 +182,26 @@ export function ScaffoldingLift({ board }: { board: Board }) {
               x2={14}
               y1={-4}
               y2={-4}
-              stroke={MODEL_COLORS[model.model_id] ?? "#a8a8b3"}
+              stroke={colorOf(li)}
               strokeWidth={2.5}
             />
             <text x={20} y={0} fontSize={11.5} fill="#a8a8b3">
-              {model.name}
+              {s.model.name}
             </text>
           </g>
         ))}
+        {baselineOnly.length > 0 && (
+          <g
+            transform={`translate(${pad.l + plotW + 18}, ${
+              pad.t + 6 + lifting.length * 22 + 6
+            })`}
+          >
+            <circle cx={7} cy={-4} r={3} fill="#3a3a44" />
+            <text x={20} y={0} fontSize={11} fill="#6e6e7a">
+              {baselineOnly.length} bare-only
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );
