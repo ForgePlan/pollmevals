@@ -49,6 +49,9 @@ export interface Cell {
   /** quality ÷ cost — the thesis metric (null when unscored or cost 0). */
   quality_per_dollar: number | null;
   per_task: Record<string, TaskScore>;
+  /** Median rubric score per criterion (correctness, security_posture, …) —
+   * the stack's quality profile, for the radar chart. Empty until re-run. */
+  per_criterion?: Record<string, number>;
   on_frontier: boolean;
 }
 

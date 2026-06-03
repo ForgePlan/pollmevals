@@ -6,6 +6,7 @@ import { formatUsd, formatScore } from "@/lib/format";
 import { HarnessModelMatrix } from "@/components/HarnessModelMatrix";
 import { StackParetoChart } from "@/components/StackParetoChart";
 import { ParallelCoordinates } from "@/components/ParallelCoordinates";
+import { RadarChart } from "@/components/RadarChart";
 import { ScaffoldingLift } from "@/components/ScaffoldingLift";
 import { PerTaskWinners } from "@/components/PerTaskWinners";
 import { StackMasterTable } from "@/components/StackMasterTable";
@@ -138,6 +139,17 @@ export default function Home() {
           out is where stacks really differ; hover one to trace a single stack.
         </p>
         <ParallelCoordinates board={board} />
+      </section>
+
+      <section className="section" id="profile">
+        <h2>Stack profiles — strong where, weak where</h2>
+        <p className="section-lede">
+          The judged score is a mean of rubric criteria. The radar opens that
+          up: each axis a criterion (correctness, security, clarity…), each
+          polygon a stack — so you see <em>why</em> a stack scores what it does,
+          not just the number. Toggle stacks to compare profiles.
+        </p>
+        <RadarChart board={board} />
       </section>
 
       <section className="section" id="lift">
