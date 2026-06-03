@@ -188,7 +188,36 @@ class TestProxyInvocation:
         )
         assert inv.env["OPENAI_API_BASE"] == "http://localhost:4000/v1"
 
-    @pytest.mark.parametrize("cli", ["claude-code", "codex", "goose", "openhands", "opencode"])
+    def test_goose_recipe_is_proven(self) -> None:
+        inv = build_proxy_invocation(
+            "goose",
+            proxy_base_url="http://pollmevals-litellm-proxy:4000",
+            api_key="sk-local-xyz",
+            model_alias="qwen-3-14b",
+            prompt="do the thing",
+        )
+        assert inv.env["GOOSE_PROVIDER"] == "openai"
+        assert inv.env["GOOSE_MODEL"] == "qwen-3-14b"
+        assert inv.env["OPENAI_API_KEY"] == "sk-local-xyz"
+        # goose splits the endpoint: host (NO path) + the chat route separately.
+        assert inv.env["OPENAI_HOST"] == "http://pollmevals-litellm-proxy:4000"
+        assert inv.env["OPENAI_BASE_PATH"] == "v1/chat/completions"
+        assert inv.env["GOOSE_DISABLE_KEYRING"] == "1"
+        assert inv.extra_args == []  # model selected by env, not a CLI flag
+        assert inv.prompt_args == ["-t", "do the thing"]
+        assert inv.config_files == {}
+
+    def test_goose_strips_trailing_slash(self) -> None:
+        inv = build_proxy_invocation(
+            "goose",
+            proxy_base_url="http://h:4000/",
+            api_key="k",
+            model_alias="m",
+            prompt="p",
+        )
+        assert inv.env["OPENAI_HOST"] == "http://h:4000"
+
+    @pytest.mark.parametrize("cli", ["claude-code", "codex", "openhands", "opencode"])
     def test_known_but_pending_harness_raises_pending(self, cli: str) -> None:
         with pytest.raises(HarnessRecipePending, match="Phase 5"):
             build_proxy_invocation(
@@ -207,8 +236,8 @@ class TestProxyInvocation:
                 None, proxy_base_url="x", api_key="k", model_alias="m", prompt="p"
             )
 
-    def test_supported_harnesses_is_aider_only_in_phase_1(self) -> None:
-        assert supported_harnesses() == frozenset({"aider"})
+    def test_supported_harnesses_are_aider_and_goose(self) -> None:
+        assert supported_harnesses() == frozenset({"aider", "goose"})
 
 
 # ---------------------------------------------------------------------------

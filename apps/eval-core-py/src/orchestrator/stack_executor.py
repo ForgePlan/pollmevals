@@ -231,10 +231,45 @@ def _aider_invocation(
     )
 
 
+def _goose_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """Goose recipe — PROVEN (2026-06-03 isolation smoke; memory).
+
+    Block's goose is model-agnostic via an OpenAI-compatible provider. Unlike
+    aider's single ``OPENAI_API_BASE``, goose splits the endpoint into
+    ``OPENAI_HOST`` (scheme+host, NO path) + ``OPENAI_BASE_PATH`` (the chat
+    route), and selects provider/model via ``GOOSE_PROVIDER`` / ``GOOSE_MODEL``.
+    ``GOOSE_DISABLE_KEYRING`` (no system keyring in a sandbox container) and
+    ``GOOSE_MODE=auto`` (never block waiting on a tool-call confirmation) are
+    baked into the image; set here too so the recipe is self-contained. The
+    model is chosen by env, so ``extra_args`` is empty; the prompt rides ``-t``
+    and the ``goose run --no-session --with-builtin developer`` scaffolding
+    lives in stack.yaml ``execution.args``.
+    """
+    base = proxy_base_url.rstrip("/")
+    return ProxyInvocation(
+        env={
+            "GOOSE_PROVIDER": "openai",
+            "GOOSE_MODEL": model_alias,
+            "GOOSE_MODE": "auto",
+            "GOOSE_DISABLE_KEYRING": "1",
+            "OPENAI_API_KEY": api_key,
+            "OPENAI_HOST": base,
+            "OPENAI_BASE_PATH": "v1/chat/completions",
+        },
+        config_files={},
+        extra_args=[],
+        prompt_args=["-t", prompt],
+    )
+
+
 # Proven recipes (validated end-to-end via the proxy). aider is the RFC-006
-# first slice (aider x qwen x be_01).
+# first slice (aider x qwen x be_01); goose is the second harness (2026-06-03),
+# a model-agnostic peer that runs the same coder models for a clean comparison.
 _PROVEN_RECIPES: dict[str, _RecipeBuilder] = {
     "aider": _aider_invocation,
+    "goose": _goose_invocation,
 }
 
 # Known harnesses whose recipe is proven in spikes but lands at its per-stack
@@ -244,7 +279,6 @@ _PENDING_RECIPES: frozenset[str] = frozenset(
         "claude-code",
         "codex",
         "opencode",
-        "goose",
         "openhands",
         "hermes",
         "cline",
