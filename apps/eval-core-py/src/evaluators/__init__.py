@@ -20,6 +20,7 @@ from .correctness_evaluator import CorrectnessEvaluator
 from .coverage_evaluator import CoverageEvaluator
 from .lint_evaluator import LintEvaluator
 from .protocol import Evaluator, EvaluatorResult
+from .python_correctness_evaluator import PythonCorrectnessEvaluator
 from .secret_scan_evaluator import SecretScanEvaluator
 from .type_safety_evaluator import TypeSafetyEvaluator
 
@@ -30,6 +31,7 @@ __all__ = [
     "Evaluator",
     "EvaluatorResult",
     "LintEvaluator",
+    "PythonCorrectnessEvaluator",
     "SecretScanEvaluator",
     "TypeSafetyEvaluator",
 ]
