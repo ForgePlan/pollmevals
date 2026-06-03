@@ -87,8 +87,14 @@ _AIDER_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # comparable pair — isolating the harness variable (aider L4 vs goose L2 on
 # identical models). Diverge this list later if goose handles models aider can't.
 _GOOSE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+# opencode (sst): model-agnostic, same coder models → directly comparable.
+_OPENCODE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 # Per-stack candidate model lists for --add-stack (merge ONE harness column in).
-_STACK_MODELS = {"aider": _AIDER_MODELS, "goose": _GOOSE_MODELS}
+_STACK_MODELS = {
+    "aider": _AIDER_MODELS,
+    "goose": _GOOSE_MODELS,
+    "opencode": _OPENCODE_MODELS,
+}
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
 _JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]

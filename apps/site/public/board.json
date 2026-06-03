@@ -36,6 +36,18 @@
         "L2_tools"
       ],
       "family": "agnostic"
+    },
+    {
+      "stack_id": "opencode",
+      "name": "OpenCode",
+      "level": 4,
+      "layers": [
+        "L1_system_prompt",
+        "L2_tools",
+        "L3_skills",
+        "L4_file_memory"
+      ],
+      "family": "agnostic"
     }
   ],
   "models": [
@@ -731,6 +743,85 @@
         "test_alignment": 6.5,
         "type_safety": 5.25
       },
+      "on_frontier": false
+    },
+    {
+      "model_id": "codestral",
+      "stack_id": "opencode",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 18721,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "devstral",
+      "stack_id": "opencode",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 601029,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen-3-14b",
+      "stack_id": "opencode",
+      "mean_score": 6.92,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 35845,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": 6.92,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {
+        "code_clarity": 7.5,
+        "correctness": 6.5,
+        "error_handling": 7.0,
+        "security_posture": 8.0,
+        "test_alignment": 6.5,
+        "type_safety": 6.0
+      },
+      "on_frontier": false
+    },
+    {
+      "model_id": "qwen3-coder-30b",
+      "stack_id": "opencode",
+      "mean_score": null,
+      "mean_cost_usd": 0.0,
+      "mean_latency_ms": 20283,
+      "pass_hat_k": null,
+      "quality_per_dollar": null,
+      "per_task": {
+        "be_01_jwt_auth": {
+          "score": null,
+          "cost_usd": 0.0,
+          "pass_hat_k": null
+        }
+      },
+      "per_criterion": {},
       "on_frontier": false
     }
   ]
