@@ -50,19 +50,70 @@ from src.orchestrator.stack_executor import (  # noqa: E402
 
 # Candidate ladder — OPEN models only (cheap→strong). Judges are the closed
 # frontier (claude/gpt/gemini), so open candidates never trigger self-judging.
-_MODELS = ["qwen-3-14b", "llama-3-3-70b", "deepseek-v3-5"]
-_STACKS = ["raw-llm", "aider"]
+# Non-cartesian grid: raw-llm runs on every candidate (a model-only baseline);
+# aider only on models that actually follow its edit format. qwen (14b/32b)
+# does; llama-70b and deepseek-v3.5 loop and time out (a real harness-compat
+# signal, EVID prior) so they stay raw-llm-only here.
+# Coding-model ladder by family, cheap→expensive (a broad capability sweep),
+# topped by a frontier-open tier ("more powerful" candidates). raw-llm runs on
+# all; aider only on the strong coders that follow its edit format.
+_RAW_MODELS = [
+    # Qwen
+    "qwen-3-14b",
+    "qwen3-coder-30b",
+    "qwen-3-32b",
+    "qwen3-235b",
+    # DeepSeek
+    "deepseek-v3-2",
+    "deepseek-v3-5",
+    "deepseek-v4-pro",
+    # Mistral (coding)
+    "codestral",
+    "devstral",
+    # Llama
+    "llama-3-1-8b",
+    "llama-3-3-70b",
+    "llama-4-scout",
+    # GLM
+    "glm-4-32b",
+    "glm-4-7",
+    "glm-5",
+    # frontier-open
+    "kimi-k2-5",
+    "grok-4",
+]
+_AIDER_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
 _JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
 _RUN_HASH = "sha256:" + "realboard".ljust(58, "0")[:58]
-_SNAP = datetime(2026, 6, 2, tzinfo=UTC)
-# Approximate OpenRouter pricing (per Mtoken) — informational; the proxy meters
-# the authoritative spend.
+_SNAP = datetime(2026, 6, 3, tzinfo=UTC)
+
+
+# Approximate OpenRouter pricing (per Mtoken, in/out) — informational; the proxy
+# meters the authoritative spend. Drives raw-llm cost + quality-per-$ on the board.
+def _pt(mid: str, pin: str, pout: str) -> PricingTuple:
+    return PricingTuple(mid, Decimal(pin), Decimal(pout), _SNAP)
+
+
 _PRICING = {
-    "qwen-3-14b": PricingTuple("qwen-3-14b", Decimal("0.07"), Decimal("0.24"), _SNAP),
-    "llama-3-3-70b": PricingTuple("llama-3-3-70b", Decimal("0.12"), Decimal("0.30"), _SNAP),
-    "deepseek-v3-5": PricingTuple("deepseek-v3-5", Decimal("0.30"), Decimal("0.90"), _SNAP),
+    "qwen-3-14b": _pt("qwen-3-14b", "0.07", "0.24"),
+    "qwen3-coder-30b": _pt("qwen3-coder-30b", "0.07", "0.27"),
+    "qwen-3-32b": _pt("qwen-3-32b", "0.08", "0.28"),
+    "qwen3-235b": _pt("qwen3-235b", "0.07", "0.10"),
+    "deepseek-v3-2": _pt("deepseek-v3-2", "0.23", "0.34"),
+    "deepseek-v3-5": _pt("deepseek-v3-5", "0.30", "0.90"),
+    "deepseek-v4-pro": _pt("deepseek-v4-pro", "0.43", "0.87"),
+    "codestral": _pt("codestral", "0.30", "0.90"),
+    "devstral": _pt("devstral", "0.40", "2.00"),
+    "llama-3-1-8b": _pt("llama-3-1-8b", "0.02", "0.05"),
+    "llama-3-3-70b": _pt("llama-3-3-70b", "0.10", "0.32"),
+    "llama-4-scout": _pt("llama-4-scout", "0.08", "0.30"),
+    "glm-4-32b": _pt("glm-4-32b", "0.10", "0.10"),
+    "glm-4-7": _pt("glm-4-7", "0.40", "1.75"),
+    "glm-5": _pt("glm-5", "0.60", "2.08"),
+    "kimi-k2-5": _pt("kimi-k2-5", "0.40", "1.90"),
+    "grok-4": _pt("grok-4", "3.00", "15.00"),
 }
 
 
@@ -109,8 +160,11 @@ async def _main() -> int:
         print("ERROR: LITELLM_MASTER_KEY not set (.env)", file=sys.stderr)
         return 2
     if not args.confirm_spend:
-        n = len(_STACKS) * len(_MODELS) * len(_SEEDS)
-        print(f"DRY: pass --confirm-spend to run {n} evals ({_STACKS} x {_MODELS}).")
+        n = (len(_RAW_MODELS) + len(_AIDER_MODELS)) * len(_SEEDS)
+        print(
+            f"DRY: pass --confirm-spend to run {n} evals "
+            f"(raw-llm x {_RAW_MODELS} + aider x {_AIDER_MODELS}, {len(_SEEDS)} seeds)."
+        )
         return 0
 
     log_dir = Path(tempfile.mkdtemp(prefix="pollmevals-board-"))
@@ -145,7 +199,9 @@ async def _main() -> int:
 
     # candidate_model_id only drives self-judging exclusion; all candidates are
     # open (non-judge-family), so any is safe here.
-    panel = JudgePanel(judge_models=_JUDGES, candidate_model_id=_MODELS[0], rubric_version="1.0")
+    panel = JudgePanel(
+        judge_models=_JUDGES, candidate_model_id=_RAW_MODELS[0], rubric_version="1.0"
+    )
     runner = GridRunner(
         caller=inspect_caller,
         caller_for_stack=caller_for,  # type: ignore[arg-type]
@@ -153,41 +209,73 @@ async def _main() -> int:
         budget_gate=BudgetGate(cap_usd=Decimal("5")),
         pricing_snapshot=_PRICING,
         judge_panel=panel,
-        # FOLLOW-UP: JudgePanel uses inspect_ai eval_async, which forbids
-        # concurrent calls — running evals in parallel crashes the judge step.
-        # Serialize for now; the real fix is an asyncio.Lock in JudgePanel.score.
-        max_concurrent=1,
+        # JudgePanel now guards inspect_ai eval_async with a module-level
+        # asyncio.Lock (_EVAL_ASYNC_LOCK), so concurrent evals are safe: the
+        # judge step serializes on the lock while candidate calls overlap. 3-way
+        # overlap cuts wall-clock ~3x; capped at 3 to bound parallel aider
+        # containers (memory) during the aider spec.
+        max_concurrent=3,
     )
     timeout_of = make_task_timeout_provider(REPO)
-    spec = GridSpec(
-        run_hash=_RUN_HASH,
-        models=_MODELS,
-        tasks=[_TASK],
-        stacks=_STACKS,
-        seeds=_SEEDS,
-        # per-task wall-clock budget by difficulty (be_01 is medium -> 600s),
-        # so slow model x harness pairs aren't cut off at the 300s default.
-        task_timeout_s={t: timeout_of(t) for t in [_TASK]},
+    # per-task wall-clock budget by difficulty (be_01 is medium -> 600s), so slow
+    # model x harness pairs aren't cut off at the 300s default.
+    task_timeout = {t: timeout_of(t) for t in [_TASK]}
+
+    # Two specs so the grid is non-cartesian: raw-llm on every candidate, aider
+    # only on the models that follow its edit format. Same run_hash + runner so
+    # rows merge into one board.
+    specs = [
+        GridSpec(
+            run_hash=_RUN_HASH,
+            models=_RAW_MODELS,
+            tasks=[_TASK],
+            stacks=["raw-llm"],
+            seeds=_SEEDS,
+            task_timeout_s=task_timeout,
+        ),
+        GridSpec(
+            run_hash=_RUN_HASH,
+            models=_AIDER_MODELS,
+            tasks=[_TASK],
+            stacks=["aider"],
+            seeds=_SEEDS,
+            task_timeout_s=task_timeout,
+        ),
+    ]
+
+    n = (len(_RAW_MODELS) + len(_AIDER_MODELS)) * len(_SEEDS)
+    print(
+        f"Running grid: raw-llm x {_RAW_MODELS} + aider x {_AIDER_MODELS} "
+        f"x {_TASK} ({len(_SEEDS)} seeds) = {n} evals ..."
     )
+    rows = []
+    total_cost = Decimal("0")
+    out = REPO / "apps" / "site" / "public" / "board.json"
 
-    n = len(_STACKS) * len(_MODELS) * len(_SEEDS)
-    print(f"Running grid: {_STACKS} x {_MODELS} x {_TASK} ({len(_SEEDS)} seeds) = {n} evals ...")
-    result = await runner.run(spec)
-    rows = _rows_from_result(result, _PRICING)
+    def _emit() -> None:
+        board = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")
+        out.write_text(board.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        print(f"  -> wrote {out}: {len(board.cells)} cells, scored={board.scored}")
 
-    print(f"\n=== {len(rows)} eval rows, total cost ${result.total_cost_usd} ===")
+    # Incremental: write the board after EACH spec so a hang/crash in the slow
+    # aider spec still leaves the full raw-llm board on disk.
+    for spec in specs:
+        print(f"\n--- spec: {spec.stacks[0]} x {spec.models} ---", flush=True)
+        result = await runner.run(spec)
+        rows += _rows_from_result(result, _PRICING)
+        total_cost += result.total_cost_usd
+        _emit()
+
+    print(f"\n=== {len(rows)} eval rows, total cost ${total_cost} ===")
     for r in rows:
         score = r.judge_aggregate.median_per_criterion if r.judge_aggregate else None
-        print(f"  {r.stack_id:<8} x {r.model_id:<12} status={r.status} score={score}")
+        print(f"  {r.stack_id:<8} x {r.model_id:<16} status={r.status} score={score}")
 
     board = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")
-    out = REPO / "apps" / "site" / "public" / "board.json"
-    out.write_text(board.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    print(f"\nWrote {out}")
-    print(f"  cells: {len(board.cells)}  scored: {board.scored}")
+    print(f"\nFinal board: {len(board.cells)} cells, scored={board.scored}")
     for c in board.cells:
         print(
-            f"    {c.stack_id:<8} x {c.model_id}: score={c.mean_score} "
+            f"    {c.stack_id:<8} x {c.model_id:<16}: score={c.mean_score} "
             f"cost=${c.mean_cost_usd} q/$={c.quality_per_dollar}"
         )
     return 0
