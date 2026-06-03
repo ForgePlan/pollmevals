@@ -1,5 +1,5 @@
 import type { Board, Cell } from "@/lib/board";
-import { formatUsd, formatScore } from "@/lib/format";
+import { formatCost, formatScore } from "@/lib/format";
 
 /**
  * Per-task winners — because the best stack is NOT the same for every task.
@@ -61,7 +61,7 @@ export function PerTaskWinners({ board }: { board: Board }) {
                     </span>
                   </span>
                   <span className="psc tnum">{formatScore(r.score)}</span>
-                  <span className="pcost tnum muted">{formatUsd(r.cost)}</span>
+                  <span className="pcost tnum muted">{formatCost(r.cost)}</span>
                 </li>
               ))}
             </ol>

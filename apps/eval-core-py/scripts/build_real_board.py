@@ -83,6 +83,12 @@ _RAW_MODELS = [
     "grok-4",
 ]
 _AIDER_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+# goose runs the SAME coder models as aider, so each (model) gives a directly
+# comparable pair — isolating the harness variable (aider L4 vs goose L2 on
+# identical models). Diverge this list later if goose handles models aider can't.
+_GOOSE_MODELS = ["qwen-3-14b", "qwen3-coder-30b", "codestral", "devstral"]
+# Per-stack candidate model lists for --add-stack (merge ONE harness column in).
+_STACK_MODELS = {"aider": _AIDER_MODELS, "goose": _GOOSE_MODELS}
 _SEEDS = [1, 2]
 _TASK = "be_01_jwt_auth"
 _JUDGES = ["claude-sonnet-4-6-judge", "gpt-5-mini-judge", "gemini-3-flash"]
@@ -170,6 +176,14 @@ async def _main() -> int:
         help="comma-separated models to re-run on raw-llm and MERGE into the "
         "existing board.json (fills previously-failed cells without re-running "
         "the rest). e.g. --fill grok-4",
+    )
+    ap.add_argument(
+        "--add-stack",
+        default="",
+        help="run ONLY this stack's grid (on _STACK_MODELS[stack]) and MERGE its "
+        "new harness column (cells + harness metadata) into the existing "
+        "board.json, without re-spending on the other harnesses. e.g. "
+        "--add-stack goose",
     )
     args = ap.parse_args()
 
@@ -271,6 +285,53 @@ async def _main() -> int:
         existing = existing.model_copy(update={"cells": merged, "scored": scored_now > 0})
         out.write_text(existing.model_dump_json(indent=2) + "\n", encoding="utf-8")
         print(f"  board now {scored_now}/{len(merged)} cells scored. filled:")
+        for c in partial.cells:
+            print(f"    {c.stack_id} x {c.model_id}: score={c.mean_score} cost=${c.mean_cost_usd}")
+        return 0
+
+    # --add-stack: run ONLY this harness's grid and merge its NEW column (cells +
+    # harness metadata) into the existing board.json, without re-spending on the
+    # other harnesses. Unlike --fill (replace cells in place), this also unions
+    # the new harness into board.harnesses so the matrix renders the column.
+    if args.add_stack:
+        stack_id = args.add_stack
+        models = _STACK_MODELS.get(stack_id, _AIDER_MODELS)
+        print(f"ADD-STACK: {stack_id} x {models} → merge column into {out.name} ...")
+        result = await runner.run(
+            GridSpec(
+                run_hash=_RUN_HASH,
+                models=models,
+                tasks=[_TASK],
+                stacks=[stack_id],
+                seeds=_SEEDS,
+                task_timeout_s=task_timeout,
+            )
+        )
+        rows = _rows_from_result(result, _PRICING)
+        partial = build_board(rows, stacks_root=stacks_root, run_hash=_RUN_HASH, run_type="smoke")
+        existing = Board.model_validate_json(out.read_text(encoding="utf-8"))
+        # Replace-or-append cells by (model, stack); union harnesses + models.
+        by_key = {(c.model_id, c.stack_id): c for c in existing.cells}
+        for c in partial.cells:
+            by_key[(c.model_id, c.stack_id)] = c
+        h_by_id = {h.stack_id: h for h in existing.harnesses}
+        for h in partial.harnesses:
+            h_by_id[h.stack_id] = h
+        m_by_id = {m.model_id: m for m in existing.models}
+        for m in partial.models:
+            m_by_id.setdefault(m.model_id, m)
+        cells = list(by_key.values())
+        scored_now = sum(1 for c in cells if c.mean_score is not None)
+        merged_board = existing.model_copy(
+            update={
+                "cells": cells,
+                "harnesses": list(h_by_id.values()),
+                "models": list(m_by_id.values()),
+                "scored": scored_now > 0,
+            }
+        )
+        out.write_text(merged_board.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        print(f"  board now {scored_now}/{len(cells)} cells scored. new {stack_id} cells:")
         for c in partial.cells:
             print(f"    {c.stack_id} x {c.model_id}: score={c.mean_score} cost=${c.mean_cost_usd}")
         return 0

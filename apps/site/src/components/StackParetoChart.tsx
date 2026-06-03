@@ -27,7 +27,11 @@ export function StackParetoChart({ board }: { board: Board }) {
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
-  const scored = board.cells.filter((c) => c.mean_score !== null);
+  // Need both axes: a quality score AND a real (metered) cost. cost 0 ⇒
+  // unmetered → can't honestly place it on the cost axis, so leave it off.
+  const scored = board.cells.filter(
+    (c) => c.mean_score !== null && c.mean_cost_usd > 0
+  );
   if (scored.length === 0) return null;
   const frontier = frontierKeys(board);
   const map = cellMap(board);

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Board, Cell } from "@/lib/board";
-import { formatUsd, formatScore } from "@/lib/format";
+import { formatCost, formatScore } from "@/lib/format";
 
 // Locale-independent thousands separator — `toLocaleString()` differs between
 // the Node server render and the browser, which breaks hydration.
@@ -174,7 +174,7 @@ export function StackMasterTable({ board }: { board: Board }) {
                 <td className="num strong">
                   {r.score === null ? "—" : formatScore(r.score)}
                 </td>
-                <td className="num">{formatUsd(r.cost)}</td>
+                <td className="num">{formatCost(r.cost)}</td>
                 <td className="num">
                   {r.latency ? (r.latency / 1000).toFixed(1) + "s" : "—"}
                 </td>

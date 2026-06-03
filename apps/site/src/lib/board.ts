@@ -104,7 +104,12 @@ export function buildMatrix(board: Board): MatrixView {
 export type Metric = "quality_per_dollar" | "mean_score" | "mean_cost_usd";
 
 export function metricValue(cell: Cell, metric: Metric): number | null {
-  if (metric === "mean_cost_usd") return cell.mean_cost_usd;
+  // cost 0 ⇒ unmetered (a real metered eval is never exactly $0); treat it as
+  // "no value" — exactly like an unscored quality cell — so it renders "—" and
+  // drops out of the color scale / best / frontier instead of masquerading as
+  // the cheapest (free) stack. Real cost lands via proxy-side reconciliation.
+  if (metric === "mean_cost_usd")
+    return cell.mean_cost_usd > 0 ? cell.mean_cost_usd : null;
   return cell[metric];
 }
 
@@ -135,11 +140,14 @@ export function metricRange(
 
 /**
  * Pareto frontier over cells: maximize quality, minimize cost. Unscored cells
- * (no mean_score) are excluded — there's no quality axis to be on the frontier of.
- * Mutates nothing; returns the set of frontier keys.
+ * (no mean_score) are excluded — there's no quality axis to be on the frontier
+ * of — and so are unmetered cells (cost 0), which would otherwise dominate as
+ * "free". Mutates nothing; returns the set of frontier keys.
  */
 export function frontierKeys(board: Board): Set<string> {
-  const scored = board.cells.filter((c) => c.mean_score !== null);
+  const scored = board.cells.filter(
+    (c) => c.mean_score !== null && c.mean_cost_usd > 0
+  );
   const out = new Set<string>();
   for (const c of scored) {
     const dominated = scored.some(

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import type { Board, Cell } from "@/lib/board";
-import { formatUsd, formatScore } from "@/lib/format";
+import { formatCost, formatScore } from "@/lib/format";
 
 /**
  * Right-side drawer: everything about one stack (model × harness) in one place —
@@ -60,7 +60,7 @@ export function StackDrawer({
       value:
         cell.quality_per_dollar === null ? "—" : grp(cell.quality_per_dollar),
     },
-    { label: "Cost / task", value: formatUsd(cell.mean_cost_usd) },
+    { label: "Cost / task", value: formatCost(cell.mean_cost_usd) },
     {
       label: "Speed",
       value: cell.mean_latency_ms

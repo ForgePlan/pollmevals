@@ -9,6 +9,14 @@ export function formatUsd(value: string | number): string {
   return `$${n.toFixed(2)}`;
 }
 
+/** A cell's cost, or "—" when unmetered. A real metered eval is never exactly
+ * $0, so cost === 0 means the token usage wasn't captured (e.g. a black-box
+ * harness that doesn't self-report; proxy-side reconciliation is the fix) —
+ * show "unknown", never a misleading "$0 / free". */
+export function formatCost(value: number): string {
+  return value > 0 ? formatUsd(value) : "—";
+}
+
 /** Latency ms → human: "3.3s" or "847ms". */
 export function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;

@@ -10,7 +10,7 @@ import {
   frontierKeys,
 } from "@/lib/board";
 import { heat, heatText, norm } from "@/lib/color";
-import { formatUsd, formatScore } from "@/lib/format";
+import { formatUsd, formatCost, formatScore } from "@/lib/format";
 
 const METRICS: { id: Metric; label: string; caption: string }[] = [
   {
@@ -175,7 +175,7 @@ function MatrixCell({
   const fg = v === null ? "#6e6e7a" : heatText(t);
   const title =
     `${cell.model_id} × ${cell.stack_id}\n` +
-    `score ${cell.mean_score ?? "—"} · ${formatUsd(
+    `score ${cell.mean_score ?? "—"} · ${formatCost(
       cell.mean_cost_usd
     )}/task · ` +
     `${
