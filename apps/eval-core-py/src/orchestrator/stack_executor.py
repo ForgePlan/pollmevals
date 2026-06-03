@@ -300,13 +300,62 @@ def _opencode_invocation(
     )
 
 
+def _crush_invocation(
+    proxy_base_url: str, api_key: str, model_alias: str, prompt: str
+) -> ProxyInvocation:
+    """Crush (charmbracelet) recipe — PROVEN (2026-06-03 isolation smoke; memory).
+
+    Crush is model-agnostic via an ``openai-compat`` provider. Its config rides a
+    crush.json (config_files) — written into the workspace before the base commit.
+    Crush discovers it via ``CRUSH_GLOBAL_CONFIG`` (a DIRECTORY, crush appends
+    /crush.json), and writes its session DB to ``CRUSH_GLOBAL_DATA`` which we put
+    OUTSIDE /workspace (/tmp) so it never pollutes the captured patch. The api_key
+    is a literal ``$LITELLM_MASTER_KEY`` in the config (crush shell-expands it from
+    env), so the key is never written into the file. With a single model in the
+    provider, ``crush run -q`` auto-selects it; the prompt is the positional arg.
+    """
+    base = proxy_base_url.rstrip("/")
+    config = json.dumps(
+        {
+            "$schema": "https://charm.land/crush.json",
+            "providers": {
+                "litellm": {
+                    "type": "openai-compat",
+                    "base_url": f"{base}/v1",
+                    "api_key": "$LITELLM_MASTER_KEY",
+                    "models": [
+                        {
+                            "id": model_alias,
+                            "name": model_alias,
+                            "context_window": 32000,
+                            "default_max_tokens": 8000,
+                        }
+                    ],
+                }
+            },
+        },
+        indent=2,
+    )
+    return ProxyInvocation(
+        env={
+            "LITELLM_MASTER_KEY": api_key,
+            "CRUSH_GLOBAL_CONFIG": "/workspace",
+            "CRUSH_GLOBAL_DATA": "/tmp/crushdata",
+        },
+        config_files={"crush.json": config},
+        extra_args=[],
+        prompt_args=[prompt],
+    )
+
+
 # Proven recipes (validated end-to-end via the proxy). aider is the RFC-006
-# first slice (aider x qwen x be_01); goose (2026-06-03) and opencode (2026-06-03)
+# first slice (aider x qwen x be_01); goose / opencode / crush (all 2026-06-03)
 # are model-agnostic peers that run the same coder models for a clean comparison.
 _PROVEN_RECIPES: dict[str, _RecipeBuilder] = {
     "aider": _aider_invocation,
     "goose": _goose_invocation,
     "opencode": _opencode_invocation,
+    "crush": _crush_invocation,
 }
 
 # Known harnesses whose recipe is proven in spikes but lands at its per-stack
