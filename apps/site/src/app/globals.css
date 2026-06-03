@@ -1048,3 +1048,149 @@ ol.podium li.win {
   background: rgba(16, 185, 129, 0.12);
   color: var(--good);
 }
+
+/* === Transposed matrix: models = rows (scroll), harnesses = columns === */
+.matrix-scroll.tall {
+  overflow-y: auto;
+  overflow-x: auto;
+  max-height: 560px;
+}
+.matrix-scroll.tall thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+table.matrix th.harness-col {
+  text-align: center;
+  padding: 6px 8px;
+  vertical-align: bottom;
+  min-width: 80px;
+}
+.harness-col .hname {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.harness-col .hlevel {
+  display: inline-block;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.harness-col .hlevel.framework {
+  color: #34d399;
+}
+th.model-row {
+  text-align: left;
+  padding: 6px 14px 6px 8px;
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+.model-row .mname {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.model-row .tier {
+  margin-left: 8px;
+}
+.matrix-scroll.tall thead th.corner {
+  z-index: 3;
+}
+
+/* === Master table: sortable + filterable stack list === */
+.master-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.master-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.master-count {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.master-scroll {
+  overflow-x: auto;
+  max-height: 560px;
+  overflow-y: auto;
+}
+table.master {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.master thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  border-bottom: 1px solid var(--border);
+}
+table.master thead th:hover {
+  color: var(--text);
+}
+table.master thead th.num {
+  text-align: right;
+}
+table.master thead th.sorted {
+  color: var(--accent);
+}
+table.master thead th .arrow {
+  font-family: var(--font-mono);
+}
+table.master tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.master tbody tr:hover td {
+  background: var(--surface-2);
+}
+table.master tbody tr.unscored td {
+  opacity: 0.45;
+}
+table.master td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+table.master td.num.strong {
+  font-weight: 700;
+  color: var(--text);
+}
+table.master td .m-name {
+  font-weight: 580;
+}
+table.master td .m-harness {
+  color: var(--text-2);
+}
+table.master td .tier {
+  margin-left: 8px;
+}
